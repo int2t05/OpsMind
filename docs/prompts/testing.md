@@ -10,6 +10,6 @@
 
 # 请输出 docs/TEST/测试执行报告.md
 
-测试执行报告必须基于 `docs/TEST/测试方案.md` 和 `docs/TEST/里程碑测试计划.md` 编写。
+测试执行报告必须基于 `docs/TEST/TEST_BM.md` 和 `docs/TEST/MS_TESTPLAN.md` 编写。
 如已编写或执行测试代码，需要在报告中记录测试代码路径、执行命令、执行结果、失败用例和修复建议。
-每次测试完 直接修改docs\TEST\测试执行报告.md
+每次测试完 直接新建docs\TEST\TEST_EXPORT\xx.md

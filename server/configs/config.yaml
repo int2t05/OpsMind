@@ -1,4 +1,4 @@
-# OpsMind 默认配置 — 所有地址/密钥均为占位值，真实值由环境变量注入
+# OpsMind 默认配置 — 值与 docker-compose 本地开发环境对齐
 server:
   port: 8080
   mode: debug # debug | release | test
@@ -7,7 +7,7 @@ database:
   host: localhost
   port: 5432
   user: opsmind
-  password: ""
+  password: opsmind123
   dbname: opsmind
   sslmode: disable
   max_open_conns: 25
@@ -24,8 +24,8 @@ nats:
 
 minio:
   endpoint: localhost:9000
-  access_key: ""
-  secret_key: ""
+  access_key: minioadmin
+  secret_key: minioadmin123
   bucket: opsmind
   use_ssl: false
 
@@ -39,7 +39,7 @@ vllm:
   model: default
 
 jwt:
-  secret: ""
+  secret: dev-secret-change-in-production
   expire_hours: 24
   refresh_expire_hours: 168
 

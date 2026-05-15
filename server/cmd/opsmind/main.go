@@ -1,36 +1,43 @@
-// OpsMind 后端服务入口：加载配置、初始化依赖、启动 HTTP 服务
+// OpsMind 后端服务入口：加载配置 → 初始化基础设施 → 执行迁移 → 启动 HTTP 服务
 package main
 
 import (
+	"fmt"
 	"log"
-	"net/http"
+	"path/filepath"
+	"runtime"
 
-	"github.com/gin-gonic/gin"
+	"opsmind/server/internal/bootstrap"
+	"opsmind/server/internal/router"
 )
 
 func main() {
-	r := gin.Default()
+	// 获取项目根目录，用于定位 configs/ 和 migrations/
+	_, filename, _, _ := runtime.Caller(0)
+	rootDir := filepath.Join(filepath.Dir(filename), "..", "..")
 
-	// 健康检查端点 — 用于验证服务是否可启动
-	r.GET("/health", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{
-			"status":  "ok",
-			"service": "opsmind-server",
-		})
-	})
+	configPath := filepath.Join(rootDir, "configs", "config.yaml")
+	migrationsDir := filepath.Join(rootDir, "migrations")
 
-	// API v1 路由组占位
-	v1 := r.Group("/api/v1")
-	{
-		v1.GET("/ping", func(c *gin.Context) {
-			c.JSON(http.StatusOK, gin.H{"message": "pong"})
-		})
+	// 加载配置、初始化日志和数据库
+	app, err := bootstrap.InitApp(configPath)
+	if err != nil {
+		log.Fatalf("Failed to initialize app: %v", err)
 	}
 
-	// 默认端口 8080，后续由 Viper 读取 config.yaml 覆盖
-	addr := ":8080"
-	log.Printf("OpsMind server starting on %s", addr)
+	// 执行数据库迁移
+	log.Println("Running database migrations...")
+	if err := bootstrap.ExecuteMigrations(app.DB, migrationsDir); err != nil {
+		log.Fatalf("Failed to execute migrations: %v", err)
+	}
+	log.Println("Migrations completed successfully")
+
+	// 设置 Gin 路由
+	r := router.Setup()
+
+	addr := fmt.Sprintf(":%d", app.Config.Server.Port)
+	log.Printf("OpsMind server starting on %s (mode: %s)", addr, app.Config.Server.Mode)
 	if err := r.Run(addr); err != nil {
-		log.Fatalf("server failed to start: %v", err)
+		log.Fatalf("Server failed to start: %v", err)
 	}
 }
