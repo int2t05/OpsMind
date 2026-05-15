@@ -1,0 +1,48 @@
+# OpsMind 默认配置 — 所有地址/密钥均为占位值，真实值由环境变量注入
+server:
+  port: 8080
+  mode: debug # debug | release | test
+
+database:
+  host: localhost
+  port: 5432
+  user: opsmind
+  password: ""
+  dbname: opsmind
+  sslmode: disable
+  max_open_conns: 25
+  max_idle_conns: 10
+
+redis:
+  addr: localhost:6379
+  password: ""
+  db: 0
+
+nats:
+  url: nats://localhost:4222
+  stream: opsmind
+
+minio:
+  endpoint: localhost:9000
+  access_key: ""
+  secret_key: ""
+  bucket: opsmind
+  use_ssl: false
+
+anythingllm:
+  base_url: http://localhost:3001
+  api_key: ""
+
+vllm:
+  base_url: http://localhost:8000
+  api_key: ""
+  model: default
+
+jwt:
+  secret: ""
+  expire_hours: 24
+  refresh_expire_hours: 168
+
+log:
+  level: debug # debug | info | warn | error
+  output: stdout # stdout | file

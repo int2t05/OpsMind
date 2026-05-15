@@ -1,3 +1,37 @@
-Course Design
-AGENTS.md
-CLAUDE.md
+# 依赖
+node_modules/
+.pnpm-store/
+
+# 构建产物
+web/dist/
+server/tmp/
+
+# 环境变量（禁止提交真实密钥）
+.env
+.env.local
+.env.*.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 日志
+*.log
+logs/
+
+# 上传文件
+uploads/
+
+# Go
+server/opsmind
+server/opsmind.exe
+
+# Docker
+deploy/data/
