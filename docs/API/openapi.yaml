@@ -1,0 +1,947 @@
+openapi: 3.0.3
+info:
+  title: OpsMind API
+  version: 1.0.0
+  description: 运维数字员工系统 MVP REST API。详细业务说明见 docs/API 下的 Markdown 文档。
+servers:
+  - url: /api/v1
+    description: API v1
+tags:
+  - name: Auth
+    description: 认证与当前用户权限
+  - name: PortalChat
+    description: 门户智能问答
+  - name: PortalTickets
+    description: 门户申告
+  - name: PortalFiles
+    description: 门户匿名附件
+  - name: AdminTickets
+    description: 后台申告处理
+  - name: AdminKnowledge
+    description: 后台知识库和知识条目
+  - name: AdminFiles
+    description: 后台文件与对象存储
+  - name: AdminSystem
+    description: 后台账号、权限、看板、配置和审计
+
+security:
+  - bearerAuth: []
+
+paths:
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: 登录
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: 登录成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      summary: 刷新令牌
+      security: []
+      responses:
+        '200':
+          description: 刷新成功
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: 退出登录
+      responses:
+        '204':
+          description: 退出成功
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /auth/profile:
+    get:
+      tags: [Auth]
+      summary: 获取当前用户
+      responses:
+        '200':
+          description: 当前用户信息
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /auth/permissions:
+    get:
+      tags: [Auth]
+      summary: 获取当前权限
+      responses:
+        '200':
+          description: 当前用户权限
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /portal/chat-sessions:
+    post:
+      tags: [PortalChat]
+      summary: 创建问答会话
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PortalChatRequest'
+      responses:
+        '200':
+          description: 返回同步问答结果
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PortalChatResponse'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+        '502':
+          $ref: '#/components/responses/UpstreamUnavailable'
+  /portal/chat-sessions/{session_no}/feedback:
+    post:
+      tags: [PortalChat]
+      summary: 提交问答反馈
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/SessionNo'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatFeedbackRequest'
+      responses:
+        '200':
+          description: 反馈已记录
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /portal/files:
+    post:
+      tags: [PortalFiles]
+      summary: 门户上传申告附件
+      security: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PortalFileUploadRequest'
+      responses:
+        '201':
+          description: 上传成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FileResponse'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+
+  /portal/tickets:
+    post:
+      tags: [PortalTickets]
+      summary: 创建申告
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTicketRequest'
+      responses:
+        '201':
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TicketCreatedResponse'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+  /portal/tickets/{ticket_no}:
+    get:
+      tags: [PortalTickets]
+      summary: 查询申告详情
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/TicketNo'
+        - name: reporter_phone
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 申告详情
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /admin/tickets:
+    get:
+      tags: [AdminTickets]
+      summary: 查询申告列表
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/TicketStatus'
+        - name: urgency_level
+          in: query
+          schema:
+            $ref: '#/components/schemas/UrgencyLevel'
+      responses:
+        '200':
+          description: 申告列表
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /admin/tickets/{id}:
+    get:
+      tags: [AdminTickets]
+      summary: 获取申告详情
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          description: 申告详情
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /admin/tickets/{id}/status:
+    patch:
+      tags: [AdminTickets]
+      summary: 更新申告状态
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTicketStatusRequest'
+      responses:
+        '200':
+          description: 状态已更新
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /admin/tickets/{id}/visit-records:
+    post:
+      tags: [AdminTickets]
+      summary: 新增回访记录
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '201':
+          description: 回访记录已创建
+  /admin/tickets/{id}/knowledge-candidate:
+    post:
+      tags: [AdminTickets]
+      summary: 从申告生成知识候选
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '201':
+          description: 知识候选已创建
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /admin/knowledge-bases:
+    get:
+      tags: [AdminKnowledge]
+      summary: 查询知识库列表
+      responses:
+        '200':
+          description: 知识库列表
+    post:
+      tags: [AdminKnowledge]
+      summary: 创建知识库
+      responses:
+        '201':
+          description: 知识库已创建
+  /admin/knowledge-bases/{id}:
+    patch:
+      tags: [AdminKnowledge]
+      summary: 更新知识库
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          description: 知识库已更新
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /admin/knowledge-articles:
+    get:
+      tags: [AdminKnowledge]
+      summary: 查询知识条目列表
+      responses:
+        '200':
+          description: 知识条目列表
+    post:
+      tags: [AdminKnowledge]
+      summary: 创建知识条目
+      responses:
+        '201':
+          description: 知识条目已创建
+  /admin/knowledge-articles/{id}:
+    get:
+      tags: [AdminKnowledge]
+      summary: 获取知识条目详情
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          description: 知识条目详情
+    patch:
+      tags: [AdminKnowledge]
+      summary: 更新知识条目
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          description: 知识条目已更新
+  /admin/knowledge-articles/{id}/submit-review:
+    post:
+      tags: [AdminKnowledge]
+      summary: 提交知识审核
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          description: 已提交审核
+  /admin/knowledge-articles/{id}/review:
+    post:
+      tags: [AdminKnowledge]
+      summary: 审核知识
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          description: 审核完成
+  /admin/knowledge-articles/{id}/publish:
+    post:
+      tags: [AdminKnowledge]
+      summary: 发布知识
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          description: 已发布并触发同步
+  /admin/knowledge-articles/{id}/disable:
+    post:
+      tags: [AdminKnowledge]
+      summary: 停用知识
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          description: 已停用
+  /admin/knowledge-articles/{id}/sync-records:
+    get:
+      tags: [AdminKnowledge]
+      summary: 查询知识同步记录
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          description: 同步记录列表
+  /admin/knowledge-candidates:
+    get:
+      tags: [AdminKnowledge]
+      summary: 查询知识候选列表
+      responses:
+        '200':
+          description: 知识候选列表
+  /admin/knowledge-candidates/{id}/convert:
+    post:
+      tags: [AdminKnowledge]
+      summary: 转为知识条目
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '201':
+          description: 已转为知识条目
+  /admin/knowledge-candidates/{id}/ignore:
+    post:
+      tags: [AdminKnowledge]
+      summary: 忽略知识候选
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          description: 已忽略
+  /admin/knowledge-categories:
+    get:
+      tags: [AdminKnowledge]
+      summary: 查询知识分类树
+      responses:
+        '200':
+          description: 分类树
+    post:
+      tags: [AdminKnowledge]
+      summary: 创建知识分类
+      responses:
+        '201':
+          description: 分类已创建
+  /admin/knowledge-categories/{id}:
+    patch:
+      tags: [AdminKnowledge]
+      summary: 更新知识分类
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          description: 分类已更新
+
+  /admin/files:
+    post:
+      tags: [AdminFiles]
+      summary: 后台上传文件
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AdminFileUploadRequest'
+      responses:
+        '201':
+          description: 上传成功
+  /admin/files/{id}:
+    get:
+      tags: [AdminFiles]
+      summary: 查询文件详情
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          description: 文件详情
+  /admin/files/{id}/download-url:
+    get:
+      tags: [AdminFiles]
+      summary: 获取文件下载地址
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          description: 临时下载地址
+  /admin/files/{id}/binding:
+    patch:
+      tags: [AdminFiles]
+      summary: 绑定文件业务对象
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          description: 绑定成功
+
+  /admin/accounts:
+    get:
+      tags: [AdminSystem]
+      summary: 查询账号列表
+      responses:
+        '200':
+          description: 账号列表
+    post:
+      tags: [AdminSystem]
+      summary: 创建账号
+      responses:
+        '201':
+          description: 账号已创建
+  /admin/accounts/{id}:
+    get:
+      tags: [AdminSystem]
+      summary: 获取账号详情
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          description: 账号详情
+    patch:
+      tags: [AdminSystem]
+      summary: 更新账号
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          description: 账号已更新
+  /admin/accounts/{id}/freeze:
+    post:
+      tags: [AdminSystem]
+      summary: 冻结账号
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          description: 账号已冻结
+  /admin/accounts/{id}/restore:
+    post:
+      tags: [AdminSystem]
+      summary: 恢复账号
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          description: 账号已恢复
+  /admin/roles:
+    get:
+      tags: [AdminSystem]
+      summary: 查询角色列表
+      responses:
+        '200':
+          description: 角色列表
+  /admin/roles/{id}/permissions:
+    patch:
+      tags: [AdminSystem]
+      summary: 更新角色权限
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          description: 角色权限已更新
+  /admin/permissions:
+    get:
+      tags: [AdminSystem]
+      summary: 查询权限树
+      responses:
+        '200':
+          description: 权限树
+  /admin/dashboard/summary:
+    get:
+      tags: [AdminSystem]
+      summary: 查询看板摘要
+      responses:
+        '200':
+          description: 看板摘要
+  /admin/dashboard/chat-trends:
+    get:
+      tags: [AdminSystem]
+      summary: 查询问答趋势
+      responses:
+        '200':
+          description: 问答趋势
+  /admin/dashboard/todos:
+    get:
+      tags: [AdminSystem]
+      summary: 查询待办摘要
+      responses:
+        '200':
+          description: 待办摘要
+  /admin/configs:
+    get:
+      tags: [AdminSystem]
+      summary: 查询系统配置
+      responses:
+        '200':
+          description: 配置列表
+  /admin/configs/{config_key}:
+    get:
+      tags: [AdminSystem]
+      summary: 获取系统配置详情
+      parameters:
+        - name: config_key
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 配置详情
+    patch:
+      tags: [AdminSystem]
+      summary: 更新系统配置
+      parameters:
+        - name: config_key
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 配置已更新
+  /admin/configs/test-connections:
+    post:
+      tags: [AdminSystem]
+      summary: 测试外部服务连接
+      responses:
+        '200':
+          description: 测试结果
+  /admin/configs/model-options:
+    get:
+      tags: [AdminSystem]
+      summary: 查询可选模型配置
+      responses:
+        '200':
+          description: 可选模型配置
+  /admin/audit-logs:
+    get:
+      tags: [AdminSystem]
+      summary: 查询审计日志
+      responses:
+        '200':
+          description: 审计日志列表
+  /admin/audit-logs/{id}:
+    get:
+      tags: [AdminSystem]
+      summary: 获取审计日志详情
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          description: 审计日志详情
+  /admin/audit-logs/export:
+    post:
+      tags: [AdminSystem]
+      summary: 导出审计日志
+      responses:
+        '200':
+          description: 导出任务或文件信息
+  /admin/operation-logs:
+    get:
+      tags: [AdminSystem]
+      summary: 查询操作日志
+      responses:
+        '200':
+          description: 操作日志列表
+  /admin/login-logs:
+    get:
+      tags: [AdminSystem]
+      summary: 查询登录日志
+      responses:
+        '200':
+          description: 登录日志列表
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    Id:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    SessionNo:
+      name: session_no
+      in: path
+      required: true
+      schema:
+        type: string
+    TicketNo:
+      name: ticket_no
+      in: path
+      required: true
+      schema:
+        type: string
+    Page:
+      name: page
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    PerPage:
+      name: per_page
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+  responses:
+    ValidationError:
+      description: 请求参数校验失败
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Unauthorized:
+      description: 未登录或令牌无效
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Forbidden:
+      description: 无接口权限
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    NotFound:
+      description: 资源不存在
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Conflict:
+      description: 状态冲突或唯一键冲突
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    RateLimitExceeded:
+      description: 请求超过限流阈值
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    UpstreamUnavailable:
+      description: 上游服务不可用
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+  schemas:
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              example: validation_error
+            message:
+              type: string
+              example: 请求参数校验失败
+            details:
+              type: array
+              items:
+                type: object
+                properties:
+                  field:
+                    type: string
+                  message:
+                    type: string
+                  code:
+                    type: string
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+          format: password
+    LoginResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            access_token:
+              type: string
+            refresh_token:
+              type: string
+            expires_in:
+              type: integer
+            user:
+              $ref: '#/components/schemas/UserBrief'
+    UserBrief:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        username:
+          type: string
+        real_name:
+          type: string
+    PortalChatRequest:
+      type: object
+      required: [question]
+      properties:
+        question:
+          type: string
+          minLength: 1
+          maxLength: 2000
+        knowledge_base_code:
+          type: string
+        reporter_contact:
+          type: string
+    PortalChatResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            session_no:
+              type: string
+            answer:
+              type: string
+            status:
+              $ref: '#/components/schemas/ChatStatus'
+            confidence_score:
+              type: number
+              format: float
+            sources:
+              type: array
+              items:
+                type: object
+            model_name:
+              type: string
+            rag_provider:
+              type: string
+              example: anythingllm
+    ChatFeedbackRequest:
+      type: object
+      required: [feedback_type]
+      properties:
+        feedback_type:
+          $ref: '#/components/schemas/FeedbackType'
+        remark:
+          type: string
+          maxLength: 255
+    CreateTicketRequest:
+      type: object
+      required: [reporter_name, reporter_phone, title, description, urgency_level]
+      properties:
+        source_session_no:
+          type: string
+        reporter_name:
+          type: string
+        reporter_phone:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        impact_scope:
+          type: string
+        urgency_level:
+          $ref: '#/components/schemas/UrgencyLevel'
+        attachment_ids:
+          type: array
+          items:
+            type: integer
+            format: int64
+    TicketCreatedResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            id:
+              type: integer
+              format: int64
+            ticket_no:
+              type: string
+            status:
+              $ref: '#/components/schemas/TicketStatus'
+            created_at:
+              type: string
+              format: date-time
+    UpdateTicketStatusRequest:
+      type: object
+      required: [status, process_content]
+      properties:
+        status:
+          $ref: '#/components/schemas/TicketStatus'
+        process_content:
+          type: string
+        process_result:
+          type: string
+        requires_more_info:
+          type: boolean
+    PortalFileUploadRequest:
+      type: object
+      required: [file, biz_type]
+      properties:
+        file:
+          type: string
+          format: binary
+        biz_type:
+          type: string
+          enum: [ticket]
+    AdminFileUploadRequest:
+      type: object
+      required: [file, biz_type]
+      properties:
+        file:
+          type: string
+          format: binary
+        biz_type:
+          type: string
+          enum: [ticket, knowledge, import]
+        biz_id:
+          type: integer
+          format: int64
+    FileResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            id:
+              type: integer
+              format: int64
+            file_name:
+              type: string
+            file_size:
+              type: integer
+              format: int64
+            mime_type:
+              type: string
+            storage_provider:
+              type: string
+              example: minio
+            file_path:
+              type: string
+            created_at:
+              type: string
+              format: date-time
+    ChatStatus:
+      type: string
+      enum: [processing, answered, need_ticket, failed]
+    TicketStatus:
+      type: string
+      enum: [pending, processing, need_more_info, completed, closed]
+    UrgencyLevel:
+      type: string
+      enum: [low, medium, high]
+    FeedbackType:
+      type: string
+      enum: [resolved, unresolved]
+    KnowledgeStatus:
+      type: string
+      enum: [draft, pending_review, published, disabled]
+    ReviewStatus:
+      type: string
+      enum: [pending, approved, rejected]
+    SyncStatus:
+      type: string
+      enum: [not_synced, syncing, success, failed]
+    CandidateStatus:
+      type: string
+      enum: [pending_review, converted, ignored]
