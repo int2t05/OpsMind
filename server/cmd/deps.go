@@ -21,4 +21,7 @@ import (
 	_ "gorm.io/gorm"
 	// GORM PostgreSQL 驱动
 	_ "gorm.io/driver/postgres"
+
+	// 内部包 — 确保编译通过
+	_ "opsmind/internal/config"
 )

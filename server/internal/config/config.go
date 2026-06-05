@@ -1,0 +1,189 @@
+// Package config 负责加载和管理 OpsMind 后端配置。
+//
+// 使用 Viper 读取 config.yaml，支持环境变量覆盖。
+// 环境变量前缀为 OPSMIND，例如 OPSMIND_DATABASE_HOST 覆盖 database.host。
+// 这样做的原因：Docker Compose 通过环境变量注入运行时配置，
+// 本地开发使用 config.yaml 默认值，两者互不冲突。
+package config
+
+import (
+	"time"
+
+	"github.com/spf13/viper"
+)
+
+// AppConfig 是顶层配置结构体，包含所有子模块配置。
+type AppConfig struct {
+	Server       ServerConfig       `mapstructure:"server"`
+	Database     DatabaseConfig     `mapstructure:"database"`
+	JWT          JWTConfig          `mapstructure:"jwt"`
+	MinIO        MinIOConfig        `mapstructure:"minio"`
+	AnythingLLM  AnythingLLMConfig  `mapstructure:"anythingllm"`
+	AI           AIConfig           `mapstructure:"ai"`
+}
+
+// ServerConfig 是 HTTP 服务器配置。
+type ServerConfig struct {
+	Port int    `mapstructure:"port"`
+	Mode string `mapstructure:"mode"` // debug / release
+}
+
+// DatabaseConfig 是 PostgreSQL 数据库配置。
+type DatabaseConfig struct {
+	Host     string `mapstructure:"host"`
+	Port     int    `mapstructure:"port"`
+	User     string `mapstructure:"user"`
+	Password string `mapstructure:"password"`
+	DBName   string `mapstructure:"dbname"`
+	SSLMode  string `mapstructure:"sslmode"`
+}
+
+// JWTConfig 是 JWT 令牌配置。
+type JWTConfig struct {
+	Secret        string        `mapstructure:"secret"`
+	AccessExpire  time.Duration `mapstructure:"access_expire"`
+	RefreshExpire time.Duration `mapstructure:"refresh_expire"`
+}
+
+// MinIOConfig 是 MinIO 对象存储配置。
+type MinIOConfig struct {
+	Endpoint  string `mapstructure:"endpoint"`
+	AccessKey string `mapstructure:"access_key"`
+	SecretKey string `mapstructure:"secret_key"`
+	UseSSL    bool   `mapstructure:"use_ssl"`
+}
+
+// AnythingLLMConfig 是 AnythingLLM RAG 服务配置。
+//
+// BaseURL 固定使用 Docker 内部地址 http://anythingllm:3001/api，
+// 只有本机调试时才改为 http://localhost:3001/api。
+type AnythingLLMConfig struct {
+	BaseURL              string `mapstructure:"base_url"`
+	APIKey               string `mapstructure:"api_key"`
+	DefaultWorkspaceSlug string `mapstructure:"default_workspace_slug"`
+	TimeoutSeconds       int    `mapstructure:"timeout_seconds"`
+}
+
+// AIConfig 是 AI 问答相关配置。
+//
+// ConfidenceThreshold 控制 RAG 检索置信度阈值，
+// 低于此阈值的问答结果会引导用户提交申告（can_submit_ticket=true）。
+type AIConfig struct {
+	DefaultTopK          int     `mapstructure:"default_top_k"`
+	ConfidenceThreshold  float64 `mapstructure:"confidence_threshold"`
+}
+
+// Load 加载配置文件并应用环境变量覆盖。
+//
+// configPath 为空时使用默认路径 ./internal/config/config.yaml。
+// 环境变量前缀为 OPSMIND，例如 OPSMIND_DATABASE_HOST 覆盖 database.host。
+// 使用 BindEnv 显式绑定关键配置项，确保 Unmarshal 时能正确读取环境变量。
+func Load(configPath string) (*AppConfig, error) {
+	v := viper.New()
+
+	// 设置默认值
+	setDefaults(v)
+
+	// 读取配置文件
+	if configPath != "" {
+		v.SetConfigFile(configPath)
+	} else {
+		v.SetConfigName("config")
+		v.SetConfigType("yaml")
+		v.AddConfigPath("./internal/config")
+	}
+
+	// 配置文件不存在时不报错（使用默认值和环境变量）
+	if err := v.ReadInConfig(); err != nil {
+		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
+			return nil, err
+		}
+	}
+
+	// 显式绑定环境变量，确保 Unmarshal 能正确覆盖嵌套字段。
+	// 为什么用 BindEnv 而非 AutomaticEnv：AutomaticEnv 对嵌套 key 的
+	// 环境变量映射不一致（需要 key 和 env 同名），BindEnv 更可控。
+	bindEnvs(v)
+
+	var cfg AppConfig
+	if err := v.Unmarshal(&cfg); err != nil {
+		return nil, err
+	}
+
+	return &cfg, nil
+}
+
+// bindEnvs 显式绑定环境变量到配置 key。
+//
+// 环境变量命名规则：OPSMIND_ + 字段路径（下划线分隔），
+// 例如 database.host → OPSMIND_DATABASE_HOST。
+func bindEnvs(v *viper.Viper) {
+	// Server
+	v.BindEnv("server.port", "OPSMIND_SERVER_PORT")
+	v.BindEnv("server.mode", "OPSMIND_SERVER_MODE")
+
+	// Database
+	v.BindEnv("database.host", "OPSMIND_DATABASE_HOST")
+	v.BindEnv("database.port", "OPSMIND_DATABASE_PORT")
+	v.BindEnv("database.user", "OPSMIND_DATABASE_USER")
+	v.BindEnv("database.password", "OPSMIND_DATABASE_PASSWORD")
+	v.BindEnv("database.dbname", "OPSMIND_DATABASE_DBNAME")
+	v.BindEnv("database.sslmode", "OPSMIND_DATABASE_SSLMODE")
+
+	// JWT
+	v.BindEnv("jwt.secret", "OPSMIND_JWT_SECRET")
+	v.BindEnv("jwt.access_expire", "OPSMIND_JWT_ACCESS_EXPIRE")
+	v.BindEnv("jwt.refresh_expire", "OPSMIND_JWT_REFRESH_EXPIRE")
+
+	// MinIO
+	v.BindEnv("minio.endpoint", "OPSMIND_MINIO_ENDPOINT")
+	v.BindEnv("minio.access_key", "OPSMIND_MINIO_ACCESS_KEY")
+	v.BindEnv("minio.secret_key", "OPSMIND_MINIO_SECRET_KEY")
+	v.BindEnv("minio.use_ssl", "OPSMIND_MINIO_USE_SSL")
+
+	// AnythingLLM
+	v.BindEnv("anythingllm.base_url", "OPSMIND_ANYTHINGLLM_BASE_URL")
+	v.BindEnv("anythingllm.api_key", "OPSMIND_ANYTHINGLLM_API_KEY")
+	v.BindEnv("anythingllm.default_workspace_slug", "OPSMIND_ANYTHINGLLM_DEFAULT_WORKSPACE_SLUG")
+	v.BindEnv("anythingllm.timeout_seconds", "OPSMIND_ANYTHINGLLM_TIMEOUT_SECONDS")
+
+	// AI
+	v.BindEnv("ai.default_top_k", "OPSMIND_AI_DEFAULT_TOP_K")
+	v.BindEnv("ai.confidence_threshold", "OPSMIND_AI_CONFIDENCE_THRESHOLD")
+}
+
+// setDefaults 设置配置默认值，与 config.yaml 保持一致。
+func setDefaults(v *viper.Viper) {
+	// Server
+	v.SetDefault("server.port", 8080)
+	v.SetDefault("server.mode", "debug")
+
+	// Database
+	v.SetDefault("database.host", "localhost")
+	v.SetDefault("database.port", 5432)
+	v.SetDefault("database.user", "opsmind")
+	v.SetDefault("database.password", "")
+	v.SetDefault("database.dbname", "opsmind")
+	v.SetDefault("database.sslmode", "disable")
+
+	// JWT
+	v.SetDefault("jwt.secret", "")
+	v.SetDefault("jwt.access_expire", "2h")
+	v.SetDefault("jwt.refresh_expire", "168h")
+
+	// MinIO
+	v.SetDefault("minio.endpoint", "localhost:9000")
+	v.SetDefault("minio.access_key", "minioadmin")
+	v.SetDefault("minio.secret_key", "minioadmin")
+	v.SetDefault("minio.use_ssl", false)
+
+	// AnythingLLM
+	v.SetDefault("anythingllm.base_url", "http://anythingllm:3001/api")
+	v.SetDefault("anythingllm.api_key", "")
+	v.SetDefault("anythingllm.default_workspace_slug", "opsmind-it-ops")
+	v.SetDefault("anythingllm.timeout_seconds", 20)
+
+	// AI
+	v.SetDefault("ai.default_top_k", 5)
+	v.SetDefault("ai.confidence_threshold", 0.6)
+}

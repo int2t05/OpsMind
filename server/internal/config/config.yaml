@@ -1,0 +1,37 @@
+# OpsMind 后端配置文件
+#
+# 本地开发使用默认值，Docker 环境通过环境变量覆盖。
+# 环境变量前缀：OPSMIND_，例如 OPSMIND_DB_HOST 覆盖 database.host。
+
+server:
+  port: 8080
+  mode: debug  # debug / release
+
+database:
+  host: localhost        # Docker 内: postgres
+  port: 5432
+  user: opsmind
+  password: ""           # 通过环境变量 OPSMIND_DB_PASSWORD 设置
+  dbname: opsmind
+  sslmode: disable
+
+jwt:
+  secret: ""             # 通过环境变量 OPSMIND_JWT_SECRET 设置
+  access_expire: 2h
+  refresh_expire: 168h   # 7 天
+
+minio:
+  endpoint: localhost:9000  # Docker 内: minio:9000
+  access_key: minioadmin
+  secret_key: minioadmin
+  use_ssl: false
+
+anythingllm:
+  base_url: http://anythingllm:3001/api  # Docker 内部地址
+  api_key: ""                             # 通过环境变量 OPSMIND_ANYTHINGLLM_API_KEY 设置
+  default_workspace_slug: opsmind-it-ops
+  timeout_seconds: 20
+
+ai:
+  default_top_k: 5
+  confidence_threshold: 0.6  # 低于此阈值引导用户提交申告
