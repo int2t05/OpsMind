@@ -1,0 +1,61 @@
+// Package repository 实现数据访问层。
+//
+// role_repo.go 提供角色表的数据访问方法。
+// 角色的 Permissions 字段使用 JSONB 存储，GORM 通过 datatypes.JSON 自动处理序列化。
+package repository
+
+import (
+	"opsmind/internal/model"
+
+	"gorm.io/gorm"
+)
+
+// RoleRepo 角色数据访问。
+type RoleRepo struct {
+	db *gorm.DB
+}
+
+// NewRoleRepo 创建 RoleRepo 实例。
+func NewRoleRepo(db *gorm.DB) *RoleRepo {
+	return &RoleRepo{db: db}
+}
+
+// Create 创建角色。
+func (r *RoleRepo) Create(role *model.Role) error {
+	return r.db.Create(role).Error
+}
+
+// GetByID 根据 ID 获取角色。
+func (r *RoleRepo) GetByID(id int64) (*model.Role, error) {
+	var role model.Role
+	err := r.db.First(&role, id).Error
+	return &role, err
+}
+
+// List 查询角色列表（分页）。
+func (r *RoleRepo) List(page, pageSize int) ([]model.Role, int64, error) {
+	var roles []model.Role
+	var total int64
+
+	query := r.db.Model(&model.Role{})
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	offset := (page - 1) * pageSize
+	if err := query.Offset(offset).Limit(pageSize).Order("id DESC").Find(&roles).Error; err != nil {
+		return nil, 0, err
+	}
+
+	return roles, total, nil
+}
+
+// Update 更新角色。
+func (r *RoleRepo) Update(role *model.Role) error {
+	return r.db.Save(role).Error
+}
+
+// Delete 删除角色。
+func (r *RoleRepo) Delete(id int64) error {
+	return r.db.Delete(&model.Role{}, id).Error
+}

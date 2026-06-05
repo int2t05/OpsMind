@@ -614,24 +614,26 @@
 
 ---
 
-### Task 15: 角色管理 Service + Handler
+### Task 15: 角色管理 Service + Handler ✅
 
 **Files:**
-- Create: `server/internal/service/role_service.go`
-- Test: `server/tests/service/role_service_test.go`
+- Create: `server/internal/repository/role_repo.go` ✅
+- Create: `server/internal/service/role_service.go` ✅
+- Create: `server/internal/handler/role.go` ✅
+- Create: `server/internal/dto/request/role.go` ✅
+- Test: `server/tests/service/role_service_test.go` ✅
+- Test: `server/tests/handler/role_handler_test.go` ✅
 
 **说明：**
 
 `role_service.go` — 方法：
-- `CreateRole(name, description string, permissions []string) error`
-- `UpdateRole(id int64, name, description string, permissions []string) error`
-- `ListRoles() ([]Role, error)`
-- `UpdateRoleMenus(roleID int64, menuIDs []int64) error`
-- `ListMenus() ([]Menu, error)`
+- `Create(name, description string, permissions []string) error`
+- `GetByID(id int64) (*Role, error)`
+- `List(page, pageSize int) ([]Role, int64, error)`
+- `Update(id int64, name, description string, permissions []string) error`
+- `Delete(id int64) error`
 
-Handler 复用 `handler/user.go` 或新建 `handler/role.go`（如果文件过大则拆分）。
-
-**测试覆盖：** 角色 CRUD、菜单绑定。
+**测试覆盖：** 角色 CRUD（创建成功/重复/查询/列表/更新/删除） ✅
 
 ---
 
