@@ -315,6 +315,15 @@ OpsMind/
 │   │   ├── jwt/                    # JWT 工具
 │   │   └── hash/                   # 密码哈希工具
 │   ├── migrations/                 # 数据库迁移
+│   ├── tests/                      # 全部测试代码（外部测试包）
+│   │   ├── config/                 # 配置加载测试
+│   │   ├── database/               # 数据库连接和迁移测试
+│   │   ├── model/                  # 数据模型字段测试
+│   │   ├── service/                # Service 层单元测试
+│   │   ├── handler/                # Handler 层集成测试
+│   │   ├── middleware/             # 中间件测试
+│   │   ├── adapter/                # 适配层测试
+│   │   └── pkg/                    # 公共工具包测试
 │   ├── go.mod
 │   └── go.sum
 │

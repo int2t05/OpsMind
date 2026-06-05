@@ -1,0 +1,42 @@
+package model
+
+import (
+	"time"
+
+	"gorm.io/datatypes"
+)
+
+// Ticket 申告工单表
+type Ticket struct {
+	ID              int64          `gorm:"primaryKey;autoIncrement" json:"id"`
+	TicketNo        string         `gorm:"type:varchar(32);uniqueIndex;not null;column:ticket_no" json:"ticket_no"`
+	UserID          int64          `gorm:"not null;column:user_id;index:idx_tickets_user_id" json:"user_id"`
+	Title           string         `gorm:"type:varchar(255);not null" json:"title"`
+	Description     string         `gorm:"type:text;not null" json:"description"`
+	Urgency         int16          `gorm:"not null" json:"urgency"`
+	ImpactScope     int16          `gorm:"column:impact_scope" json:"impact_scope"`
+	AffectedSystems datatypes.JSON `gorm:"type:jsonb;column:affected_systems" json:"affected_systems"`
+	ContactPhone    string         `gorm:"type:varchar(11);not null;column:contact_phone" json:"contact_phone"`
+	ContactEmail    string         `gorm:"type:varchar(128);column:contact_email" json:"contact_email"`
+	Status          int16          `gorm:"not null;default:1;index:idx_tickets_status" json:"status"`
+	SupplementCount int16          `gorm:"not null;default:0;column:supplement_count" json:"supplement_count"`
+	ChatContext     datatypes.JSON `gorm:"type:jsonb;column:chat_context" json:"chat_context"`
+	Source          int16          `gorm:"not null;default:1" json:"source"`
+	CreatedAt       time.Time      `gorm:"not null;index:idx_tickets_created_at" json:"created_at"`
+	UpdatedAt       time.Time      `gorm:"not null" json:"updated_at"`
+}
+
+func (Ticket) TableName() string { return "tickets" }
+
+// TicketRecord 申告处理记录表
+type TicketRecord struct {
+	ID         int64          `gorm:"primaryKey;autoIncrement" json:"id"`
+	TicketID   int64          `gorm:"not null;column:ticket_id" json:"ticket_id"`
+	OperatorID int64          `gorm:"not null;column:operator_id" json:"operator_id"`
+	Action     string         `gorm:"type:varchar(32);not null" json:"action"`
+	Content    string         `gorm:"type:text" json:"content"`
+	Detail     datatypes.JSON `gorm:"type:jsonb" json:"detail"`
+	CreatedAt  time.Time      `gorm:"not null" json:"created_at"`
+}
+
+func (TicketRecord) TableName() string { return "ticket_records" }

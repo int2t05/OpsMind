@@ -69,16 +69,16 @@ go build ./cmd/...
 # 运行（本地开发，依赖 Docker 中的 postgres/minio/anythingllm）
 go run ./cmd/main.go
 
-# 运行全部测试
-go test ./... -v
+# 运行全部测试（不含集成测试）
+go test ./tests/config/... -v
 
-# 运行指定包测试
-go test ./pkg/jwt/... -v
-go test ./internal/service/... -v
-go test ./internal/adapter/... -v
+# 运行指定模块测试
+go test ./tests/model/... -v -tags=integration
+go test ./tests/database/... -v -tags=integration
+go test ./tests/service/... -v -tags=integration
 
-# 运行集成测试
-go test ./tests/integration/... -v
+# 运行全部集成测试（需 PostgreSQL）
+go test ./tests/... -v -tags=integration
 
 # Lint（如安装了 golangci-lint）
 golangci-lint run ./...
@@ -173,6 +173,7 @@ make seed
 | `server/internal/dto/` | 数据传输对象（request/ + response/） |
 | `server/pkg/` | 公共工具包（response / errcode / jwt / hash） |
 | `server/migrations/` | 数据库迁移和演示数据（seed.sql） |
+| `server/tests/` | 全部测试代码（外部测试包，按子目录组织：config/database/model/service/handler/middleware/adapter/pkg） |
 | `web/src/api/` | 前端 API 请求封装（Axios） |
 | `web/src/views/portal/` | 门户端页面（智能问答、申告提交、进度查询） |
 | `web/src/views/admin/` | 后台管理页面（看板、申告、知识库、用户、配置） |
