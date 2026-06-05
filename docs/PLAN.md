@@ -637,19 +637,19 @@
 
 ---
 
-### Task 16: Vue 后台框架 + 登录页面
+### Task 16: Vue 后台框架 + 登录页面 ✅
 
 **Files:**
-- Create: `src/stores/auth.ts`
-- Create: `src/stores/app.ts`
-- Create: `src/api/auth.ts`
-- Create: `src/api/user.ts`
-- Create: `src/components/layout/AdminLayout.vue`
-- Create: `src/components/common/Pagination.vue`
-- Create: `src/components/common/ConfirmDialog.vue`
-- Create: `src/components/common/StatusBadge.vue`
-- Create: `src/views/auth/Login.vue`
-- Create: `src/views/auth/ChangePassword.vue`
+- Create: `src/stores/auth.ts` ✅
+- Create: `src/stores/app.ts` ✅
+- Create: `src/api/auth.ts` ✅
+- Create: `src/api/user.ts` ✅
+- Create: `src/components/layout/AdminLayout.vue` ✅
+- Create: `src/components/common/Pagination.vue` ✅
+- Create: `src/components/common/ConfirmDialog.vue` ✅
+- Create: `src/components/common/StatusBadge.vue` ✅
+- Create: `src/views/auth/Login.vue` ✅
+- Create: `src/views/auth/ChangePassword.vue` ✅
 - Create: `src/views/admin/UserList.vue`
 - Create: `src/views/admin/RoleManage.vue`
 
