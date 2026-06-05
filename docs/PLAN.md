@@ -167,7 +167,7 @@
 | `server/tests/middleware/logger_test.go` | 日志字段、JSON 格式、不同状态码 | T06 |
 | `server/tests/middleware/request_id_test.go` | 请求 ID 自动生成、客户端透传、Context 写入 | T06 |
 | `server/tests/middleware/auth_test.go` | JWT 中间件：有效令牌/过期令牌/缺失/格式错误/无效令牌 | T12 |
-| `server/tests/middleware/rbac_test.go` | RBAC 中间件：有权限/无权限/管理员权限 | T13 |
+| `server/tests/middleware/rbac_test.go` | RBAC 中间件：有权限/无权限/无用户 | T13 ✅ |
 | `server/tests/router/router_test.go` | 路由注册骨架、健康检查端点、501 占位响应 | T07 |
 | `server/tests/repository/user_repo_test.go` | 用户 Repository：GetByID/GetByUsername/GetByPhone/ExistsByPhone/Create | T10 |
 | `server/tests/adapter/rag_client_test.go` | RagClient：请求构造/响应映射/超时/错误降级 | T20 |
@@ -560,11 +560,11 @@
 
 ---
 
-### Task 13: RBAC 权限中间件
+### Task 13: RBAC 权限中间件 ✅
 
 **Files:**
-- Create: `server/internal/middleware/rbac.go`
-- Test: `server/tests/middleware/rbac_test.go`
+- Create: `server/internal/middleware/rbac.go` ✅
+- Test: `server/tests/middleware/rbac_test.go` ✅
 
 **说明：**
 
@@ -576,9 +576,9 @@
 - 无权限返回 10002（403）
 
 **测试覆盖：**
-- 有目标权限 → 放行
-- 无目标权限 → 返回 403
-- 系统管理员 → 自动放行
+- 有目标权限 → 放行 ✅
+- 无目标权限 → 返回 403 ✅
+- 系统管理员 → 自动放行 ✅
 
 ---
 
