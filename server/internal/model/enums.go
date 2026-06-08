@@ -73,6 +73,13 @@ const (
 	ChatRoleAssistant  = "assistant"
 )
 
+// 问答反馈状态
+const (
+	ChatFeedbackUnset     int16 = 0 // 未反馈
+	ChatFeedbackResolved  int16 = 1 // 已解决
+	ChatFeedbackUnresolved int16 = 2 // 未解决
+)
+
 // 站内消息类型
 const (
 	MessageTypeTicketSupplement = "ticket_supplement" // 申告补充信息

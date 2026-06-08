@@ -157,7 +157,7 @@ make seed
 | --- | --- |
 | `docs/` | 项目文档（PRD、TECH、PLAN、集成方案、设计系统） |
 | `docs/PRD.md` | 产品需求文档 v2.2 — 功能需求、用户故事、业务规则 |
-| `docs/TECH.md` | 技术架构文档 v1.1 — 分层架构、数据库、API、适配层、部署 |
+| `docs/TECH.md` | 技术架构文档 v1.2 — 分层架构、数据库、API、适配层、部署 |
 | `docs/PLAN.md` | 实施计划 — 38 个任务，6 个里程碑 |
 | `docs/ANYTHINGLLM_AI_INTEGRATION.md` | AnythingLLM 集成方案 v1.1（权威来源） |
 | `docs/prompts/DESIGN-linear.app.md` | Linear Design 系统约束 |
@@ -165,11 +165,11 @@ make seed
 | `server/internal/config/` | Viper 配置管理（config.go + config.yaml） |
 | `server/internal/middleware/` | Gin 中间件（JWT 认证、RBAC 权限、CORS、请求日志） |
 | `server/internal/router/` | 路由注册（router.go + portal.go + admin.go） |
-| `server/internal/handler/` | Handler 层 — 参数校验、调用 Service、格式化响应 |
-| `server/internal/service/` | Service 层 — 业务逻辑、事务管理、状态机校验 |
-| `server/internal/repository/` | Repository 层 — 数据访问、GORM 查询 |
+| `server/internal/handler/` | Handler 层 — 已实现：auth/user/role；待实现：chat/ticket/knowledge/dashboard/config/audit/message（M3-M5） |
+| `server/internal/service/` | Service 层 — 已实现：auth/user/role；待实现：chat/ticket/knowledge/dashboard/config/message/scheduler（M3-M5） |
+| `server/internal/repository/` | Repository 层 — 已实现：user/config/role；待实现：ticket/knowledge/chat/audit/message（M3-M5） |
 | `server/internal/model/` | GORM 数据模型（对应 TECH.md §4.2 表结构） |
-| `server/internal/adapter/` | 外部服务适配层（RagClient / StorageClient） |
+| `server/internal/adapter/` | 外部服务适配层（RagClient / StorageClient — M3/M4 实现） |
 | `server/internal/dto/` | 数据传输对象（request/ + response/） |
 | `server/pkg/` | 公共工具包（response / errcode / jwt / hash） |
 | `server/migrations/` | 数据库迁移和演示数据（seed.sql） |
@@ -182,9 +182,10 @@ make seed
 | `web/src/stores/` | Pinia 状态管理（auth / chat / app） |
 | `web/src/router/` | Vue Router 路由定义和守卫 |
 | `web/src/styles/` | 全局样式（Linear Design 暗色主题 CSS 变量） |
-| `docker-compose.yml` | Docker Compose 编排（6 个服务） |
-| `.env` | 环境变量模板 |
-| `Makefile` | 构建和开发命令 |
+| `docker-compose.yml` | Docker Compose 编排（M1 仅 PostgreSQL；T37 补充完整 6 服务） |
+| `.env` | 环境变量（已 gitignore） |
+| `.env.example` | 环境变量模板（提交到版本库） |
+| `Makefile` | 构建和开发命令（T37 实现） |
 
 ---
 

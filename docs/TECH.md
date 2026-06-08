@@ -2,8 +2,8 @@
 
 | 项目 | 内容 |
 | --- | --- |
-| 文档版本 | v1.1 |
-| 日期 | 2026-06-05 |
+| 文档版本 | v1.2 |
+| 日期 | 2026-06-08 |
 | 关联文档 | [PRD](PRD.md)、[Design System](prompts/DESIGN-linear.app.md)、[AnythingLLM 集成方案](ANYTHINGLLM_AI_INTEGRATION.md) |
 
 ---
@@ -798,13 +798,13 @@ CREATE INDEX idx_messages_is_read ON messages(user_id, is_read);
 | POST | `/knowledge-articles/:id/submit-review` | 提交审核 | 知识库管理员 |
 | POST | `/knowledge-articles/:id/review` | 审核知识 | 知识库管理员（非创建人） |
 | POST | `/knowledge-articles/:id/publish` | 发布知识 | 知识库管理员 |
+| POST | `/knowledge-articles/:id/disable` | 停用知识 | 知识库管理员 |
+| POST | `/knowledge-articles/:id/retry-sync` | 重试同步 | 知识库管理员 |
 
 **审核业务规则（Service 层强制校验）：**
 - 审核人必须具有"知识库管理员"角色（RBAC 中间件校验）。
 - 审核人不能是知识条目的创建人（`KnowledgeService.Review` 方法内校验 `article.CreatedBy != currentUser.ID`，违反时返回错误码 10003）。
 - 驳回时必须填写 `review_comment`（参数校验）。
-| POST | `/knowledge-articles/:id/disable` | 停用知识 | 知识库管理员 |
-| POST | `/knowledge-articles/:id/retry-sync` | 重试同步 | 知识库管理员 |
 
 **用户管理：**
 
@@ -822,7 +822,9 @@ CREATE INDEX idx_messages_is_read ON messages(user_id, is_read);
 | --- | --- | --- | --- |
 | GET | `/roles` | 角色列表 | 系统管理员 |
 | POST | `/roles` | 创建角色 | 系统管理员 |
+| GET | `/roles/:id` | 获取角色详情 | 系统管理员 |
 | PUT | `/roles/:id` | 更新角色 | 系统管理员 |
+| DELETE | `/roles/:id` | 删除角色 | 系统管理员 |
 | GET | `/menus` | 菜单列表 | 系统管理员 |
 | PUT | `/roles/:id/menus` | 更新角色菜单 | 系统管理员 |
 
