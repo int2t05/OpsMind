@@ -26,6 +26,7 @@ func (KnowledgeBase) TableName() string { return "knowledge_bases" }
 type KnowledgeArticle struct {
 	ID                  int64          `gorm:"primaryKey;autoIncrement" json:"id"`
 	KBID                int64          `gorm:"not null;column:kb_id" json:"kb_id"`
+	KnowledgeBase       KnowledgeBase  `gorm:"foreignKey:KBID;references:ID" json:"knowledge_base,omitempty"`
 	Question            string         `gorm:"type:text;not null" json:"question"`
 	Answer              string         `gorm:"type:text;not null" json:"answer"`
 	Category            string         `gorm:"type:varchar(64)" json:"category"`
