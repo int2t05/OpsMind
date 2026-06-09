@@ -26,6 +26,7 @@ type Handlers struct {
 	User      *handler.UserHandler
 	Role      *handler.RoleHandler
 	Knowledge *handler.KnowledgeHandler
+	Ticket    *handler.TicketHandler
 }
 
 // Setup 初始化 Gin 引擎并注册所有路由。
@@ -56,7 +57,7 @@ func Setup(cfg *config.AppConfig, h *Handlers) *gin.Engine {
 	// 门户端路由组（需要 JWT 认证）
 	portal := r.Group("/api/v1/portal")
 	portal.Use(middleware.JWTAuth(cfg.JWT.Secret))
-	registerPortalRoutes(portal)
+	registerPortalRoutes(portal, h)
 
 	// 后台管理路由组（需要 JWT 认证 + RBAC 权限）
 	admin := r.Group("/api/v1/admin")

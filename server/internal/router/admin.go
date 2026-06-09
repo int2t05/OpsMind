@@ -16,11 +16,18 @@ import (
 // 路由列表与 TECH.md §5.2 后台管理对齐。
 // 已实现 Handler 的路由绑定真实 Handler，未实现的仍使用占位。
 func registerAdminRoutes(rg *gin.RouterGroup, h *Handlers) {
-	// 申告管理（占位 — T24 实现）
-	rg.GET("/tickets", placeholder())
-	rg.GET("/tickets/:id", placeholder())
-	rg.PATCH("/tickets/:id/status", placeholder())
-	rg.POST("/tickets/:id/records", placeholder())
+	// 申告管理（T24 — 已实现）
+	if h != nil && h.Ticket != nil {
+		rg.GET("/tickets", h.Ticket.ListAll)
+		rg.GET("/tickets/:id", h.Ticket.GetDetail)
+		rg.PATCH("/tickets/:id/status", h.Ticket.UpdateStatus)
+		rg.POST("/tickets/:id/records", h.Ticket.AddRecord)
+	} else {
+		rg.GET("/tickets", placeholder())
+		rg.GET("/tickets/:id", placeholder())
+		rg.PATCH("/tickets/:id/status", placeholder())
+		rg.POST("/tickets/:id/records", placeholder())
+	}
 	rg.POST("/tickets/:id/knowledge-candidate", placeholder())
 
 	// 知识库管理（T18 — 已实现）

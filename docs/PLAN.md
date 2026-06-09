@@ -864,7 +864,7 @@
 
 ---
 
-### Task 23: 申告 Repository
+### Task 23: 申告 Repository ✅
 
 **Files:**
 - Create: `server/internal/repository/ticket_repo.go`
@@ -889,7 +889,7 @@
 
 ---
 
-### Task 24: 申告 Service + Handler
+### Task 24: 申告 Service + Handler ✅
 
 **Files:**
 - Create: `server/internal/dto/request/ticket.go`
