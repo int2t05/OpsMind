@@ -170,6 +170,9 @@
 | `server/tests/middleware/rbac_test.go` | RBAC 中间件：有权限/无权限/无用户 | T13 ✅ |
 | `server/tests/router/router_test.go` | 路由注册骨架、健康检查端点、501 占位响应 | T07 |
 | `server/tests/repository/user_repo_test.go` | 用户 Repository：GetByID/GetByUsername/GetByPhone/ExistsByPhone/Create | T10 |
+| `server/tests/repository/knowledge_repo_test.go` | 知识库 Repository：KB CRUD/文章分页/Chunk 批量 | T17 |
+| `server/tests/repository/ticket_repo_test.go` | 申告 Repository：Ticket CRUD/状态更新/自动关闭/分页 | T23 |
+| `server/tests/repository/chat_repo_test.go` | 问答 Repository：Session CRUD/反馈/分页/CreateBatch | T25 |
 | `server/tests/adapter/rag_client_test.go` | RagClient：请求构造/响应映射/超时/错误降级 | T20 |
 | `server/tests/adapter/storage_client_test.go` | StorageClient：上传/预签名/删除 | T27 |
 | `server/tests/service/auth_service_test.go` | 登录成功/密码错误/账号冻结/令牌刷新/修改密码 | T11 |
@@ -187,6 +190,7 @@
 | `server/tests/handler/ticket_test.go` | 申告接口集成测试（含状态机） | T24 |
 | `server/tests/handler/knowledge_test.go` | 知识管理接口集成测试 | T18, T19 |
 | `server/tests/handler/user_handler_test.go` | 用户管理接口集成测试 | T14 ✅ |
+| `server/tests/handler/role_handler_test.go` | 角色管理接口集成测试 | T15 |
 | `server/tests/database/database_test.go` | 数据库连接和迁移验证 | T03, T04 |
 | `server/tests/database/migrate_test.go` | 自动迁移：16 张表创建/列验证 | T04 |
 | `server/tests/config/config_test.go` | 配置加载/环境变量覆盖 | T02 |
@@ -937,10 +941,11 @@
 
 ---
 
-### Task 25: 问答 Repository
+### Task 25: 问答 Repository ✅
 
 **Files:**
-- Create: `server/internal/repository/chat_repo.go`
+- Create: `server/internal/repository/chat_repo.go` ✅
+- Test: `server/tests/repository/chat_repo_test.go` ✅
 
 **说明：**
 
@@ -957,18 +962,18 @@
 
 ---
 
-### Task 26: 智能问答 Service + Handler
+### Task 26: 智能问答 Service + Handler ✅
 
 **Files:**
-- Create: `server/internal/dto/request/chat.go`
-- Create: `server/internal/dto/response/chat.go`
-- Create: `server/internal/service/chat_service.go`
-- Create: `server/internal/handler/chat.go`
-- Create: `server/internal/stores/chat.ts`
-- Create: `src/api/chat.ts`
-- Create: `src/views/portal/Chat.vue`
-- Test: `server/tests/service/chat_service_test.go`
-- Test: `server/tests/handler/chat_test.go`
+- Create: `server/internal/dto/request/chat.go` ✅
+- Create: `server/internal/dto/response/chat.go` ✅
+- Create: `server/internal/service/chat_service.go` ✅
+- Create: `server/internal/handler/chat.go` ✅
+- Create: `web/src/stores/chat.ts` ✅
+- Create: `web/src/api/chat.ts` ✅
+- Modify: `web/src/views/portal/Chat.vue` ✅
+- Test: `server/tests/service/chat_service_test.go` ✅
+- Test: `server/tests/handler/chat_test.go` ✅
 
 **说明：**
 
@@ -1017,11 +1022,11 @@
 
 ---
 
-### Task 27: MinIO StorageClient 适配器
+### Task 27: MinIO StorageClient 适配器 ✅
 
 **Files:**
-- Create: `server/internal/adapter/storage_client.go`
-- Test: `server/tests/adapter/storage_client_test.go`
+- Create: `server/internal/adapter/storage_client.go` ✅
+- Test: `server/tests/adapter/storage_client_test.go` ✅
 
 **说明：**
 
@@ -1039,16 +1044,18 @@ Bucket 规划：`opsmind-attachments`（申告附件）、`opsmind-documents`（
 
 ---
 
-### Task 28: Vue 门户端页面
+### Task 28: Vue 门户端页面 ✅
 
 **Files:**
-- Create: `src/components/layout/PortalLayout.vue`
-- Create: `src/api/ticket.ts`
-- Create: `src/api/message.ts`
-- Create: `src/views/portal/TicketSubmit.vue`
-- Create: `src/views/portal/TicketQuery.vue`
-- Create: `src/views/portal/TicketDetail.vue`
-- Create: `src/views/portal/Messages.vue`
+- Modify: `web/src/components/layout/PortalLayout.vue` ✅
+- Create: `web/src/api/ticket.ts` ✅
+- Create: `web/src/api/message.ts` ✅
+- Modify: `web/src/views/portal/TicketSubmit.vue` ✅
+- Modify: `web/src/views/portal/TicketQuery.vue` ✅
+- Modify: `web/src/views/portal/TicketDetail.vue` ✅
+- Modify: `web/src/views/portal/Messages.vue` ✅
+- Test: `web/src/api/__tests__/ticket.test.ts` ✅
+- Test: `web/src/api/__tests__/message.test.ts` ✅
 
 **说明：**
 
@@ -1064,13 +1071,13 @@ Bucket 规划：`opsmind-attachments`（申告附件）、`opsmind-documents`（
 
 ---
 
-### Task 29: 站内消息 Service + Handler
+### Task 29: 站内消息 Service + Handler ✅
 
 **Files:**
-- Create: `server/internal/repository/message_repo.go`
-- Create: `server/internal/service/message_service.go`
-- Create: `server/internal/handler/message.go`
-- Test: `server/tests/service/message_service_test.go`
+- Create: `server/internal/repository/message_repo.go` ✅
+- Create: `server/internal/service/message_service.go` ✅
+- Create: `server/internal/handler/message.go` ✅
+- Test: `server/tests/service/message_service_test.go` ✅
 
 **说明：**
 
@@ -1095,11 +1102,11 @@ Bucket 规划：`opsmind-attachments`（申告附件）、`opsmind-documents`（
 
 ---
 
-### Task 30: 后台调度器
+### Task 30: 后台调度器 ✅
 
 **Files:**
-- Create: `server/internal/service/scheduler.go`
-- Test: `server/tests/service/scheduler_test.go`
+- Create: `server/internal/service/scheduler.go` ✅
+- Test: `server/tests/service/scheduler_test.go` ✅
 
 **说明：**
 
@@ -1124,10 +1131,12 @@ Bucket 规划：`opsmind-attachments`（申告附件）、`opsmind-documents`（
 
 ---
 
-### Task 31: main.go 集成调度器
+### Task 31: main.go 集成调度器 ✅
 
 **Files:**
-- Modify: `server/cmd/main.go`
+- Modify: `server/cmd/main.go` ✅
+- Modify: `server/internal/router/router.go` ✅
+- Modify: `server/internal/router/portal.go` ✅
 
 **说明：**
 
