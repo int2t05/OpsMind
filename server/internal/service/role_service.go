@@ -69,6 +69,9 @@ func (s *RoleService) List(page, pageSize int) ([]model.Role, int64, error) {
 }
 
 // Update 更新角色。
+//
+// 校验新名称是否与其他角色冲突（排除自身），
+// 与 Create 保持一致的唯一性约束。
 func (s *RoleService) Update(id int64, name, description string, permissions []string) error {
 	role, err := s.repo.GetByID(id)
 	if err != nil {
@@ -76,6 +79,13 @@ func (s *RoleService) Update(id int64, name, description string, permissions []s
 			return AppError{Code: errcode.ErrNotFound, Message: "角色不存在"}
 		}
 		return err
+	}
+
+	// 校验角色名唯一（排除自身）
+	var count int64
+	s.db.Model(&model.Role{}).Where("name = ? AND id != ?", name, id).Count(&count)
+	if count > 0 {
+		return AppError{Code: errcode.ErrConflict, Message: "角色名已存在"}
 	}
 
 	permsJSON, err := json.Marshal(permissions)

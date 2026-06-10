@@ -124,6 +124,8 @@ func TestRoleService_List_Success(t *testing.T) {
 
 func TestRoleService_Update_Success(t *testing.T) {
 	svc := setupRoleService(t)
+	// 清理可能残留的目标名称，避免跨测试污染触发唯一约束冲突
+	roleSvcDB.Where("name = ?", "test_role_updated").Delete(&model.Role{})
 	role := seedTestRole(t, "test_role_update")
 
 	err := svc.Update(role.ID, "test_role_updated", "更新后的角色", []string{"ticket:read", "ticket:write", "system:config"})
