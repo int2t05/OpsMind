@@ -193,15 +193,6 @@ docker compose up -d anythingllm
 docker compose up -d --build
 ```
 
-> **完成以上 4 步后**，访问 http://localhost:5173 即可使用完整功能。验证 AI 问答是否正常：
-> ```bash
-> # 先用 admin 登录获取 token，然后在门户端提问测试
-> curl -s http://localhost:8080/api/v1/portal/chat-sessions \
->   -H "Authorization: Bearer <token>" \
->   -H "Content-Type: application/json" \
->   -d '{"question":"如何重置VPN密码？","kb_id":1}'
-> ```
-
 ---
 
 ### 第四步：加载演示数据
@@ -226,6 +217,19 @@ curl -s -X POST http://localhost:8080/api/v1/auth/login \
 # 使用 admin / Admin@123 登录
 ```
 
+> **验证 AI 问答**（需先完成第二步 LLM 配置和第三步 API Key，否则跳过此步骤）：
+> ```bash
+> # 获取 token 后测试智能问答
+> TOKEN=$(curl -s -X POST http://localhost:8080/api/v1/auth/login \
+>   -H "Content-Type: application/json" \
+>   -d '{"username":"admin","password":"Admin@123"}' | grep -o '"token":"[^"]*"' | cut -d'"' -f4)
+> 
+> curl -s -X POST http://localhost:8080/api/v1/portal/chat-sessions \
+>   -H "Authorization: Bearer $TOKEN" \
+>   -H "Content-Type: application/json" \
+>   -d '{"question":"如何重置VPN密码？","kb_id":1}'
+> ```
+
 ---
 
 ## 默认账号
@@ -242,28 +246,6 @@ curl -s -X POST http://localhost:8080/api/v1/auth/login \
 | `reporter2` | `Reporter@123` | 报障人 | 同上 |
 
 > 首次登录会强制跳转修改密码页面。
-
-## AnythingLLM API Key 初始化
-
-AnythingLLM 的 API Key 需要在容器启动后手动创建：
-
-```bash
-# 1. 临时暴露 AnythingLLM 管理端口（编辑 docker-compose.yml，取消 anythingllm ports 注释）
-# 2. 重启
-docker compose up -d anythingllm
-
-# 3. 浏览器访问 http://localhost:3001
-# 4. 完成初始化向导后，进入 General Settings → API Keys，创建 API Key
-# 5. 将 API Key 写入 .env 文件
-ANYTHINGLLM_API_KEY=<刚创建的 API Key>
-
-# 6. 重新构建并启动
-docker compose up -d --build
-```
-
-详细步骤参见 [ANYTHINGLLM_AI_INTEGRATION.md](docs/ANYTHINGLLM_AI_INTEGRATION.md) §3.3。
-
----
 
 ## 项目结构
 

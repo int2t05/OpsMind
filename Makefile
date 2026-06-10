@@ -69,7 +69,7 @@ down-v:
 
 # 运行全部测试（非集成）
 test:
-	cd server && go test ./tests/pkg/... ./tests/middleware/... ./tests/router/... -v
+	cd server && go test ./tests/pkg/... ./tests/middleware/... ./tests/router/... ./tests/config/... ./tests/adapter/... -v
 
 # 运行集成测试（需要 PostgreSQL opsmind_test 库）
 test-integration:
