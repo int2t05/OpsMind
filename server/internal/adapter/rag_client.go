@@ -303,10 +303,14 @@ type anythingLLMSyncResponse struct {
 func (c *AnythingLLMClient) SyncDocument(ctx context.Context, req RAGSyncRequest) (*RAGSyncResponse, error) {
 	url := fmt.Sprintf("%s/v1/document/raw-text", c.baseURL)
 
+	// AnythingLLM raw-text API 要求 metadata.title 为必填字段（见 anything-llm source:
+	// server/endpoints/api/document/index.js:569-576）
 	payload := map[string]interface{}{
-		"title":           req.Title,
-		"textContent":     req.Content,
-		"workspaceSlug":   req.WorkspaceSlug,
+		"textContent":   req.Content,
+		"workspaceSlug": req.WorkspaceSlug,
+		"metadata": map[string]string{
+			"title": req.Title,
+		},
 	}
 
 	body, err := json.Marshal(payload)

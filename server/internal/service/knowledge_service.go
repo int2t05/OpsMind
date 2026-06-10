@@ -12,6 +12,7 @@ import (
 	"context"
 	"encoding/json"
 	"strings"
+	"time"
 
 	"opsmind/internal/adapter"
 	"opsmind/internal/dto/request"
@@ -251,7 +252,21 @@ func (s *KnowledgeService) Publish(id int64, publisherID int64) error {
 	if syncErr != nil {
 		_ = s.repo.UpdateChunkSyncStatus(id, "failed", syncErr.Error())
 	} else {
-		_ = s.repo.UpdateChunkSyncStatus(id, "synced", "")
+		// 已有 chunks 则更新状态，不存则创建新 chunk
+		chunks, _ := s.repo.FindChunksByArticleID(id)
+		if len(chunks) > 0 {
+			_ = s.repo.UpdateChunkSyncStatus(id, "synced", "")
+		} else {
+			now := time.Now()
+			_ = s.repo.CreateChunks([]model.KnowledgeChunk{{
+				ArticleID:       id,
+				Content:         article.Answer,
+				EmbeddingModel:  article.KnowledgeBase.EmbeddingModel,
+				VectorDimension: article.KnowledgeBase.VectorDimension,
+				SyncStatus:      "synced",
+				SyncedAt:        &now,
+			}})
+		}
 	}
 
 	return nil
