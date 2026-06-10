@@ -1,31 +1,172 @@
-# OpsMind 本地开发环境
+# OpsMind — 运维数字员工系统 Docker Compose 编排
 #
-# 当前仅包含 M1 阶段所需的 PostgreSQL。
-# 后续任务（T37）会补充完整服务编排（opsmind-server, opsmind-web, anythingllm, minio, vllm）。
+# 与 ANYTHINGLLM_AI_INTEGRATION.md §3.1 完全对齐。
+# 6 个服务：opsmind-server, opsmind-web, anythingllm, vllm, postgres, minio。
 #
 # 使用方式：
-#   docker compose up -d          # 启动
-#   docker compose down           # 停止
-#   docker compose down -v        # 停止并清除数据卷
+#   docker compose up -d --build        # 一键启动全部服务（不含 vLLM）
+#   docker compose --profile ai-local up -d --build  # 含 vLLM 的完整环境
+#   docker compose down                 # 停止
+#   docker compose down -v              # 停止并清除数据卷
 
 services:
+  # ===== OpsMind Go 后端 =====
+  opsmind-server:
+    build:
+      context: ./server
+    container_name: opsmind-server
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    environment:
+      OPSMIND_SERVER_PORT: 8080
+      OPSMIND_DB_HOST: postgres
+      OPSMIND_DB_PORT: 5432
+      OPSMIND_DB_USER: opsmind
+      OPSMIND_DB_PASSWORD: ${POSTGRES_PASSWORD:-opsmind_dev}
+      OPSMIND_DB_NAME: opsmind
+      OPSMIND_MINIO_ENDPOINT: minio:9000
+      OPSMIND_ANYTHINGLLM_BASE_URL: ${ANYTHINGLLM_BASE_URL:-http://anythingllm:3001/api}
+      OPSMIND_ANYTHINGLLM_API_KEY: ${ANYTHINGLLM_API_KEY}
+      OPSMIND_JWT_SECRET: ${OPSMIND_JWT_SECRET}
+      OPSMIND_AI_DEFAULT_TOP_K: ${AI_DEFAULT_TOP_K:-5}
+      OPSMIND_AI_CONFIDENCE_THRESHOLD: ${AI_CONFIDENCE_THRESHOLD:-0.6}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_started
+      anythingllm:
+        condition: service_started
+    networks:
+      - opsmind
+
+  # ===== OpsMind Vue 前端 =====
+  opsmind-web:
+    build:
+      context: ./web
+    container_name: opsmind-web
+    restart: unless-stopped
+    ports:
+      - "5173:80"
+    depends_on:
+      - opsmind-server
+    networks:
+      - opsmind
+
+  # ===== AnythingLLM RAG 服务 =====
+  anythingllm:
+    image: mintplexlabs/anythingllm:latest
+    container_name: opsmind-anythingllm
+    restart: unless-stopped
+    cap_add:
+      - SYS_ADMIN
+    env_file:
+      - .env
+    environment:
+      SERVER_PORT: 3001
+      STORAGE_DIR: /app/server/storage
+      JWT_SECRET: ${ANYTHINGLLM_JWT_SECRET}
+      SIG_KEY: ${ANYTHINGLLM_SIG_KEY}
+      SIG_SALT: ${ANYTHINGLLM_SIG_SALT}
+      LLM_PROVIDER: generic-openai
+      GENERIC_OPEN_AI_BASE_PATH: ${VLLM_BASE_URL}
+      GENERIC_OPEN_AI_MODEL_PREF: ${VLLM_MODEL}
+      GENERIC_OPEN_AI_MODEL_TOKEN_LIMIT: ${VLLM_TOKEN_LIMIT:-8192}
+      GENERIC_OPEN_AI_API_KEY: ${VLLM_API_KEY}
+      EMBEDDING_ENGINE: generic-openai
+      EMBEDDING_BASE_PATH: ${EMBEDDING_BASE_URL}
+      EMBEDDING_MODEL_PREF: ${EMBEDDING_MODEL}
+      EMBEDDING_MODEL_MAX_CHUNK_LENGTH: ${EMBEDDING_MAX_CHUNK_LENGTH:-8192}
+      GENERIC_OPEN_AI_EMBEDDING_API_KEY: ${EMBEDDING_API_KEY}
+      VECTOR_DB: lancedb
+    volumes:
+      - anythingllm_storage:/app/server/storage
+      - anythingllm_hotdir:/app/collector/hotdir
+      - anythingllm_outputs:/app/collector/outputs
+    # 默认不暴露端口；初始化 API Key 时临时取消注释：
+    # ports:
+    #   - "3001:3001"
+    # depends_on 不包含 vllm，因为 vllm 在 ai-local profile 中是可选的。
+    # 使用 --profile ai-local 时 vllm 才会启动，anythingllm 可在之后重启以连接。
+    networks:
+      - opsmind
+
+  # ===== vLLM 模型推理（可选，通过 --profile ai-local 启用）=====
+  vllm:
+    image: vllm/vllm-openai:latest
+    container_name: opsmind-vllm
+    restart: unless-stopped
+    # 实际部署时按模型和 GPU 环境补充启动参数。
+    # 示例：
+    #   deploy:
+    #     resources:
+    #       reservations:
+    #         devices:
+    #           - driver: nvidia
+    #             count: 1
+    #             capabilities: [gpu]
+    #   command:
+    #     - "--model"
+    #     - "/models/qwen2.5-7b-instruct"
+    #     - "--served-model-name"
+    #     - "qwen2.5-7b-instruct"
+    volumes:
+      - ./models:/models
+    networks:
+      - opsmind
+    profiles:
+      - ai-local
+
+  # ===== PostgreSQL + pgvector =====
   postgres:
-    image: pgvector/pgvector:pg16
+    image: pgvector/pgvector:pg18
     container_name: opsmind-postgres
     restart: unless-stopped
     ports:
       - "5432:5432"
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-opsmind}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-opsmind123}
-      POSTGRES_DB: ${POSTGRES_DB:-opsmind}
+      POSTGRES_DB: opsmind
+      POSTGRES_USER: opsmind
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-opsmind_dev}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-opsmind}"]
+      test: ["CMD-SHELL", "pg_isready -U opsmind"]
       interval: 5s
       timeout: 3s
       retries: 5
+    networks:
+      - opsmind
 
+  # ===== MinIO 对象存储 =====
+  minio:
+    image: minio/minio:latest
+    container_name: opsmind-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    networks:
+      - opsmind
+
+# ===== 数据卷 =====
 volumes:
   postgres_data:
+  minio_data:
+  anythingllm_storage:
+  anythingllm_hotdir:
+  anythingllm_outputs:
+
+# ===== 网络 =====
+networks:
+  opsmind:
+    driver: bridge
