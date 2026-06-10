@@ -128,7 +128,12 @@ func registerAdminRoutes(rg *gin.RouterGroup, h *Handlers) {
 		rg.PUT("/embedding-configs/:id", placeholder())
 	}
 
-	// 系统配置（占位 — T34 实现）
-	rg.GET("/configs/:key", placeholder())
-	rg.PUT("/configs/:key", placeholder())
+	// 系统配置（T34 — 已实现）
+	if h != nil && h.Config != nil {
+		rg.GET("/configs/:key", h.Config.Get)
+		rg.PUT("/configs/:key", h.Config.Update)
+	} else {
+		rg.GET("/configs/:key", placeholder())
+		rg.PUT("/configs/:key", placeholder())
+	}
 }
