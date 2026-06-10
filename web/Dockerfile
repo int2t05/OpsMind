@@ -15,7 +15,9 @@ WORKDIR /build
 
 # 利用 Docker 层缓存：先复制依赖文件
 COPY package.json package-lock.json* ./
-RUN npm ci --silent
+# 使用淘宝镜像加速（国内环境），fallback 到官方源
+RUN npm config set registry https://registry.npmmirror.com && \
+    npm ci --silent || npm install --silent
 
 # 复制源码并构建
 COPY . .

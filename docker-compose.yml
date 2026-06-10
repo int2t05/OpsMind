@@ -22,11 +22,11 @@ services:
       - .env
     environment:
       OPSMIND_SERVER_PORT: 8080
-      OPSMIND_DB_HOST: postgres
-      OPSMIND_DB_PORT: 5432
-      OPSMIND_DB_USER: opsmind
-      OPSMIND_DB_PASSWORD: ${POSTGRES_PASSWORD:-opsmind_dev}
-      OPSMIND_DB_NAME: opsmind
+      OPSMIND_DATABASE_HOST: postgres
+      OPSMIND_DATABASE_PORT: 5432
+      OPSMIND_DATABASE_USER: opsmind
+      OPSMIND_DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-opsmind_dev}
+      OPSMIND_DATABASE_DBNAME: opsmind
       OPSMIND_MINIO_ENDPOINT: minio:9000
       OPSMIND_ANYTHINGLLM_BASE_URL: ${ANYTHINGLLM_BASE_URL:-http://anythingllm:3001/api}
       OPSMIND_ANYTHINGLLM_API_KEY: ${ANYTHINGLLM_API_KEY}
@@ -131,8 +131,9 @@ services:
       POSTGRES_DB: opsmind
       POSTGRES_USER: opsmind
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-opsmind_dev}
+      PGDATA: /var/lib/postgresql/data/pgdata
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U opsmind"]
       interval: 5s

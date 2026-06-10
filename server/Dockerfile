@@ -9,7 +9,7 @@
 #   docker compose build opsmind-server
 
 # ===== 阶段 1: 编译 =====
-FROM golang:1.22-alpine AS builder
+FROM golang:1.26-alpine AS builder
 
 # 安装 git（Go module 下载需要）和 ca-certificates
 RUN apk add --no-cache git ca-certificates
@@ -18,6 +18,8 @@ WORKDIR /build
 
 # 利用 Docker 层缓存：先复制依赖文件
 COPY go.mod go.sum ./
+# 设置 Go module 代理（国内环境加速）
+ENV GOPROXY=https://goproxy.cn,direct
 RUN go mod download
 
 # 复制源码并编译

@@ -6,17 +6,31 @@
  * - 响应拦截器：处理 401（跳转登录）、403（提示无权限）、统一提取 data
  */
 
-import axios from 'axios'
+import axios, { type AxiosRequestConfig } from 'axios'
 import { getToken, removeToken } from './auth'
 import router from '@/router'
 
+// 响应拦截器已将 AxiosResponse 的 data 提取，因此返回类型应为 T 而非 AxiosResponse<T>。
+// 通过类型断言覆盖 axios.create 的返回类型。
+interface InterceptedAxiosInstance {
+  request<T = any>(config: AxiosRequestConfig): Promise<T>
+  get<T = any>(url: string, config?: AxiosRequestConfig): Promise<T>
+  post<T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<T>
+  put<T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<T>
+  patch<T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<T>
+  delete<T = any>(url: string, config?: AxiosRequestConfig): Promise<T>
+}
+
 // 创建 Axios 实例，baseURL 为空（通过 Vite proxy 转发）
-const request = axios.create({
+const raw = axios.create({
   timeout: 30000
 })
 
+// 类型断言：拦截器已提取 response.data，返回类型简化为 T
+const request = raw as unknown as InterceptedAxiosInstance
+
 // 请求拦截器：注入 token
-request.interceptors.request.use(
+raw.interceptors.request.use(
   (config) => {
     const token = getToken()
     if (token) {
@@ -30,7 +44,7 @@ request.interceptors.request.use(
 )
 
 // 响应拦截器：统一错误处理
-request.interceptors.response.use(
+raw.interceptors.response.use(
   (response) => {
     // 统一提取 data 字段
     return response.data
