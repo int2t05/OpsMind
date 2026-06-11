@@ -31,7 +31,12 @@ type Chunker struct {
 // NewChunker 创建分块器实例。
 //
 // chunkSize 为目标分块大小（字符数），chunkOverlap 为重叠量。
+// 如果 chunkOverlap ≥ chunkSize，将自动 clamp 到 chunkSize/2，
+// 避免产生 O(N²) 级别的海量重叠分块。
 func NewChunker(chunkSize, chunkOverlap int) *Chunker {
+	if chunkOverlap >= chunkSize {
+		chunkOverlap = chunkSize / 2
+	}
 	return &Chunker{
 		ChunkSize:    chunkSize,
 		ChunkOverlap: chunkOverlap,

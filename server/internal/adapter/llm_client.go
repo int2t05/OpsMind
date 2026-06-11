@@ -220,19 +220,15 @@ func (c *OpenAIClient) ChatCompletionStream(ctx context.Context, req ChatRequest
 // 为什么在 goroutine 中读取而非调用方直接读取 Body：
 // 流式读取需要持续占用 goroutine，channel 模式将「网络 IO」和「业务处理」解耦，
 // 调用方可以用 range channel 消费 token，同时检测 ctx.Done() 实现断连处理。
+//
+// 所有 ch <- send 都通过 sendChunk 辅助函数执行，
+// 当 ctx 取消或 channel 满且消费者已断开时，goroutine 优雅退出而非永久阻塞。
 func (c *OpenAIClient) readSSEStream(ctx context.Context, resp *http.Response, ch chan<- StreamChunk) {
 	defer close(ch)
 	defer resp.Body.Close()
 
 	scanner := bufio.NewScanner(resp.Body)
 	for scanner.Scan() {
-		// 检测 context 取消（客户端断连）
-		select {
-		case <-ctx.Done():
-			return
-		default:
-		}
-
 		line := scanner.Text()
 		// 跳过空行和注释
 		if line == "" || strings.HasPrefix(line, ":") {
@@ -249,7 +245,9 @@ func (c *OpenAIClient) readSSEStream(ctx context.Context, resp *http.Response, c
 		var chunk openAIStreamChunk
 		if err := json.Unmarshal([]byte(data), &chunk); err != nil {
 			// 解析失败：发送错误 token 并继续（非致命）
-			ch <- StreamChunk{Error: fmt.Errorf("解析 SSE chunk 失败: %w", err)}
+			if !sendChunk(ctx, ch, StreamChunk{Error: fmt.Errorf("解析 SSE chunk 失败: %w", err)}) {
+				return
+			}
 			continue
 		}
 
@@ -260,16 +258,31 @@ func (c *OpenAIClient) readSSEStream(ctx context.Context, resp *http.Response, c
 				finishReason = *chunk.Choices[0].FinishReason
 			}
 			if content != "" || finishReason != "" {
-				ch <- StreamChunk{
+				if !sendChunk(ctx, ch, StreamChunk{
 					Content:      content,
 					FinishReason: finishReason,
+				}) {
+					return
 				}
 			}
 		}
 	}
 
 	if err := scanner.Err(); err != nil {
-		ch <- StreamChunk{Error: fmt.Errorf("读取 SSE 流失败: %w", err)}
+		sendChunk(ctx, ch, StreamChunk{Error: fmt.Errorf("读取 SSE 流失败: %w", err)})
+	}
+}
+
+// sendChunk 安全地向 channel 发送 chunk，ctx 取消时返回 false。
+//
+// 使用 select 同时监听 ctx.Done() 和 channel send，
+// 消费者断开连接时 goroutine 不会永久阻塞在 channel send 上。
+func sendChunk(ctx context.Context, ch chan<- StreamChunk, chunk StreamChunk) bool {
+	select {
+	case <-ctx.Done():
+		return false
+	case ch <- chunk:
+		return true
 	}
 }
 

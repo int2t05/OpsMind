@@ -47,8 +47,11 @@ type Segmenter interface {
 // gse 是纯 Go 实现，无 CGO 依赖，交叉编译友好。
 // 支持中文、英文、日文等多语言分词，
 // 内置词典覆盖常见中文词汇，MVP 阶段无需额外训练。
+//
+// 线程安全：Segment 方法通过 mu 保护 gse 内部状态（HMM 标记器在 Cut 时修改内部结构）。
 type GseSegmenter struct {
 	seg gse.Segmenter
+	mu  sync.Mutex
 }
 
 // NewGseSegmenter 创建 gse 分词器实例。
@@ -61,8 +64,10 @@ func NewGseSegmenter() *GseSegmenter {
 	return s
 }
 
-// Segment 对文本分词。
+// Segment 对文本分词（线程安全）。
 func (s *GseSegmenter) Segment(text string) []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	return s.seg.Cut(text, true) // true = 启用 HMM 分词
 }
 
@@ -159,7 +164,7 @@ type bm25Entry struct {
 
 // NewBM25Retriever 创建 BM25Retriever 实例。
 //
-// ttl 为索引过期时间，设为 0 完全禁用缓存（不推荐）。
+// ttl 为索引自动过期时间。设 0 禁用自动过期，索引永久有效。
 func NewBM25Retriever(seg Segmenter, ttl time.Duration) *BM25Retriever {
 	r := &BM25Retriever{
 		segmenter: seg,
@@ -234,9 +239,29 @@ func (r *BM25Retriever) Retrieve(ctx context.Context, query string, kbID int64, 
 		return nil, nil
 	}
 
-	// TTL 检查
+	// TTL 检查：过期时自动重建索引（使用存储的文档副本）
 	if r.ttl > 0 && time.Since(entry.builtAt) > r.ttl {
-		return nil, nil // 过期返回空，由调用方触发重建
+		r.mu.RUnlock()
+		// 升级为写锁并重建
+		r.mu.Lock()
+		// 双重检查（其他 goroutine 可能已重建）
+		if e, stillExists := r.indexes[kbID]; stillExists && time.Since(e.builtAt) > r.ttl {
+			if len(e.documents) > 0 {
+				idx := r.buildIndex(e.documents)
+				r.indexes[kbID] = &bm25Entry{
+					index:     idx,
+					documents: e.documents,
+					builtAt:   time.Now(),
+				}
+			}
+		}
+		r.mu.Unlock()
+		r.mu.RLock()
+		// 重新获取（可能已更新）
+		entry = r.indexes[kbID]
+		if entry == nil || entry.index.docCount == 0 {
+			return nil, nil
+		}
 	}
 
 	// 对查询分词
@@ -307,9 +332,15 @@ func (r *BM25Retriever) scoreQuery(idx *BM25Index, queryTokens []string) map[int
 		for _, p := range postings {
 			docLen := float64(idx.docLens[p.ChunkID])
 
+			// 防止 avgdl=0 导致除零（所有文档内容为空时）
+			avgdl := idx.avgdl
+			if avgdl == 0 {
+				avgdl = 1 // 默认长度为 1，避免除零
+			}
+
 			// tf_norm = f * (k1 + 1) / (f + k1 * (1 - b + b * dl/avgdl))
 			f := float64(p.TermFreq)
-			normFactor := bm25K1 * (1 - bm25B + bm25B*docLen/idx.avgdl)
+			normFactor := bm25K1 * (1 - bm25B + bm25B*docLen/avgdl)
 			tfNorm := (f * (bm25K1 + 1)) / (f + normFactor)
 
 			scores[p.ChunkID] += idf * tfNorm

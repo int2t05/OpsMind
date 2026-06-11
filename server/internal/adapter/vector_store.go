@@ -245,6 +245,10 @@ func (s *PgvectorStore) GetChunksByArticle(ctx context.Context, articleID int64)
 //
 // pgvector 接受 ARRAY[...] 或 [val1,val2,...] 格式。
 // 使用 [val1,val2,...] 格式配合 ::halfvec 显式类型转换。
+//
+// 对 NaN 和 ±Inf 使用 0.0 替代——pgvector 不接受非有限浮点数，
+// 而 NaN/Inf 在 normalized embedding 中不应出现（出现意味着上游 bug），
+// 0.0 替代是最小伤害的降级策略（不影响向量维度）。
 func float32ToPgVector(v []float32) string {
 	if len(v) == 0 {
 		return "[]"
@@ -254,6 +258,10 @@ func float32ToPgVector(v []float32) string {
 	for i, f := range v {
 		if i > 0 {
 			b.WriteByte(',')
+		}
+		// NaN 和 Inf 无法被 pgvector 解析，替换为 0.0
+		if f != f || f > 1e30 || f < -1e30 {
+			f = 0.0
 		}
 		b.WriteString(fmt.Sprintf("%.6f", f))
 	}

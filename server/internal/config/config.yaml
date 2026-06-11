@@ -1,7 +1,7 @@
 # OpsMind 后端配置文件
 #
 # 本地开发使用默认值，Docker 环境通过环境变量覆盖。
-# 环境变量前缀：OPSMIND_，例如 OPSMIND_DB_HOST 覆盖 database.host。
+# 环境变量前缀：OPSMIND_，例如 OPSMIND_DATABASE_HOST 覆盖 database.host。
 
 server:
   port: 8080
@@ -11,7 +11,7 @@ database:
   host: localhost        # Docker 内: postgres
   port: 5432
   user: opsmind
-  password: ""           # 通过环境变量 OPSMIND_DB_PASSWORD 设置
+  password: ""           # 通过环境变量 OPSMIND_DATABASE_PASSWORD 设置
   dbname: opsmind
   sslmode: disable
 

@@ -93,11 +93,12 @@ func (p *Processor) Submit(task ProcessTask) {
 
 // Stop 优雅关闭处理器。
 //
-// 关闭任务通道，等待所有 worker 完成当前任务后退出。
+// 先 cancel context（中断正在进行的 I/O），关闭任务通道（不再接收新任务），
+// 然后等待所有 worker 完成当前任务后退出。
 func (p *Processor) Stop() {
+	p.cancel() // 先中断所有进行中的 I/O 操作
 	close(p.taskCh)
 	p.wg.Wait()
-	p.cancel()
 }
 
 // worker 处理任务循环。
@@ -152,11 +153,10 @@ func (p *Processor) processTask(task ProcessTask) {
 		}
 	}
 
-	if err := p.store.DeleteByArticle(ctx, articleID); err != nil {
-		p.updateStatus(task, "failed", fmt.Sprintf("清理旧向量失败: %v", err))
-		return
-	}
-
+	// 阶段 3: 写入 pgvector
+	// 注意：这里不执行 DeleteByArticle——避免「先删后写失败导致数据丢失」。
+	// 旧向量由调用方（Service 层）在重新发布时负责清理。
+	p.updateStatus(task, "indexing", "")
 	if err := p.store.BatchInsert(ctx, vc); err != nil {
 		p.updateStatus(task, "failed", fmt.Sprintf("写入向量失败: %v", err))
 		return

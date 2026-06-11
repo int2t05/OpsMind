@@ -208,9 +208,9 @@ func TestLoad_StructFields(t *testing.T) {
 	}
 }
 
-// TestLoad_LLMConfigHotReload 验证 LLM 配置支持热替换所需的字段完整性。
+// TestLoad_LLMConfigHotReload 验证 LLM 配置包含热替换所需的所有字段。
 //
-// config 包使用 atomic.Value 存储当前 LLMConfig，
+// LLMConfigManager（M4 Service 层）使用 atomic.Value 进行零锁热替换，
 // 要求 LLMConfig 包含所有调用 LLMClient 所需的字段（BaseURL/APIKey/Model/MaxTokens）。
 func TestLoad_LLMConfigHotReload(t *testing.T) {
 	cfgPath := filepath.Join("..", "..", "internal", "config", "config.yaml")

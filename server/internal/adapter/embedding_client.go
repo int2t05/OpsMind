@@ -143,8 +143,11 @@ func (c *OpenAIEmbeddingClient) CreateEmbeddings(ctx context.Context, req Embedd
 
 	embeddings := make([][]float32, len(apiResp.Data))
 	for _, d := range apiResp.Data {
-		if d.Index >= len(embeddings) {
+		if d.Index < 0 || d.Index >= len(embeddings) {
 			return nil, fmt.Errorf("embedding index 越界: %d (总数 %d)", d.Index, len(embeddings))
+		}
+		if embeddings[d.Index] != nil {
+			return nil, fmt.Errorf("embedding index 重复: %d", d.Index)
 		}
 		embeddings[d.Index] = d.Embedding
 	}

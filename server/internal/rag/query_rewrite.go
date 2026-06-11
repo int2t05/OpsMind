@@ -52,8 +52,9 @@ func QueryRewrite(ctx context.Context, llm adapter.LLMClient, query string, hist
 		// 降级：返回原始查询
 		return query, nil
 	}
-	if resp.Content == "" {
+	result := strings.TrimSpace(resp.Content)
+	if result == "" {
 		return query, nil
 	}
-	return strings.TrimSpace(resp.Content), nil
+	return result, nil
 }

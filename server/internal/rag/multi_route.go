@@ -45,14 +45,18 @@ func MultiRoute(ctx context.Context, llm adapter.LLMClient, query string, count 
 		return []string{query}, nil
 	}
 
-	// 解析子查询（按行分割，过滤空行）
+	// 解析子查询（按行分割，过滤空行、去重）
 	lines := strings.Split(strings.TrimSpace(resp.Content), "\n")
 	var routes []string
+	seen := make(map[string]bool)
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
-		// 去除可能的编号前缀（如 "1. "、"1、"、"- "）
-		line = strings.TrimLeft(line, "0123456789.、- ")
-		if line != "" && line != query {
+		// 去除编号前缀：匹配 "1." "1、" "1) " "- " 等格式
+		line = strings.TrimLeft(line, "0123456789")
+		line = strings.TrimLeft(line, ".、) -")
+		line = strings.TrimSpace(line)
+		if line != "" && line != query && !seen[line] {
+			seen[line] = true
 			routes = append(routes, line)
 		}
 	}

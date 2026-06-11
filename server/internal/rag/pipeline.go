@@ -33,23 +33,22 @@ import (
 
 // Pipeline 组装 RAG 管道各步骤，按序执行检索流程。
 type Pipeline struct {
-	vectorRetriever Retriever            // 向量检索器（通过 Embedder+VectorStore 实现）
-	bm25Retriever   Retriever            // BM25 检索器（可为 nil，表示不启用 BM25）
-	llmClient       adapter.LLMClient    // LLM 客户端（查询改写/多路/重排序）
-	embedder        *Embedder            // 向量嵌入器
-	onStep          StepCallback         // 步骤回调（SSE 通知）
+	vectorRetriever Retriever         // 向量检索器（通过 Embedder+VectorStore 实现，不可为 nil）
+	bm25Retriever   Retriever         // BM25 检索器（可为 nil，表示不启用 BM25）
+	llmClient       adapter.LLMClient // LLM 客户端（查询改写/多路/重排序）
+	embedder        *Embedder         // 向量嵌入器
 }
 
 // NewPipeline 创建 Pipeline 实例。
 //
-// bm25Retriever 可以为 nil（不启用 BM25 混合检索）。
-func NewPipeline(vectorRet, bm25Ret Retriever, llm adapter.LLMClient, emb *Embedder, onStep StepCallback) *Pipeline {
+// vectorRet 不可为 nil。bm25Ret 可以为 nil（不启用 BM25 混合检索）。
+// onStep 回调通过 Execute 的 onStep 参数传入，不在此处存储（避免闭包陷阱）。
+func NewPipeline(vectorRet, bm25Ret Retriever, llm adapter.LLMClient, emb *Embedder) *Pipeline {
 	return &Pipeline{
 		vectorRetriever: vectorRet,
 		bm25Retriever:   bm25Ret,
 		llmClient:       llm,
-		embedder:         emb,
-		onStep:           onStep,
+		embedder:        emb,
 	}
 }
 
@@ -146,13 +145,22 @@ func (p *Pipeline) Execute(ctx context.Context, query string, kbID int64, opts R
 		})
 
 		// 3c: RRF 融合
-		_ = track("hybrid_fuse", "混合融合", func() error {
+		fuseErr := track("hybrid_fuse", "混合融合", func() error {
 			allChunks = HybridFuse(vectorResults, bm25Results, 60, opts.RerankCount)
 			if len(allChunks) == 0 {
 				return fmt.Errorf("混合融合后无结果")
 			}
 			return nil
 		})
+		if fuseErr != nil && len(vectorResults) == 0 && len(bm25Results) == 0 {
+			// 两路都为空时才传播错误（否则融合失败不影响已有结果）
+			return nil, fmt.Errorf("混合检索无结果: %w", fuseErr)
+		}
+		if len(allChunks) == 0 && len(vectorResults) > 0 {
+			allChunks = vectorResults
+		} else if len(allChunks) == 0 && len(bm25Results) > 0 {
+			allChunks = bm25Results
+		}
 	} else {
 		// 纯向量模式
 		err := track("vector_retrieve", "向量检索", func() error {

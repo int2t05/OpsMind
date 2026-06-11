@@ -169,19 +169,25 @@ func TestCreateEmbeddings_DimensionValidation(t *testing.T) {
 	client := adapter.NewOpenAIEmbeddingClient(server.URL, "test-key", 10*time.Second)
 
 	// bge-m3 → 1024 维
-	resp1, _ := client.CreateEmbeddings(context.Background(), adapter.EmbeddingRequest{
+	resp1, err1 := client.CreateEmbeddings(context.Background(), adapter.EmbeddingRequest{
 		Model: "bge-m3",
 		Input: []string{"test"},
 	})
+	if err1 != nil {
+		t.Fatalf("bge-m3 CreateEmbeddings 失败: %v", err1)
+	}
 	if resp1.Dimension != 1024 {
 		t.Errorf("bge-m3 维期望 1024, 实际 %d", resp1.Dimension)
 	}
 
 	// text-embedding-3-small → 1536 维
-	resp2, _ := client.CreateEmbeddings(context.Background(), adapter.EmbeddingRequest{
+	resp2, err2 := client.CreateEmbeddings(context.Background(), adapter.EmbeddingRequest{
 		Model: "text-embedding-3-small",
 		Input: []string{"test"},
 	})
+	if err2 != nil {
+		t.Fatalf("text-embedding-3-small CreateEmbeddings 失败: %v", err2)
+	}
 	if resp2.Dimension != 1536 {
 		t.Errorf("text-embedding-3-small 维期望 1536, 实际 %d", resp2.Dimension)
 	}
