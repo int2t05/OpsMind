@@ -1,6 +1,6 @@
 <template>
-  <div class="portal-layout">
-    <header class="portal-header">
+  <n-layout class="portal-layout">
+    <n-layout-header bordered class="portal-header">
       <div class="header-inner">
         <router-link to="/portal/chat" class="logo">OpsMind</router-link>
         <nav class="main-nav">
@@ -13,31 +13,46 @@
           <router-link to="/portal/tickets" class="nav-link" active-class="nav-link--active">
             我的申告
           </router-link>
-          <router-link to="/portal/messages" class="nav-link" active-class="nav-link--active">
+          <router-link to="/portal/messages" class="nav-link nav-link--badge" active-class="nav-link--active">
             消息
-            <span v-if="unreadCount > 0" class="badge">{{ unreadCount > 99 ? '99+' : unreadCount }}</span>
+            <n-badge
+              v-if="unreadCount > 0"
+              :value="unreadCount"
+              :max="99"
+              size="tiny"
+              class="msg-badge"
+            />
           </router-link>
         </nav>
         <div class="header-right">
-          <router-link to="/change-password" class="nav-link">修改密码</router-link>
-          <button class="nav-link logout-btn" @click="handleLogout">退出</button>
+          <n-button quaternary circle size="small" @click="toggleTheme" title="切换主题">
+            <template #icon>
+              <n-icon size="18"><SunnyOutline v-if="isDark" /><MoonOutline v-else /></n-icon>
+            </template>
+          </n-button>
+          <n-button text size="small" @click="router.push('/change-password')">修改密码</n-button>
+          <n-button text size="small" @click="handleLogout">退出</n-button>
         </div>
       </div>
-    </header>
-    <main class="portal-main">
+    </n-layout-header>
+    <n-layout-content class="portal-main">
       <router-view />
-    </main>
-  </div>
+    </n-layout-content>
+  </n-layout>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { NLayout, NLayoutHeader, NLayoutContent, NButton, NIcon, NBadge } from 'naive-ui'
+import { SunnyOutline, MoonOutline } from '@vicons/ionicons5'
 import { useAuthStore } from '@/stores/auth'
+import { useTheme } from '@/composables/useTheme'
 import { getUnreadCount } from '@/api/message'
 
 const router = useRouter()
 const authStore = useAuthStore()
+const { toggleTheme, isDark } = useTheme()
 const unreadCount = ref(0)
 
 onMounted(async () => {
@@ -59,14 +74,9 @@ function handleLogout() {
 <style scoped>
 .portal-layout {
   min-height: 100vh;
-  background: var(--bg-base);
-  color: var(--text-primary);
-  font-family: var(--font-family);
 }
 
 .portal-header {
-  border-bottom: 1px solid var(--border-default);
-  background: var(--bg-panel);
   position: sticky;
   top: 0;
   z-index: 50;
@@ -75,24 +85,25 @@ function handleLogout() {
 .header-inner {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 0 24px;
+  padding: 0 var(--spacing-lg);
   height: 56px;
   display: flex;
   align-items: center;
-  gap: 32px;
+  gap: var(--spacing-xl);
 }
 
 .logo {
   font-size: 18px;
-  font-weight: var(--font-weight-semibold, 600);
+  font-weight: var(--font-weight-strong);
   color: var(--accent);
   text-decoration: none;
   flex-shrink: 0;
+  letter-spacing: -0.3px;
 }
 
 .main-nav {
   display: flex;
-  gap: 4px;
+  gap: var(--spacing-xs);
   flex: 1;
 }
 
@@ -100,9 +111,10 @@ function handleLogout() {
   color: var(--text-secondary);
   text-decoration: none;
   font-size: 14px;
+  font-weight: var(--font-weight-emphasis);
   padding: 8px 16px;
-  border-radius: 6px;
-  transition: color 0.15s, background 0.15s;
+  border-radius: var(--radius-md);
+  transition: color var(--transition-fast), background var(--transition-fast);
   position: relative;
 }
 
@@ -116,37 +128,22 @@ function handleLogout() {
   background: var(--bg-overlay);
 }
 
+.nav-link--badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .header-right {
   display: flex;
-  gap: 8px;
+  gap: var(--spacing-sm);
   align-items: center;
   flex-shrink: 0;
-}
-
-.logout-btn {
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-size: 14px;
-  font-family: inherit;
-}
-
-.badge {
-  position: absolute;
-  top: 2px;
-  right: 2px;
-  background: var(--accent);
-  color: #fff;
-  font-size: 11px;
-  padding: 1px 5px;
-  border-radius: 10px;
-  min-width: 18px;
-  text-align: center;
 }
 
 .portal-main {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 32px 24px;
+  padding: var(--spacing-xl) var(--spacing-lg);
 }
 </style>

@@ -1,37 +1,100 @@
-/**
- * Linear Design 全局样式
- *
- * 暗色主题 CSS 变量，参考 DESIGN-linear.app.md。
- * 字体：Inter Variable，OpenType 特性 "cv01", "ss03"。
- * 强调字重：510。
- */
+/* ===== OpsMind 全局样式 — Linear Design 设计系统 ===== */
+/* 与 docs/prompts/DESIGN-linear.app.md 完全对齐 */
+/* 支持 dark/light 双主题，通过 [data-theme] 属性切换 */
 
-:root {
-  /* 背景色 */
+/* ===== 暗色主题（默认）===== */
+:root,
+[data-theme='dark'] {
+  /* 背景 */
   --bg-base: #08090a;
   --bg-panel: #0f1011;
   --bg-overlay: #191a1b;
+  --bg-elevated: #28282c;
+  --bg-subtle: rgba(255, 255, 255, 0.02);
 
-  /* 边框色 */
-  --border-default: rgba(255, 255, 255, 0.05);
-  --border-hover: rgba(255, 255, 255, 0.08);
+  /* 文字 */
+  --text-primary: #f7f8f8;
+  --text-secondary: #d0d6e0;
+  --text-tertiary: #8a8f98;
+  --text-muted: #62666d;
 
-  /* 强调色 */
+  /* 品牌色 */
   --accent: #5e6ad2;
   --accent-interactive: #7170ff;
   --accent-hover: #828fff;
 
-  /* 文本色 */
-  --text-primary: #e8e8e8;
-  --text-secondary: #8a8a8a;
+  /* 状态色 */
+  --success: #27a644;
+  --success-soft: #10b981;
+  --error: #e0484c;
+  --warning: #f0a020;
+
+  /* 边框 */
+  --border-subtle: rgba(255, 255, 255, 0.05);
+  --border-default: rgba(255, 255, 255, 0.08);
+  --border-hover: rgba(255, 255, 255, 0.12);
+  --border-solid: #23252a;
+
+  /* 阴影 */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
 
   /* 字体 */
-  --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu,
-    Cantarell, 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+  --font-family: 'Inter Variable', -apple-system, system-ui, 'Segoe UI', sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', Menlo, monospace;
+  --font-weight-regular: 400;
+  --font-weight-emphasis: 510;
+  --font-weight-strong: 590;
+
+  /* 间距 */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+  --spacing-2xl: 48px;
+
+  /* 圆角 */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  --radius-full: 9999px;
+  --radius-circle: 50%;
+
+  /* 过渡 */
+  --transition-fast: 150ms ease;
+  --transition-normal: 250ms ease;
+
+  /* 字体特性 */
   --font-features: 'cv01', 'ss03';
-  --font-weight-semibold: 510;
 }
 
+/* ===== 浅色主题 ===== */
+[data-theme='light'] {
+  --bg-base: #f7f8f8;
+  --bg-panel: #ffffff;
+  --bg-overlay: #ffffff;
+  --bg-elevated: #f3f4f5;
+  --bg-subtle: rgba(0, 0, 0, 0.02);
+
+  --text-primary: #1a1a2e;
+  --text-secondary: #4a4a5a;
+  --text-tertiary: #8a8f98;
+  --text-muted: #a0a4ab;
+
+  --border-subtle: #e6e6e6;
+  --border-default: #d0d6e0;
+  --border-hover: #b0b6c0;
+  --border-solid: #d0d6e0;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+/* ===== 全局重置 ===== */
 *,
 *::before,
 *::after {
@@ -44,20 +107,24 @@ html {
   font-size: 16px;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 body {
   font-family: var(--font-family);
   font-feature-settings: var(--font-features);
-  background-color: var(--bg-base);
-  color: var(--text-primary);
+  font-weight: var(--font-weight-regular);
+  font-size: 16px;
   line-height: 1.5;
+  color: var(--text-primary);
+  background: var(--bg-base);
   min-height: 100vh;
 }
 
 a {
   color: var(--accent-interactive);
   text-decoration: none;
+  transition: color var(--transition-fast);
 }
 
 a:hover {
@@ -67,10 +134,45 @@ a:hover {
 button {
   cursor: pointer;
   font-family: inherit;
+  font-feature-settings: var(--font-features);
 }
 
 input,
 textarea,
 select {
   font-family: inherit;
+  font-feature-settings: var(--font-features);
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-default);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--border-hover);
+}
+
+/* Naive UI 全局微调 */
+.n-config-provider {
+  font-family: var(--font-family) !important;
+  font-feature-settings: var(--font-features);
+}
+
+.n-button__content {
+  font-weight: var(--font-weight-emphasis) !important;
+}
+
+.n-menu .n-menu-item-content.n-menu-item-content--selected::before {
+  background: var(--accent) !important;
+  opacity: 0.12 !important;
 }

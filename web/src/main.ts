@@ -1,8 +1,5 @@
-/**
- * Vue 应用入口
- *
- * 创建 Vue app，注册 Pinia、Router、全局样式。
- */
+// Vue 应用入口 — 注册 Naive UI、Pinia、Router、全局样式。
+// Naive UI 通过 NConfigProvider 提供全局主题，主题切换由 useTheme composable 驱动。
 
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'

@@ -13,7 +13,9 @@
     "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix"
   },
   "dependencies": {
+    "@vicons/ionicons5": "^0.13.0",
     "axios": "^1.7.0",
+    "naive-ui": "^2.44.1",
     "pinia": "^2.1.0",
     "radix-vue": "^1.9.0",
     "vue": "^3.4.0",
