@@ -30,6 +30,13 @@ func NewKnowledgeHandler(svc *service.KnowledgeService) *KnowledgeHandler {
 // KnowledgeBase
 // =============================================================================
 
+// ListKBsForPortal 门户端知识库列表（无需 admin 权限，供 Chat 页选择知识库下拉框使用）。
+//
+// GET /api/v1/portal/knowledge-bases
+func (h *KnowledgeHandler) ListKBsForPortal(c *gin.Context) {
+	h.ListKBs(c)
+}
+
 // CreateKB 创建知识库。
 //
 // POST /api/v1/admin/knowledge-bases
@@ -215,6 +222,24 @@ func (h *KnowledgeHandler) Disable(c *gin.Context) {
 	}
 
 	if svcErr := h.svc.Disable(id); svcErr != nil {
+		handleServiceError(c, svcErr)
+		return
+	}
+
+	response.Success(c, nil)
+}
+
+// Enable 恢复已停用文章为草稿。
+//
+// POST /api/v1/admin/articles/:id/enable
+func (h *KnowledgeHandler) Enable(c *gin.Context) {
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		response.Error(c, errcode.ErrParam, "无效的文章 ID")
+		return
+	}
+
+	if svcErr := h.svc.Enable(id); svcErr != nil {
 		handleServiceError(c, svcErr)
 		return
 	}

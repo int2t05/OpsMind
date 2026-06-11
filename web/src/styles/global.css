@@ -69,6 +69,32 @@
 
   /* 字体特性 */
   --font-features: 'cv01', 'ss03';
+
+  /* === 组件语义色（暗色）=== */
+  --tag-draft-bg: #2a2a2a;         --tag-draft-text: #9ca3af;
+  --tag-pending-bg: #3a3a1a;       --tag-pending-text: #fbbf24;
+  --tag-approved-bg: #1a2a3a;      --tag-approved-text: #60a5fa;
+  --tag-published-bg: #1a3a2a;     --tag-published-text: #4ade80;
+  --tag-rejected-bg: #3a1a1a;      --tag-rejected-text: #f87171;
+  --tag-disabled-bg: #2a2a2a;      --tag-disabled-text: #6b7280;
+  --tag-urgent-bg: rgba(220,38,38,0.12);       --tag-urgent-text: #f87171;
+  --tag-processing-bg: rgba(59,130,246,0.12);   --tag-processing-text: #60a5fa;
+  --tag-supplement-bg: rgba(168,85,247,0.12);   --tag-supplement-text: #c084fc;
+  --tag-resolved-bg: rgba(16,185,129,0.12);     --tag-resolved-text: #34d399;
+  --tag-frozen-bg: rgba(220,38,38,0.12);        --tag-frozen-text: #f87171;
+
+  --sync-synced-bg: #1a3a2a;    --sync-synced-text: #4ade80;
+  --sync-pending-bg: #3a3a1a;   --sync-pending-text: #fbbf24;
+  --sync-failed-bg: #3a1a1a;    --sync-failed-text: #f87171;
+  --sync-disabled-bg: #2a2a2a;  --sync-disabled-text: #9ca3af;
+
+  --btn-success-bg: #1a3a2a;    --btn-success-text: #4ade80;
+  --btn-warning-bg: #3a3a1a;    --btn-warning-text: #fbbf24;
+  --btn-danger-bg: #3a1a1a;     --btn-danger-text: #f87171;
+  --btn-info-bg: rgba(59,130,246,0.12); --btn-info-text: #60a5fa;
+
+  --toast-success-bg: #065f46;  --toast-success-text: #6ee7b7; --toast-success-border: #059669;
+  --toast-error-bg: #7f1d1d;   --toast-error-text: #fca5a5;   --toast-error-border: #dc2626;
 }
 
 /* ===== 浅色主题 ===== */
@@ -92,6 +118,32 @@
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.06);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
   --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
+
+  /* === 组件语义色（浅色）=== */
+  --tag-draft-bg: #f3f4f6;       --tag-draft-text: #6b7280;
+  --tag-pending-bg: #fef3c7;     --tag-pending-text: #92400e;
+  --tag-approved-bg: #dbeafe;    --tag-approved-text: #1e40af;
+  --tag-published-bg: #d1fae5;   --tag-published-text: #065f46;
+  --tag-rejected-bg: #fee2e2;    --tag-rejected-text: #991b1b;
+  --tag-disabled-bg: #f3f4f6;    --tag-disabled-text: #9ca3af;
+  --tag-urgent-bg: #fee2e2;      --tag-urgent-text: #991b1b;
+  --tag-processing-bg: #dbeafe;  --tag-processing-text: #1e40af;
+  --tag-supplement-bg: #ede9fe;  --tag-supplement-text: #6d28d9;
+  --tag-resolved-bg: #d1fae5;    --tag-resolved-text: #065f46;
+  --tag-frozen-bg: #fee2e2;      --tag-frozen-text: #991b1b;
+
+  --sync-synced-bg: #d1fae5;   --sync-synced-text: #065f46;
+  --sync-pending-bg: #fef3c7;  --sync-pending-text: #92400e;
+  --sync-failed-bg: #fee2e2;   --sync-failed-text: #991b1b;
+  --sync-disabled-bg: #f3f4f6; --sync-disabled-text: #9ca3af;
+
+  --btn-success-bg: #d1fae5;   --btn-success-text: #065f46;
+  --btn-warning-bg: #fef3c7;   --btn-warning-text: #92400e;
+  --btn-danger-bg: #fee2e2;    --btn-danger-text: #991b1b;
+  --btn-info-bg: #dbeafe;      --btn-info-text: #1e40af;
+
+  --toast-success-bg: #d1fae5;   --toast-success-text: #065f46; --toast-success-border: #6ee7b7;
+  --toast-error-bg: #fee2e2;     --toast-error-text: #991b1b;   --toast-error-border: #fca5a5;
 }
 
 /* ===== 全局重置 ===== */

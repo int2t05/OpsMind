@@ -336,6 +336,6 @@ async function handleSubmit() {
 .btn-primary:hover { background: var(--accent-hover); }
 .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
 
-.error-text { color: #f87171; font-size: 13px; }
-.success-text { color: #4ade80; font-size: 13px; }
+.error-text { color: var(--tag-rejected-text); font-size: 13px; }
+.success-text { color: var(--tag-published-text); font-size: 13px; }
 </style>

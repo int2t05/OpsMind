@@ -11,6 +11,13 @@ import "github.com/gin-gonic/gin"
 // 门户端面向报障人用户，提供智能问答、申告提交、进度查询等功能。
 // 路由列表与 TECH.md §5.2 门户端对齐。
 func registerPortalRoutes(rg *gin.RouterGroup, h *Handlers) {
+	// 知识库列表（门户端 Chat 需要选择知识库，无需 admin 权限）
+	if h != nil && h.Knowledge != nil {
+		rg.GET("/knowledge-bases", h.Knowledge.ListKBsForPortal)
+	} else {
+		rg.GET("/knowledge-bases", placeholder())
+	}
+
 	// 智能问答（T26 — 已实现）
 	// chat-sessions/stream 必须在 :id 路由之前注册，避免 "stream" 被当作 :id 参数捕获
 	if h != nil && h.Chat != nil {

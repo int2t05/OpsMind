@@ -293,8 +293,8 @@ async function handleSave(key: string) {
   animation: slideIn 0.3s ease;
 }
 
-.toast.success { background: #065f46; color: #6ee7b7; border: 1px solid #059669; }
-.toast.error { background: #7f1d1d; color: #fca5a5; border: 1px solid #dc2626; }
+.toast.success { background: var(--toast-success-bg); color: var(--toast-success-text); border: 1px solid var(--toast-success-border); }
+.toast.error { background: var(--toast-error-bg); color: var(--toast-error-text); border: 1px solid var(--toast-error-border); }
 
 @keyframes slideIn {
   from { transform: translateY(20px); opacity: 0; }

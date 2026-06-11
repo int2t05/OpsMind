@@ -86,9 +86,7 @@ const handleLogin = async () => {
       menus: data.menus,
     })
 
-    if (data.user.first_login) {
-      router.push('/change-password')
-    } else if (data.permissions?.length > 0) {
+    if (data.permissions?.length > 0) {
       router.push('/admin')
     } else {
       router.push('/portal')

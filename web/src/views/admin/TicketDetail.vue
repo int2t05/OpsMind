@@ -135,15 +135,15 @@ function actionText(a: string) { const m: Record<string, string> = { start: '接
 .description .label { font-size: 11px; color: var(--text-secondary); display: block; margin-bottom: 6px; }
 .description p { font-size: 14px; color: var(--text-primary); line-height: 1.6; margin: 0; }
 .status-tag { display: inline-block; padding: 2px 12px; border-radius: 10px; font-size: 13px; }
-.status-tag.pending { background: rgba(245,158,11,0.12); color: #fbbf24; }
-.status-tag.processing { background: rgba(59,130,246,0.12); color: #60a5fa; }
-.status-tag.supplement { background: rgba(168,85,247,0.12); color: #c084fc; }
-.status-tag.resolved { background: rgba(16,185,129,0.12); color: #34d399; }
-.status-tag.closed { background: rgba(107,114,128,0.12); color: #9ca3af; }
+.status-tag.pending { background: var(--tag-pending-bg); color: var(--tag-pending-text); }
+.status-tag.processing { background: var(--tag-processing-bg); color: var(--tag-processing-text); }
+.status-tag.supplement { background: var(--tag-supplement-bg); color: var(--tag-supplement-text); }
+.status-tag.resolved { background: var(--tag-resolved-bg); color: var(--tag-resolved-text); }
+.status-tag.closed { background: var(--tag-disabled-bg); color: var(--tag-disabled-text); }
 .action-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-start; }
 .btn-primary { padding: 8px 20px; background: var(--accent); color: #fff; border: none; border-radius: 8px; font-size: 13px; cursor: pointer; font-family: inherit; }
 .btn-primary:hover { background: var(--accent-hover); }
-.btn-warn { padding: 8px 20px; background: rgba(245,158,11,0.15); color: #fbbf24; border: 1px solid rgba(245,158,11,0.3); border-radius: 8px; font-size: 13px; cursor: pointer; font-family: inherit; }
+.btn-warn { padding: 8px 20px; background: var(--btn-warning-bg); color: var(--btn-warning-text); border: 1px solid var(--border-default); border-radius: 8px; font-size: 13px; cursor: pointer; font-family: inherit; }
 .action-textarea { flex-basis: 100%; padding: 10px; background: var(--bg-base); border: 1px solid var(--border-default); border-radius: 6px; color: var(--text-primary); font-size: 13px; font-family: inherit; resize: vertical; }
 .action-textarea:focus { outline: none; border-color: var(--accent); }
 .records { border-top: 1px solid var(--border-default); padding-top: 8px; }
@@ -151,15 +151,15 @@ function actionText(a: string) { const m: Record<string, string> = { start: '接
 .record-item:last-child { border-bottom: none; }
 .record-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
 .record-action { display: inline-block; padding: 1px 8px; border-radius: 4px; font-size: 11px; font-weight: 510; }
-.record-action.start { background: rgba(59,130,246,0.12); color: #60a5fa; }
-.record-action.resolve { background: rgba(16,185,129,0.12); color: #34d399; }
-.record-action.request_info { background: rgba(168,85,247,0.12); color: #c084fc; }
-.record-action.remark { background: rgba(107,114,128,0.12); color: #9ca3af; }
-.record-action.supplement { background: rgba(245,158,11,0.1); color: #fbbf24; }
+.record-action.start { background: var(--tag-processing-bg); color: var(--tag-processing-text); }
+.record-action.resolve { background: var(--tag-resolved-bg); color: var(--tag-resolved-text); }
+.record-action.request_info { background: var(--tag-supplement-bg); color: var(--tag-supplement-text); }
+.record-action.remark { background: var(--tag-disabled-bg); color: var(--tag-disabled-text); }
+.record-action.supplement { background: var(--tag-pending-bg); color: var(--tag-pending-text); }
 .record-time { font-size: 11px; color: var(--text-secondary); }
 .record-content { font-size: 14px; color: var(--text-primary); margin: 4px 0 0; line-height: 1.5; }
 .empty-hint { text-align: center; padding: 20px; color: var(--text-secondary); font-size: 13px; }
 .toast { position: fixed; bottom: 32px; right: 32px; padding: 12px 24px; border-radius: 8px; font-size: 14px; z-index: 9999; }
-.toast.success { background: #065f46; color: #6ee7b7; border: 1px solid #059669; }
-.toast.error { background: #7f1d1d; color: #fca5a5; border: 1px solid #dc2626; }
+.toast.success { background: var(--toast-success-bg); color: var(--toast-success-text); border: 1px solid var(--toast-success-border); }
+.toast.error { background: var(--toast-error-bg); color: var(--toast-error-text); border: 1px solid var(--toast-error-border); }
 </style>

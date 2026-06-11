@@ -63,6 +63,9 @@
         <button class="btn-disable" @click="handleDisable">停用</button>
         <button v-if="article?.sync_status === 'failed'" class="btn-retry" @click="handleRetrySync">重试同步</button>
       </div>
+      <div class="form-actions" v-if="article?.status === 0">
+        <button class="btn-save" @click="handleEnable">恢复为草稿</button>
+      </div>
 
       <!-- 切片状态 -->
       <div v-if="article?.chunks?.length" class="chunk-info">
@@ -80,7 +83,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { listKnowledgeBases, getArticleDetail, createArticle, updateArticle, submitReview, reviewArticle, publishArticle, disableArticle, retrySyncArticle } from '../../api/knowledge'
+import { listKnowledgeBases, getArticleDetail, createArticle, updateArticle, submitReview, reviewArticle, publishArticle, disableArticle, enableArticle, retrySyncArticle } from '../../api/knowledge'
 
 const router = useRouter()
 const route = useRoute()
@@ -136,6 +139,7 @@ const handleReview = async (approved: boolean) => {
 }
 const handlePublish = async () => { try { await publishArticle(Number(articleId)); await fetchArticle() } catch (e: any) { alert(e?.message) } }
 const handleDisable = async () => { if (!confirm('确定停用？')) return; try { await disableArticle(Number(articleId)); await fetchArticle() } catch (e: any) { alert(e?.message) } }
+const handleEnable = async () => { try { await enableArticle(Number(articleId)); await fetchArticle() } catch (e: any) { alert(e?.message) } }
 const handleRetrySync = async () => { try { await retrySyncArticle(Number(articleId)); await fetchArticle() } catch (e: any) { alert(e?.message) } }
 
 const statusClass = (s: number) => { const m: Record<number,string> = { 0:'disabled',1:'draft',2:'pending',3:'approved',4:'published',5:'rejected' }; return m[s]||'' }
@@ -146,46 +150,46 @@ const statusText = (s: number) => { const m: Record<number,string> = { 0:'已停
 .knowledge-edit-page { max-width: 800px; margin: 0 auto; padding: 20px 24px; }
 .page-header { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; }
 .page-header h1 { font-size: 20px; font-weight: 600; color: var(--text-primary); }
-.btn-back { padding: 6px 12px; background: var(--bg-elevated); border: 1px solid var(--border); color: var(--text-secondary); border-radius: 4px; cursor: pointer; font-size: 13px; }
-.form-card { background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 8px; padding: 24px; }
+.btn-back { padding: 6px 12px; background: var(--bg-elevated); border: 1px solid var(--border-default); color: var(--text-secondary); border-radius: 4px; cursor: pointer; font-size: 13px; }
+.form-card { background: var(--bg-elevated); border: 1px solid var(--border-default); border-radius: 8px; padding: 24px; }
 .form-group { margin-bottom: 16px; }
 .form-group label { display: block; margin-bottom: 4px; font-size: 14px; color: var(--text-secondary); }
-.required { color: #f87171; }
-.form-group input, .form-group textarea, .form-select { width: 100%; padding: 8px 10px; background: var(--bg-subtle); border: 1px solid var(--border); border-radius: 4px; color: var(--text-primary); font-size: 14px; resize: vertical; }
+.required { color: var(--tag-rejected-text); }
+.form-group input, .form-group textarea, .form-select { width: 100%; padding: 8px 10px; background: var(--bg-subtle); border: 1px solid var(--border-default); border-radius: 4px; color: var(--text-primary); font-size: 14px; resize: vertical; }
 .form-group input:focus, .form-group textarea:focus, .form-select:focus { outline: none; border-color: var(--accent); }
 .form-group input:disabled, .form-group textarea:disabled { opacity: 0.6; }
 .form-select { cursor: pointer; }
-.tags-input { display: flex; flex-wrap: wrap; gap: 6px; padding: 6px; background: var(--bg-subtle); border: 1px solid var(--border); border-radius: 4px; min-height: 36px; align-items: center; }
+.tags-input { display: flex; flex-wrap: wrap; gap: 6px; padding: 6px; background: var(--bg-subtle); border: 1px solid var(--border-default); border-radius: 4px; min-height: 36px; align-items: center; }
 .tag { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; background: var(--accent); color: #fff; border-radius: 3px; font-size: 12px; }
 .tag-remove { background: none; border: none; color: #fff; cursor: pointer; font-size: 14px; padding: 0 2px; }
 .tag-input { border: none !important; background: none !important; flex: 1; min-width: 120px; padding: 4px !important; font-size: 13px !important; }
 .form-actions { display: flex; gap: 10px; margin-top: 20px; }
 .btn-save { padding: 10px 20px; background: var(--accent); color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; }
-.btn-submit { padding: 10px 20px; background: #3a3a1a; color: #fbbf24; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; }
-.btn-cancel { padding: 10px 20px; background: var(--bg-elevated); border: 1px solid var(--border); color: var(--text-secondary); border-radius: 4px; cursor: pointer; font-size: 14px; }
-.btn-approve { padding: 10px 20px; background: #1a3a2a; color: #4ade80; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; }
-.btn-reject { padding: 10px 20px; background: #3a1a1a; color: #f87171; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; }
+.btn-submit { padding: 10px 20px; background: var(--btn-warning-bg); color: var(--btn-warning-text); border: none; border-radius: 4px; cursor: pointer; font-size: 14px; }
+.btn-cancel { padding: 10px 20px; background: var(--bg-elevated); border: 1px solid var(--border-default); color: var(--text-secondary); border-radius: 4px; cursor: pointer; font-size: 14px; }
+.btn-approve { padding: 10px 20px; background: var(--btn-success-bg); color: var(--btn-success-text); border: none; border-radius: 4px; cursor: pointer; font-size: 14px; }
+.btn-reject { padding: 10px 20px; background: var(--btn-danger-bg); color: var(--btn-danger-text); border: none; border-radius: 4px; cursor: pointer; font-size: 14px; }
 .btn-publish { padding: 10px 20px; background: var(--accent); color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; }
-.btn-disable { padding: 10px 20px; background: #3a1a1a; color: #f87171; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; }
-.btn-retry { padding: 10px 20px; background: #3a3a1a; color: #fbbf24; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; }
-.review-section { margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border); }
+.btn-disable { padding: 10px 20px; background: var(--btn-danger-bg); color: var(--btn-danger-text); border: none; border-radius: 4px; cursor: pointer; font-size: 14px; }
+.btn-retry { padding: 10px 20px; background: var(--btn-warning-bg); color: var(--btn-warning-text); border: none; border-radius: 4px; cursor: pointer; font-size: 14px; }
+.review-section { margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border-default); }
 .review-section h3 { font-size: 16px; color: var(--text-primary); margin-bottom: 12px; }
 .review-actions { display: flex; gap: 10px; margin-top: 12px; }
-.chunk-info { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border); }
+.chunk-info { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border-default); }
 .chunk-info h4 { font-size: 14px; color: var(--text-primary); margin-bottom: 8px; }
 .chunk-item { display: flex; align-items: center; gap: 8px; padding: 6px 0; font-size: 12px; color: var(--text-secondary); }
 .chunk-content { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.sync-error { color: #f87171; }
+.sync-error { color: var(--tag-rejected-text); }
 .sync-badge { font-size: 11px; padding: 1px 6px; border-radius: 3px; }
-.sync-badge.synced { background: #1a3a2a; color: #4ade80; }
-.sync-badge.pending { background: #3a3a1a; color: #fbbf24; }
-.sync-badge.failed { background: #3a1a1a; color: #f87171; }
-.sync-badge.disabled { background: #2a2a2a; color: #9ca3af; }
+.sync-badge.synced { background: var(--sync-synced-bg); color: var(--sync-synced-text); }
+.sync-badge.pending { background: var(--sync-pending-bg); color: var(--sync-pending-text); }
+.sync-badge.failed { background: var(--sync-failed-bg); color: var(--sync-failed-text); }
+.sync-badge.disabled { background: var(--sync-disabled-bg); color: var(--sync-disabled-text); }
 .status-tag { font-size: 12px; padding: 2px 8px; border-radius: 3px; }
-.status-tag.draft { background: #2a2a2a; color: #9ca3af; }
-.status-tag.pending { background: #3a3a1a; color: #fbbf24; }
-.status-tag.approved { background: #1a2a3a; color: #60a5fa; }
-.status-tag.published { background: #1a3a2a; color: #4ade80; }
-.status-tag.rejected { background: #3a1a1a; color: #f87171; }
-.status-tag.disabled { background: #2a2a2a; color: #6b7280; }
+.status-tag.draft { background: var(--tag-draft-bg); color: var(--tag-draft-text); }
+.status-tag.pending { background: var(--tag-pending-bg); color: var(--tag-pending-text); }
+.status-tag.approved { background: var(--tag-approved-bg); color: var(--tag-approved-text); }
+.status-tag.published { background: var(--tag-published-bg); color: var(--tag-published-text); }
+.status-tag.rejected { background: var(--tag-rejected-bg); color: var(--tag-rejected-text); }
+.status-tag.disabled { background: var(--tag-disabled-bg); color: var(--tag-disabled-text); }
 </style>

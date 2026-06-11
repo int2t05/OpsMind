@@ -305,6 +305,35 @@ func (s *KnowledgeService) Disable(id int64) error {
 	return nil
 }
 
+// Enable 恢复已停用文章为草稿状态。
+//
+// 为什么恢复到草稿而非直接发布：
+// 停用的文章向量已从 AnythingLLM 中删除，恢复到草稿允许编辑后重新走审核→发布流程，
+// 确保内容仍然适用后再同步到 RAG。
+func (s *KnowledgeService) Enable(id int64) error {
+	article, err := s.repo.FindArticleByID(id)
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return AppError{Code: errcode.ErrNotFound, Message: "文章不存在"}
+		}
+		return err
+	}
+
+	if article.Status != 0 {
+		return AppError{Code: errcode.ErrParam, Message: "仅已停用状态的文章可恢复"}
+	}
+
+	article.Status = 1 // 已停用 → 草稿
+	if err := s.repo.UpdateArticle(article); err != nil {
+		return err
+	}
+
+	// 清除切片的 disabled 状态，重置为 pending 待重新同步
+	_ = s.repo.UpdateChunkStatusByArticleID(id, "pending")
+
+	return nil
+}
+
 // RetrySync 重试同步已发布的文章到 AnythingLLM。
 func (s *KnowledgeService) RetrySync(id int64) error {
 	article, err := s.repo.FindArticleByID(id)

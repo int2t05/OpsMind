@@ -320,8 +320,8 @@ function formatDate(dateStr: string): string {
 .btn-primary:hover { background: var(--accent-hover); }
 .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
 
-.error-text { color: #f87171; font-size: 13px; margin-left: 12px; }
-.success-text { color: #4ade80; font-size: 13px; margin-left: 12px; }
+.error-text { color: var(--tag-rejected-text); font-size: 13px; margin-left: 12px; }
+.success-text { color: var(--tag-published-text); font-size: 13px; margin-left: 12px; }
 
 .loading-text { text-align: center; padding: 48px; color: var(--text-secondary); }
 .empty-state { text-align: center; padding: 64px; color: var(--text-secondary); }

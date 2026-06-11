@@ -57,15 +57,15 @@ function formatDate(d: string) { if (!d) return '-'; return d.substring(0, 10) }
 .data-table tr:last-child td { border-bottom: none; }
 .ticket-no { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; color: var(--text-secondary); }
 .urgency-tag { display: inline-block; padding: 2px 10px; border-radius: 10px; font-size: 12px; }
-.urgency-tag.high { background: rgba(220,38,38,0.12); color: #f87171; }
-.urgency-tag.medium { background: rgba(245,158,11,0.12); color: #fbbf24; }
+.urgency-tag.high { background: var(--tag-urgent-bg); color: var(--tag-urgent-text); }
+.urgency-tag.medium { background: var(--tag-pending-bg); color: var(--tag-pending-text); }
 .urgency-tag.low { background: rgba(94,106,210,0.12); color: var(--accent); }
 .status-tag { display: inline-block; padding: 2px 10px; border-radius: 10px; font-size: 12px; }
-.status-tag.pending { background: rgba(245,158,11,0.12); color: #fbbf24; }
-.status-tag.processing { background: rgba(59,130,246,0.12); color: #60a5fa; }
-.status-tag.supplement { background: rgba(168,85,247,0.12); color: #c084fc; }
-.status-tag.resolved { background: rgba(16,185,129,0.12); color: #34d399; }
-.status-tag.closed { background: rgba(107,114,128,0.12); color: #9ca3af; }
+.status-tag.pending { background: var(--tag-pending-bg); color: var(--tag-pending-text); }
+.status-tag.processing { background: var(--tag-processing-bg); color: var(--tag-processing-text); }
+.status-tag.supplement { background: var(--tag-supplement-bg); color: var(--tag-supplement-text); }
+.status-tag.resolved { background: var(--tag-resolved-bg); color: var(--tag-resolved-text); }
+.status-tag.closed { background: var(--tag-disabled-bg); color: var(--tag-disabled-text); }
 .btn-action { padding: 4px 14px; background: var(--accent); color: #fff; border: none; border-radius: 5px; font-size: 12px; cursor: pointer; font-family: inherit; }
 .btn-action:hover { background: var(--accent-hover); }
 </style>

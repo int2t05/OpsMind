@@ -347,7 +347,7 @@ async function handleDelete() {
   font-family: inherit;
 }
 .btn-action:hover { color: var(--text-primary); border-color: var(--border-hover); }
-.btn-action--danger:hover { color: #f87171; border-color: #f87171; }
+.btn-action--danger:hover { color: var(--tag-rejected-text); border-color: var(--tag-rejected-text); }
 
 /* 弹窗 */
 .modal-overlay {
@@ -446,8 +446,8 @@ async function handleDelete() {
 }
 .btn-submit:hover { background: var(--accent-hover); }
 .btn-submit:disabled { opacity: 0.5; cursor: not-allowed; }
-.btn-submit--danger { background: #dc2626; }
-.btn-submit--danger:hover { background: #b91c1c; }
+.btn-submit--danger { background: var(--btn-danger-bg); }
+.btn-submit--danger:hover { background: var(--btn-danger-bg); }
 
 /* Toast */
 .toast {
@@ -461,8 +461,8 @@ async function handleDelete() {
   animation: slideIn 0.3s ease;
 }
 
-.toast.success { background: #065f46; color: #6ee7b7; border: 1px solid #059669; }
-.toast.error { background: #7f1d1d; color: #fca5a5; border: 1px solid #dc2626; }
+.toast.success { background: var(--toast-success-bg); color: var(--toast-success-text); border: 1px solid var(--toast-success-border); }
+.toast.error { background: var(--toast-error-bg); color: var(--toast-error-text); border: 1px solid var(--toast-error-border); }
 
 @keyframes slideIn {
   from { transform: translateY(20px); opacity: 0; }

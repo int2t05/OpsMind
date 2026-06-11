@@ -48,6 +48,7 @@ func registerAdminRoutes(rg *gin.RouterGroup, h *Handlers) {
 		rg.POST("/articles/:id/review", h.Knowledge.Review)
 		rg.POST("/articles/:id/publish", h.Knowledge.Publish)
 		rg.POST("/articles/:id/disable", h.Knowledge.Disable)
+		rg.POST("/articles/:id/enable", h.Knowledge.Enable)
 		rg.POST("/articles/:id/retry-sync", h.Knowledge.RetrySync)
 	} else {
 		rg.GET("/knowledge-bases", placeholder())
@@ -61,6 +62,7 @@ func registerAdminRoutes(rg *gin.RouterGroup, h *Handlers) {
 		rg.POST("/articles/:id/review", placeholder())
 		rg.POST("/articles/:id/publish", placeholder())
 		rg.POST("/articles/:id/disable", placeholder())
+		rg.POST("/articles/:id/enable", placeholder())
 		rg.POST("/articles/:id/retry-sync", placeholder())
 	}
 

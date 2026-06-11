@@ -250,15 +250,15 @@ async function handleSave() {
 }
 
 .toast.success {
-  background: #065f46;
-  color: #6ee7b7;
-  border: 1px solid #059669;
+  background: var(--toast-success-bg);
+  color: var(--toast-success-text);
+  border: 1px solid var(--toast-success-border);
 }
 
 .toast.error {
-  background: #7f1d1d;
-  color: #fca5a5;
-  border: 1px solid #dc2626;
+  background: var(--toast-error-bg);
+  color: var(--toast-error-text);
+  border: 1px solid var(--toast-error-border);
 }
 
 @keyframes slideIn {

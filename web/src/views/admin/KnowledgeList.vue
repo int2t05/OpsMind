@@ -56,6 +56,7 @@
                 <button v-if="a.status===2" class="btn-sm btn-primary" @click="goEdit(a.id)">审核</button>
                 <button v-if="a.status===3" class="btn-sm btn-success" @click="handlePublish(a.id)">发布</button>
                 <button v-if="a.status===4" class="btn-sm btn-warning" @click="handleDisable(a.id)">停用</button>
+                <button v-if="a.status===0" class="btn-sm btn-success" @click="handleEnable(a.id)">恢复</button>
                 <button v-if="a.sync_status==='failed'" class="btn-sm btn-warning" @click="handleRetrySync(a.id)">重试同步</button>
                 <button v-if="a.status===1||a.status===5" class="btn-sm btn-default" @click="goEdit(a.id)">编辑</button>
               </td>
@@ -88,7 +89,7 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import Pagination from '../../components/common/Pagination.vue'
-import { listKnowledgeBases, createKnowledgeBase, listArticles, submitReview, publishArticle, disableArticle, retrySyncArticle } from '../../api/knowledge'
+import { listKnowledgeBases, createKnowledgeBase, listArticles, submitReview, publishArticle, disableArticle, enableArticle, retrySyncArticle } from '../../api/knowledge'
 
 interface KB { id: number; name: string }
 interface Article { id: number; question: string; category: string; status: number; sync_status: string; updated_at: string }
@@ -128,6 +129,7 @@ const goEdit = (id: number) => { router.push(`/admin/knowledge/${id}`) }
 const handleSubmitReview = async (id: number) => { try { await submitReview(id); await fetchArticles() } catch (e: any) { alert(e?.message) } }
 const handlePublish = async (id: number) => { try { await publishArticle(id); await fetchArticles() } catch (e: any) { alert(e?.message) } }
 const handleDisable = async (id: number) => { if (!confirm('确定停用？')) return; try { await disableArticle(id); await fetchArticles() } catch (e: any) { alert(e?.message) } }
+const handleEnable = async (id: number) => { try { await enableArticle(id); await fetchArticles() } catch (e: any) { alert(e?.message) } }
 const handleRetrySync = async (id: number) => { try { await retrySyncArticle(id); await fetchArticles() } catch (e: any) { alert(e?.message) } }
 
 const statusClass = (s: number) => { const m: Record<number,string> = { '-1':'disabled',0:'disabled',1:'draft',2:'pending',3:'approved',4:'published',5:'rejected' }; return m[s]||'' }
@@ -140,7 +142,7 @@ const formatTime = (t: string) => t ? new Date(t).toLocaleString('zh-CN') : '-'
 <style scoped>
 .knowledge-page { height: 100%; }
 .knowledge-layout { display: flex; height: 100%; }
-.kb-sidebar { width: 220px; min-width: 220px; background: var(--bg-elevated); border-right: 1px solid var(--border); padding: 16px; overflow-y: auto; }
+.kb-sidebar { width: 220px; min-width: 220px; border-right: 1px solid var(--border-default); padding: 16px; overflow-y: auto; }
 .sidebar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .sidebar-header h2 { font-size: 15px; font-weight: 600; color: var(--text-primary); }
 .btn-add-kb { padding: 4px 10px; font-size: 12px; background: var(--accent); color: #fff; border: none; border-radius: 4px; cursor: pointer; }
@@ -152,38 +154,38 @@ const formatTime = (t: string) => t ? new Date(t).toLocaleString('zh-CN') : '-'
 .articles-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
 .articles-header h2 { font-size: 18px; font-weight: 600; color: var(--text-primary); }
 .header-actions { display: flex; gap: 10px; align-items: center; }
-.status-filter { padding: 6px 10px; background: var(--bg-elevated); border: 1px solid var(--border); color: var(--text-primary); border-radius: 4px; font-size: 13px; }
+.status-filter { padding: 6px 10px; background: var(--bg-elevated); border: 1px solid var(--border-default); color: var(--text-primary); border-radius: 4px; font-size: 13px; }
 .btn-add-article { padding: 8px 16px; background: var(--accent); color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; }
 .article-table { width: 100%; border-collapse: collapse; }
-.article-table th, .article-table td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border); font-size: 13px; color: var(--text-primary); }
+.article-table th, .article-table td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border-default); font-size: 13px; color: var(--text-primary); }
 .article-table th { font-weight: 600; color: var(--text-secondary); font-size: 12px; }
 .question-cell { cursor: pointer; color: var(--accent); max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .question-cell:hover { text-decoration: underline; }
 .action-cell { display: flex; gap: 4px; flex-wrap: wrap; }
 .btn-sm { padding: 4px 10px; font-size: 12px; border: none; border-radius: 4px; cursor: pointer; white-space: nowrap; }
 .btn-primary { background: var(--accent); color: #fff; }
-.btn-success { background: #1a3a2a; color: #4ade80; }
-.btn-warning { background: #3a3a1a; color: #fbbf24; }
-.btn-default { background: var(--bg-elevated); color: var(--text-secondary); border: 1px solid var(--border); }
-.btn-cancel { padding: 8px 16px; background: var(--bg-elevated); color: var(--text-secondary); border: 1px solid var(--border); border-radius: 4px; cursor: pointer; }
+.btn-success { background: var(--btn-success-bg); color: var(--btn-success-text); }
+.btn-warning { background: var(--btn-warning-bg); color: var(--btn-warning-text); }
+.btn-default { background: var(--bg-elevated); color: var(--text-secondary); border: 1px solid var(--border-default); }
+.btn-cancel { padding: 8px 16px; background: var(--bg-elevated); color: var(--text-secondary); border: 1px solid var(--border-default); border-radius: 4px; cursor: pointer; }
 .status-tag { font-size: 12px; padding: 2px 6px; border-radius: 3px; }
-.status-tag.draft { background: #2a2a2a; color: #9ca3af; }
-.status-tag.pending { background: #3a3a1a; color: #fbbf24; }
-.status-tag.approved { background: #1a2a3a; color: #60a5fa; }
-.status-tag.published { background: #1a3a2a; color: #4ade80; }
-.status-tag.rejected { background: #3a1a1a; color: #f87171; }
-.status-tag.disabled { background: #2a2a2a; color: #6b7280; }
+.status-tag.draft { background: var(--tag-draft-bg); color: var(--tag-draft-text); }
+.status-tag.pending { background: var(--tag-pending-bg); color: var(--tag-pending-text); }
+.status-tag.approved { background: var(--tag-approved-bg); color: var(--tag-approved-text); }
+.status-tag.published { background: var(--tag-published-bg); color: var(--tag-published-text); }
+.status-tag.rejected { background: var(--tag-rejected-bg); color: var(--tag-rejected-text); }
+.status-tag.disabled { background: var(--tag-disabled-bg); color: var(--tag-disabled-text); }
 .sync-badge { font-size: 12px; padding: 2px 6px; border-radius: 3px; }
-.sync-badge.synced { background: #1a3a2a; color: #4ade80; }
-.sync-badge.pending { background: #3a3a1a; color: #fbbf24; }
-.sync-badge.failed { background: #3a1a1a; color: #f87171; }
-.sync-badge.disabled { background: #2a2a2a; color: #9ca3af; }
+.sync-badge.synced { background: var(--sync-synced-bg); color: var(--sync-synced-text); }
+.sync-badge.pending { background: var(--sync-pending-bg); color: var(--sync-pending-text); }
+.sync-badge.failed { background: var(--sync-failed-bg); color: var(--sync-failed-text); }
+.sync-badge.disabled { background: var(--sync-disabled-bg); color: var(--sync-disabled-text); }
 .dialog-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 100; }
-.dialog { background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 8px; padding: 24px; width: 400px; }
+.dialog { background: var(--bg-elevated); border: 1px solid var(--border-default); border-radius: 8px; padding: 24px; width: 400px; }
 .dialog h3 { margin-bottom: 16px; font-size: 16px; color: var(--text-primary); }
 .form-group { margin-bottom: 12px; }
 .form-group label { display: block; margin-bottom: 4px; font-size: 13px; color: var(--text-secondary); }
-.form-group input, .form-group textarea { width: 100%; padding: 8px 10px; background: var(--bg-subtle); border: 1px solid var(--border); border-radius: 4px; color: var(--text-primary); font-size: 13px; resize: vertical; }
+.form-group input, .form-group textarea { width: 100%; padding: 8px 10px; background: var(--bg-subtle); border: 1px solid var(--border-default); border-radius: 4px; color: var(--text-primary); font-size: 13px; resize: vertical; }
 .dialog-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
 .empty-hint { padding: 60px; text-align: center; color: var(--text-secondary); font-size: 14px; }
 </style>

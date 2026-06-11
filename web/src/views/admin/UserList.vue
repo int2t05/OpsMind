@@ -161,17 +161,17 @@ async function handleRestore(id: number) {
 .username { font-weight: 510; }
 .status-tag { display: inline-block; padding: 2px 10px; border-radius: 10px; font-size: 12px; }
 .status-tag.active { background: rgba(94,106,210,0.15); color: var(--accent); }
-.status-tag.frozen { background: rgba(220,38,38,0.12); color: #f87171; }
+.status-tag.frozen { background: var(--tag-frozen-bg); color: var(--tag-frozen-text); }
 .action-cell { text-align: right; white-space: nowrap; }
 .btn-action { padding: 4px 10px; background: var(--bg-base); color: var(--text-secondary); border: 1px solid var(--border-default); border-radius: 5px; font-size: 12px; cursor: pointer; font-family: inherit; margin-left: 4px; }
 .btn-action:hover { color: var(--text-primary); border-color: var(--border-hover); }
-.btn-action.danger { color: #f87171; } .btn-action.danger:hover { background: rgba(220,38,38,0.1); }
+.btn-action.danger { color: var(--btn-danger-text); } .btn-action.danger:hover { background: var(--btn-danger-bg); }
 .dialog-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 1000; }
 .dialog { background: var(--bg-overlay); border: 1px solid var(--border-default); border-radius: 12px; padding: 28px; width: 420px; max-height: 80vh; overflow-y: auto; }
 .dialog h2 { font-size: 18px; font-weight: 510; margin: 0 0 20px; color: var(--text-primary); }
 .form-group { margin-bottom: 14px; }
 .form-group label { display: block; font-size: 13px; color: var(--text-secondary); margin-bottom: 5px; }
-.required { color: #f87171; }
+.required { color: var(--tag-rejected-text); }
 .form-input, .form-select { width: 100%; padding: 8px 12px; background: var(--bg-base); border: 1px solid var(--border-default); border-radius: 6px; color: var(--text-primary); font-size: 14px; font-family: inherit; box-sizing: border-box; }
 .form-input:focus, .form-select:focus { outline: none; border-color: var(--accent); }
 .form-input:disabled { opacity: 0.5; }
@@ -181,6 +181,6 @@ async function handleRestore(id: number) {
 .btn-save { padding: 8px 18px; background: var(--accent); color: #fff; border: none; border-radius: 8px; font-size: 13px; cursor: pointer; font-family: inherit; }
 .btn-save:hover { background: var(--accent-hover); } .btn-save:disabled { opacity: 0.5; cursor: not-allowed; }
 .toast { position: fixed; bottom: 32px; right: 32px; padding: 12px 24px; border-radius: 8px; font-size: 14px; z-index: 9999; }
-.toast.success { background: #065f46; color: #6ee7b7; border: 1px solid #059669; }
-.toast.error { background: #7f1d1d; color: #fca5a5; border: 1px solid #dc2626; }
+.toast.success { background: var(--toast-success-bg); color: var(--toast-success-text); border: 1px solid var(--toast-success-border); }
+.toast.error { background: var(--toast-error-bg); color: var(--toast-error-text); border: 1px solid var(--toast-error-border); }
 </style>

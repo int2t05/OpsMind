@@ -15,8 +15,14 @@ interface UpdateKBParams {
   description?: string
 }
 
+/** 知识库列表（后台管理用，需要 admin 权限） */
 export function listKnowledgeBases() {
   return request.get('/api/v1/admin/knowledge-bases')
+}
+
+/** 知识库列表（门户端用，无需 admin 权限 — Chat 页知识库下拉框） */
+export function listKnowledgeBasesForPortal() {
+  return request.get('/api/v1/portal/knowledge-bases')
 }
 
 export function createKnowledgeBase(data: CreateKBParams) {
@@ -82,6 +88,10 @@ export function publishArticle(id: number) {
 
 export function disableArticle(id: number) {
   return request.post(`/api/v1/admin/articles/${id}/disable`)
+}
+
+export function enableArticle(id: number) {
+  return request.post(`/api/v1/admin/articles/${id}/enable`)
 }
 
 export function retrySyncArticle(id: number) {

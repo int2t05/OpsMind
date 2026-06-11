@@ -96,7 +96,7 @@
 <script setup lang="ts">
 import { ref, onMounted, nextTick } from 'vue'
 import { useChatStore } from '@/stores/chat'
-import { listKnowledgeBases } from '@/api/knowledge'
+import { listKnowledgeBasesForPortal } from '@/api/knowledge'
 
 const chatStore = useChatStore()
 const question = ref('')
@@ -106,9 +106,11 @@ const messagesContainer = ref<HTMLElement | null>(null)
 
 onMounted(async () => {
   try {
-    const res = await listKnowledgeBases()
+    const res = await listKnowledgeBasesForPortal()
+    // 后端返回 { items: [...] }，需要提取 items 数组
     const data = (res as any).data || res
-    knowledgeBases.value = data || []
+    const items = data?.items || data
+    knowledgeBases.value = Array.isArray(items) ? items : []
     if (knowledgeBases.value.length > 0) {
       selectedKB.value = knowledgeBases.value[0].id
     }
@@ -380,7 +382,7 @@ function scrollToBottom() {
 
 .btn-feedback:hover { border-color: var(--accent); }
 
-.btn-feedback--no:hover { border-color: #f87171; color: #f87171; }
+.btn-feedback--no:hover { border-color: var(--tag-rejected-text); color: var(--tag-rejected-text); }
 
 /* 流式输出光标动画 */
 .streaming-cursor {
