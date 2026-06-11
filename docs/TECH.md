@@ -341,11 +341,6 @@ OpsMind/
 │   ├── go.mod
 │   └── go.sum
 │
-│   # P2 扩展模块占位（后续里程碑实现）
-│   # internal/handler/inspection.go   # 智能巡检
-│   # internal/handler/selfhealing.go  # 故障自愈
-│   # internal/handler/alert.go        # 告警中枢
-│
 ├── web/                            # Vue 前端
 │   ├── src/
 │   │   ├── api/                    # API 请求封装
@@ -387,10 +382,6 @@ OpsMind/
 │   │   ├── styles/                 # 全局样式（Linear Design）
 │   │   └── App.vue
 │   │
-│   │   # P2 扩展模块占位（后续里程碑实现）
-│   │   # ├── views/admin/InspectionList.vue   # 智能巡检
-│   │   # ├── views/admin/SelfHealing.vue      # 故障自愈
-│   │   # └── views/admin/AlertHub.vue         # 告警中枢
 │   ├── package.json
 │   └── vite.config.ts
 │
@@ -992,11 +983,6 @@ CREATE INDEX idx_messages_is_read ON messages(user_id, is_read);
 /admin/model-config             // 模型配置
 /admin/embedding-config         // embedding 配置
 /admin/system-config            // 系统配置
-
-// P2 扩展路由占位（后续里程碑实现）
-// /admin/inspection              // 智能巡检
-// /admin/self-healing            // 故障自愈
-// /admin/alerts                  // 告警中枢
 ```
 
 ### 6.2 状态管理（Pinia）

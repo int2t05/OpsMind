@@ -1,19 +1,27 @@
 # OpsMind — 运维数字员工系统
 
-面向企业运维场景的 AI 数字员工系统，基于 Go + Vue 3 单体分层架构，集成 AnythingLLM RAG 实现智能问答、申告管理、知识库管理和 RBAC 权限控制。
+<p align="center">
+  <img src="https://img.shields.io/badge/Go-1.22+-00ADD8?logo=go" alt="Go">
+  <img src="https://img.shields.io/badge/Vue-3.4+-4FC08D?logo=vuedotjs" alt="Vue">
+  <img src="https://img.shields.io/badge/PostgreSQL-18-4169E1?logo=postgresql" alt="PostgreSQL">
+  <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
+  <img src="https://img.shields.io/badge/PRs-welcome-brightgreen" alt="PRs Welcome">
+</p>
 
-## 当前进度
+面向企业运维场景的 AI 数字员工系统。基于 **Go + Vue 3** 单体分层架构，集成 **AnythingLLM RAG** 实现智能问答、申告管理、知识库管理和 RBAC 权限控制，支持本地化大模型私有部署。
 
-| 里程碑 | 状态 | 内容 |
-|--------|------|------|
-| M1 数据库与后端基础能力 | ✅ 完成 | Go 项目骨架、GORM 模型(16 表)、配置管理、中间件、路由注册 |
-| M2 账号权限与后台框架 | ✅ 完成 | JWT 认证、RBAC 权限、用户 CRUD、角色管理、Vue 后台布局 |
-| M3 知识库管理与 AI 服务 | ✅ 完成 | 知识库 CRUD、审核发布流程、AnythingLLM 适配器、RagClient |
-| M4 智能问答与申告处理 | ✅ 完成 | RAG 集成、问答 API、申告状态机、站内消息、StorageClient |
-| M5 数据看板与日志审计 | ✅ 完成 | 看板统计、审计日志、系统配置、模型/Embedding 配置页面 |
-| M6 联调测试与文档完善 | ✅ 完成 | 集成测试(17 用例)、演示数据、Docker 7 服务编排、README |
+## 功能特性
 
-**全部 38 个任务已完成。**
+| 模块 | 特性 |
+|------|------|
+| 🤖 **智能问答** | RAG 知识增强问答，置信度判断，低置信度自动转人工申告 |
+| 🎫 **申告管理** | 完整状态机（待处理→处理中→需补充→已解决/已关闭），7 天超时自动关闭 |
+| 📚 **知识库** | CRUD + 审核发布工作流，AnythingLLM 自动同步，pgvector 向量追溯 |
+| 👥 **用户权限** | JWT 认证 + RBAC 角色权限，菜单动态渲染，密码策略强制 |
+| 📊 **数据看板** | 实时统计卡片 + 趋势图，问答量/解决率/命中率一目了然 |
+| 📝 **审计日志** | 敏感操作全量记录，支持按操作类型/操作人/时间筛选 |
+| 🎨 **双主题** | Naive UI 组件库，暗色/浅色双主题，Linear Design 设计系统 |
+| 🐳 **一键部署** | Docker Compose 7 服务编排，AnythingLLM API Key 全自动初始化 |
 
 ---
 

@@ -96,9 +96,9 @@ flowchart LR
     subgraph Portal["门户路由组 /api/v1/portal"]
         P1["portal.Use(JWTAuth(secret))"]
         P2["registerPortalRoutes(rg)"]
-        P3["POST /chat-sessions → placeholder (T26)"]
-        P4["POST /tickets, GET /tickets → placeholder (T24)"]
-        P5["GET /messages → placeholder (T29)"]
+        P3["POST /chat-sessions → ChatHandler"]
+        P4["POST /tickets, GET /tickets → TicketHandler"]
+        P5["GET /messages → MessageHandler"]
     end
 
     subgraph Admin["后台路由组 /api/v1/admin"]
@@ -106,7 +106,7 @@ flowchart LR
         D2["registerAdminRoutes(rg, h)"]
         D3["/users/* → UserHandler + RequirePermission('user:manage')"]
         D4["/roles/* → RoleHandler + RequirePermission('user:manage')"]
-        D5["/tickets/*, /knowledge-* → placeholder (M3/M4)"]
+        D5["/tickets/*, /knowledge-* → TicketHandler / KnowledgeHandler"]
     end
 
     S7 --> Public
