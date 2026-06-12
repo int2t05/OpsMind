@@ -158,7 +158,7 @@ import {
   listKnowledgeBases, getArticleDetail, createArticle, updateArticle,
   submitReview, reviewArticle, publishArticle, disableArticle, enableArticle,
   uploadDocuments, retryDocument,
-} from '../../api/knowledge'
+} from '@/api/knowledge'
 
 const router = useRouter()
 const route = useRoute()

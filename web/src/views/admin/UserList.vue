@@ -76,7 +76,7 @@
 // TODO(admin/UserList): 创建/编辑用户表单缺少手机号、邮箱格式校验，密码无强度指示器。
 // TODO(admin/UserList): toast 定时器未在 onUnmounted 清理 — 存在内存泄漏。
 // TODO(admin/UserList): 使用 res?.items || res?.data?.items || res || [] 链式解包，待 API 泛型补全。
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { getUserList, createUser, updateUser, freezeUser, restoreUser } from '@/api/user'
 import { getRoleList } from '@/api/role'
 import type { RoleItem } from '@/api/role'
@@ -99,16 +99,19 @@ function showToast(message: string, type: 'success' | 'error') {
   toastTimer = window.setTimeout(() => { toast.value = { message: '', type: 'success' } }, 3000)
 }
 
+// 组件卸载时清理定时器，防止内存泄漏
+onUnmounted(() => { if (toastTimer) clearTimeout(toastTimer) })
+
 async function fetchUsers() {
   loading.value = true
   try {
     const res = await getUserList({ page: 1, page_size: 100 }) as any
     users.value = res?.items || res?.data?.items || res || []
-  } catch { showToast('加载用户失败', 'error') } finally { loading.value = false }
+  } catch (err) { console.error('加载用户列表失败', err); showToast('加载用户失败', 'error') } finally { loading.value = false }
 }
 
 async function fetchRoles() {
-  try { const res = await getRoleList() as any; allRoles.value = res?.data || res || [] } catch { /* ignore */ }
+  try { const res = await getRoleList() as any; allRoles.value = res?.data || res || [] } catch (err) { console.error('加载角色列表失败', err) }
 }
 
 function startCreate() {

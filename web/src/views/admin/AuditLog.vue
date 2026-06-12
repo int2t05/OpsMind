@@ -43,7 +43,7 @@ onMounted(async () => {
   try {
     const res = await request.get('/api/v1/admin/audit-logs', { params: { page: 1, page_size: 100 } }) as any
     logs.value = res?.data || res?.items || []
-  } catch { /* ignore */ }
+  } catch (err) { console.error('加载审计日志失败', err) }
   finally { loading.value = false }
 })
 

@@ -2,17 +2,8 @@
  * Axios 实例封装
  *
  * 创建统一的 HTTP 客户端，配置：
- * - 请求拦截器：注入 Authorization: Bearer <token>
- * - 响应拦截器：处理 401（跳转登录）、403（提示无权限）、统一提取 data
- *
- * TODO(request): 401 处理存在无限重定向风险 — 若用户已在 /login 页面收到 401，会再次
- *               router.push('/login') 形成循环。应增加 router.currentRoute.value.path !== '/login' 判断。
- * TODO(request): 403 仅 console.error，没有用户可见的提示（应弹出 toast/notification）。
- * TODO(request): 缺少全局 loading 计数器 — 无法在 API 请求期间自动展示全局加载指示器。
- * TODO(request): login 接口返回了 refresh_token 但未被拦截器使用 — 可增加 token 过期自动刷新逻辑，
- *               避免用户因 token 过期而频繁重新登录。
- * TODO(request): InterceptedAxiosInstance 所有方法默认泛型 T = any — 调用方不传泛型时返回 any，
- *               应改为 T = unknown 强制调用方显式声明返回类型。
+ * - 请求拦截器：注入 Authorization: Bearer <token> + 全局 loading 计数器
+ * - 响应拦截器：处理 401（跳转登录）、403（提示无权限）、统一提取 data + loading 递减
  */
 
 import axios, { type AxiosRequestConfig } from 'axios'
@@ -22,55 +13,73 @@ import router from '@/router'
 // 响应拦截器已将 AxiosResponse 的 data 提取，因此返回类型应为 T 而非 AxiosResponse<T>。
 // 通过类型断言覆盖 axios.create 的返回类型。
 interface InterceptedAxiosInstance {
-  request<T = any>(config: AxiosRequestConfig): Promise<T>
-  get<T = any>(url: string, config?: AxiosRequestConfig): Promise<T>
-  post<T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<T>
-  put<T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<T>
-  patch<T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<T>
-  delete<T = any>(url: string, config?: AxiosRequestConfig): Promise<T>
+  request<T = unknown>(config: AxiosRequestConfig): Promise<T>
+  get<T = unknown>(url: string, config?: AxiosRequestConfig): Promise<T>
+  post<T = unknown>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<T>
+  put<T = unknown>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<T>
+  patch<T = unknown>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<T>
+  delete<T = unknown>(url: string, config?: AxiosRequestConfig): Promise<T>
 }
+
+// 全局 loading 计数器 — 模块级共享变量，避免循环依赖
+// 由 useLoading composable 在组件中使用，拦截器直接操作此变量
+export const loadingState = { active: 0 }
+
+function incLoading() { loadingState.active++ }
+function decLoading() { if (loadingState.active > 0) loadingState.active-- }
 
 // 创建 Axios 实例，baseURL 为空（通过 Vite proxy 转发）
 const raw = axios.create({
-  timeout: 30000
+  timeout: 30000,
 })
 
 // 类型断言：拦截器已提取 response.data，返回类型简化为 T
 const request = raw as unknown as InterceptedAxiosInstance
 
-// 请求拦截器：注入 token
+// 请求拦截器：注入 token + 全局 loading
 raw.interceptors.request.use(
   (config) => {
     const token = getToken()
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }
+    // 增加全局 loading 计数
+    incLoading()
     return config
   },
   (error) => {
+    decLoading()
     return Promise.reject(error)
-  }
+  },
 )
 
-// 响应拦截器：统一错误处理
+// 响应拦截器：统一错误处理 + loading 递减
 raw.interceptors.response.use(
   (response) => {
+    decLoading()
     // 统一提取 data 字段
     return response.data
   },
   (error) => {
+    decLoading()
     const { response } = error
 
     if (response) {
       switch (response.status) {
         case 401:
           // 未登录或令牌过期，清除 token 并跳转登录页
+          // 防止无限循环：若当前已在登录页则不重复跳转
           removeToken()
-          router.push('/login')
+          if (router.currentRoute.value.path !== '/login') {
+            router.push('/login')
+          }
           break
         case 403:
-          // 无权限
-          console.error('无权限访问')
+          // 无权限 — 输出错误并跳转登录页（角色不匹配时后端返回 403）
+          console.error('无权限访问该资源')
+          if (router.currentRoute.value.path !== '/login') {
+            router.push('/login')
+          }
           break
         default:
           console.error(response.data?.message || '请求失败')
@@ -80,7 +89,7 @@ raw.interceptors.response.use(
     }
 
     return Promise.reject(error)
-  }
+  },
 )
 
 export default request

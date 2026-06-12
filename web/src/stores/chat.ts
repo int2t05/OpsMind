@@ -40,7 +40,7 @@ export interface RAGOptions {
 export const useChatStore = defineStore('chat', () => {
   // State
   const currentSession = ref<ChatSessionResponse | null>(null)
-  const messages = ref<Array<{ role: string; content: string; sources?: any[]; isStreaming?: boolean }>>([])
+  const messages = ref<Array<{ id: string; role: string; content: string; sources?: import('@/api/chat').SourceItem[]; isStreaming?: boolean }>>([])
   const loading = ref(false)
   const streaming = ref(false)  // 是否正在流式输出中
   const selectedKBID = ref<number | null>(null)
@@ -69,11 +69,12 @@ export const useChatStore = defineStore('chat', () => {
     pipelineMetrics.value = null
 
     // 添加用户消息
-    messages.value.push({ role: 'user', content: question })
+    messages.value.push({ id: crypto.randomUUID(), role: 'user', content: question })
 
     // 添加 AI 消息占位（流式填充）
-    const aiMsgIndex = messages.value.length
+    const aiMsgId = crypto.randomUUID()
     messages.value.push({
+      id: aiMsgId,
       role: 'assistant',
       content: '',
       sources: [],
@@ -110,14 +111,15 @@ export const useChatStore = defineStore('chat', () => {
           loading.value = false
           streaming.value = false
           // v2: 管道指标由 metadata 携带（如果后端支持）
-          if ((session as any).pipeline_metrics) {
-            pipelineMetrics.value = (session as any).pipeline_metrics
+          if (session.pipeline_metrics) {
+            pipelineMetrics.value = session.pipeline_metrics
           }
         },
         onError(error: string) {
           // 流式失败时移除占位消息，显示错误
           messages.value.splice(aiMsgIndex, 1)
           messages.value.push({
+            id: crypto.randomUUID(),
             role: 'assistant',
             content: `抱歉，${error || 'AI 服务暂时不可用，请稍后重试或提交申告。'}`,
           })
@@ -133,8 +135,8 @@ export const useChatStore = defineStore('chat', () => {
     if (!currentSession.value) return
     try {
       await submitFeedbackApi(currentSession.value.session_id, feedback)
-    } catch {
-      // 静默失败
+    } catch (err) {
+      console.error('提交反馈失败', err)
     }
   }
 

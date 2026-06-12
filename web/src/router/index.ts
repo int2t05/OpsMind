@@ -6,21 +6,39 @@
  * - 门户路由（/portal/*）— 需要登录 + 报障人角色
  * - 后台路由（/admin/*）— 需要登录 + 对应角色权限
  *
- * 路由守卫检查 token 有效性、首次登录强制跳转修改密码页、角色权限校验。
- *
- * TODO(router): 路由守卫未读取 meta.roles 进行角色权限校验 — 任何已登录用户可访问所有路由。
- *               需在 beforeEach 中根据 auth store 的 user roles 与 to.meta.roles 做交集判断。
- * TODO(router): 路由守卫仅检查 token 是否存在，未校验 JWT 是否过期 — 过期 token 会导致页面加载闪白后
- *               才被 API 拦截器踢回登录页。应在守卫层主动解码 token 并校验 exp。
- * TODO(router): 缺少 scrollBehavior 配置 — 页面间导航不会自动恢复/重置滚动位置。
- * TODO(router): /admin 路由组缺少 meta.roles 定义 — 应限定为 admin/operator 等后台角色。
+ * 路由守卫检查 token 有效性、JWT 过期、角色权限校验。
  */
 
 import { createRouter, createWebHistory } from 'vue-router'
-import { getToken } from '@/utils/auth'
+import { getToken, removeToken } from '@/utils/auth'
+import { useAuthStore } from '@/stores/auth'
+
+/** 解码 JWT payload（不验证签名，仅提取过期时间） */
+function decodeJWTPayload(token: string): { exp?: number } | null {
+  try {
+    const parts = token.split('.')
+    if (parts.length !== 3) return null
+    return JSON.parse(atob(parts[1]))
+  } catch {
+    return null
+  }
+}
+
+/** 检查 JWT token 是否已过期（含 60 秒缓冲） */
+function isTokenExpired(token: string): boolean {
+  const payload = decodeJWTPayload(token)
+  if (!payload?.exp) return false
+  const now = Math.floor(Date.now() / 1000)
+  return payload.exp < now + 60
+}
 
 const router = createRouter({
   history: createWebHistory(),
+  // 页面切换时恢复保存的滚动位置，否则回到顶部
+  scrollBehavior(_to, _from, savedPosition) {
+    if (savedPosition) return savedPosition
+    return { top: 0 }
+  },
   routes: [
     // 公开路由
     {
@@ -78,7 +96,7 @@ const router = createRouter({
     {
       path: '/admin',
       component: () => import('@/components/layout/AdminLayout.vue'),
-      meta: { requiresAuth: true },
+      meta: { requiresAuth: true, roles: ['admin', 'operator', 'knowledge_manager'] },
       children: [
         {
           path: '',
@@ -168,6 +186,25 @@ router.beforeEach((to, _from, next) => {
       // 未登录，跳转登录页
       next('/login')
       return
+    }
+
+    // JWT 过期检查：过期 token 在守卫层主动拦截，避免页面闪白
+    if (isTokenExpired(token)) {
+      removeToken()
+      next('/login')
+      return
+    }
+
+    // 角色权限校验：若路由定义了 meta.roles，检查用户是否拥有所需角色
+    const requiredRoles = to.meta.roles as string[] | undefined
+    if (requiredRoles && requiredRoles.length > 0) {
+      const authStore = useAuthStore()
+      const hasRole = requiredRoles.some((role) => authStore.roles.includes(role))
+      if (!hasRole) {
+        // 角色不匹配，重定向到登录页（与缺少 token 行为一致）
+        next('/login')
+        return
+      }
     }
   }
 

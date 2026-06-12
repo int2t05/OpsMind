@@ -29,7 +29,7 @@
       :current-page="page"
       :total="total"
       :page-size="pageSize"
-      @change="handlePageChange"
+      @update:current-page="handlePageChange"
     />
   </div>
 </template>
@@ -63,7 +63,8 @@ async function loadMessages() {
     const data = (res as any).data || res
     messages.value = data?.items || []
     total.value = data?.total || 0
-  } catch {
+  } catch (err) {
+    console.error('加载消息列表失败', err)
     messages.value = []
   } finally {
     loading.value = false
@@ -81,8 +82,8 @@ async function handleClick(msg: MessageItem) {
     try {
       await markAsRead(msg.id)
       msg.is_read = true
-    } catch {
-      // 静默失败
+    } catch (err) {
+      console.error('标记消息已读失败', err)
     }
   }
 

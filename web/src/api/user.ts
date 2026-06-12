@@ -4,7 +4,8 @@
  *                例如：request.get<ApiResponse<UserListData>>(...)。
  *                同时应将导入路径统一为 @/utils/request（混用相对路径）。
  */
-import request from '../utils/request'
+import request from '@/utils/request'
+import type { ApiResponse, PageResponse } from '@/types/api'
 
 interface UserListParams {
   page?: number
@@ -28,26 +29,38 @@ interface UpdateUserParams {
   role_ids: number[]
 }
 
+/** 用户数据模型 */
+export interface UserItem {
+  id: number
+  username: string
+  real_name: string
+  phone: string
+  email?: string
+  status: number
+  role_names?: string[]
+  created_at?: string
+}
+
 export function getUserList(params: UserListParams) {
-  return request.get('/api/v1/admin/users', { params })
+  return request.get<ApiResponse<PageResponse<UserItem>>>('/api/v1/admin/users', { params })
 }
 
 export function getUserById(id: number) {
-  return request.get(`/api/v1/admin/users/${id}`)
+  return request.get<ApiResponse<UserItem>>(`/api/v1/admin/users/${id}`)
 }
 
 export function createUser(data: CreateUserParams) {
-  return request.post('/api/v1/admin/users', data)
+  return request.post<ApiResponse<UserItem>>('/api/v1/admin/users', data)
 }
 
 export function updateUser(id: number, data: UpdateUserParams) {
-  return request.put(`/api/v1/admin/users/${id}`, data)
+  return request.put<ApiResponse<UserItem>>(`/api/v1/admin/users/${id}`, data)
 }
 
 export function freezeUser(id: number) {
-  return request.patch(`/api/v1/admin/users/${id}/freeze`)
+  return request.patch<ApiResponse<null>>(`/api/v1/admin/users/${id}/freeze`)
 }
 
 export function restoreUser(id: number) {
-  return request.patch(`/api/v1/admin/users/${id}/restore`)
+  return request.patch<ApiResponse<null>>(`/api/v1/admin/users/${id}/restore`)
 }

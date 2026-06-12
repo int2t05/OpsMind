@@ -62,8 +62,8 @@ onMounted(async () => {
     const res = await getUnreadCount()
     const data = (res as any).data || res
     unreadCount.value = data?.count ?? data ?? 0
-  } catch {
-    // 静默失败
+  } catch (err) {
+    console.error('获取未读消息数失败', err)
   }
 })
 

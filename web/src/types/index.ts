@@ -1,12 +1,10 @@
 /**
- * 共享类型定义
+ * 共享类型定义统—入口
  *
- * 本目录集中管理项目中多处使用的类型，避免在各 API 模块中重复定义。
- *
- * TODO(types): 创建 api.ts 统一 ApiResponse<T>/PageResponse<T>，消除 api/auth.ts 和
- *            api/dashboard.ts 中的重复定义。
- * TODO(types): 创建 menu.ts 统一 MenuItem 类型，替代 api/auth.ts 中的 any[]。
- * TODO(types): 创建 ticket.ts 统一 TicketItem/TicketDetail/urgencyText 枚举映射，
- *            替代 4 个视图中的重复类型定义。
- * TODO(types): 创建 knowledge.ts 统一知识状态/处理状态枚举，替代多个视图中的重复映射。
+ * 统一导出所有共享类型，消费方只需 import from '@/types'。
  */
+
+export type { ApiResponse, PageResponse } from './api'
+export type { MenuItem } from './menu'
+export { TicketUrgency, TicketStatus, TICKET_STATUS_TEXT, TICKET_URGENCY_TEXT } from './ticket'
+export { KnowledgeStatus, ProcessStatus, KNOWLEDGE_STATUS_TEXT, PROCESS_STATUS_TEXT } from './knowledge'

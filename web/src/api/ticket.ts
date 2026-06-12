@@ -52,7 +52,7 @@ export interface TicketRecord {
   operator_id: number
   action: string
   content: string
-  detail?: Record<string, any>
+  detail?: Record<string, unknown>
   created_at: string
 }
 

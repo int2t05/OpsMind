@@ -74,7 +74,7 @@
 //                         应提取到 utils/ticket.ts 共享。
 // TODO(admin/TicketDetail): toast 使用 window.setTimeout 但 onUnmounted 未清理定时器 — 组件卸载时存在内存泄漏风险。
 // TODO(admin/TicketDetail): 使用 (res as any) 强制类型转换 — 等 API 泛型补全后移除。
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { getTicketDetail, updateTicketStatus } from '@/api/admin'
 import type { TicketDetail } from '@/api/ticket'
@@ -98,6 +98,9 @@ function showToast(message: string, type: 'success' | 'error') {
   if (toastTimer) clearTimeout(toastTimer)
   toastTimer = window.setTimeout(() => { toast.value = { message: '', type: 'success' } }, 3000)
 }
+
+// 组件卸载时清理定时器，防止内存泄漏
+onUnmounted(() => { if (toastTimer) clearTimeout(toastTimer) })
 
 async function doAction(action: string) {
   saving.value = true

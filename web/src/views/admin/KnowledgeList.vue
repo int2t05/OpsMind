@@ -104,8 +104,8 @@
 // TODO(admin/KnowledgeList): 使用 (res.data as any) 强制类型转换 — 等 API 泛型补全后移除。
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import Pagination from '../../components/common/Pagination.vue'
-import { listKnowledgeBases, createKnowledgeBase, listArticles, submitReview, publishArticle, disableArticle, enableArticle, retryDocument } from '../../api/knowledge'
+import Pagination from '@/components/common/Pagination.vue'
+import { listKnowledgeBases, createKnowledgeBase, listArticles, submitReview, publishArticle, disableArticle, enableArticle, retryDocument } from '@/api/knowledge'
 
 interface KB { id: number; name: string }
 // v2: 统一文章模型字段

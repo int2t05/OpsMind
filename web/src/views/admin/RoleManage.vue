@@ -35,7 +35,7 @@ const loading = ref(true); const roles = ref<RoleItem[]>([])
 
 onMounted(async () => {
   try { const res = await getRoleList() as any; roles.value = res?.data || res || [] }
-  catch { /* ignore */ }
+  catch (err) { console.error('加载角色列表失败', err) }
   finally { loading.value = false }
 })
 </script>

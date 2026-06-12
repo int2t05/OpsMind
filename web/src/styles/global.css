@@ -1,8 +1,7 @@
 /* ===== OpsMind 全局样式 — Linear Design 设计系统 ===== */
-/* TODO(styles): .n-menu / .n-config-provider / .n-button__content 中使用 !important —
-               在 Naive UI 版本升级时可能失效。应考虑用更高特异性选择器替代。 */
 /* 与 docs/prompts/DESIGN-linear.app.md 完全对齐 */
 /* 支持 dark/light 双主题，通过 [data-theme] 属性切换 */
+/* Naive UI 覆盖策略：font-family/button 使用高特异性选择器；menu ::before 保留 !important（Naive 内联样式） */
 
 /* ===== 暗色主题（默认）===== */
 :root,
@@ -217,15 +216,17 @@ select {
 }
 
 /* Naive UI 全局微调 */
-.n-config-provider {
-  font-family: var(--font-family) !important;
+/* 使用更高特异性选择器替代 !important */
+body .n-config-provider {
+  font-family: var(--font-family);
   font-feature-settings: var(--font-features);
 }
 
-.n-button__content {
-  font-weight: var(--font-weight-emphasis) !important;
+.n-button .n-button__content {
+  font-weight: var(--font-weight-emphasis);
 }
 
+/* Naive UI 选中菜单项使用内联样式，!important 为必要性覆盖 */
 .n-menu .n-menu-item-content.n-menu-item-content--selected::before {
   background: var(--accent) !important;
   opacity: 0.12 !important;

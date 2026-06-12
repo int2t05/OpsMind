@@ -63,8 +63,8 @@
         </div>
 
         <div
-          v-for="(msg, i) in chatStore.messages"
-          :key="i"
+          v-for="msg in chatStore.messages"
+          :key="msg.id"
           :class="['message', msg.role === 'user' ? 'message--user' : 'message--assistant']"
         >
           <div class="message-bubble">
@@ -164,8 +164,8 @@ onMounted(async () => {
     if (knowledgeBases.value.length > 0) {
       selectedKB.value = knowledgeBases.value[0].id
     }
-  } catch {
-    // 静默失败
+  } catch (err) {
+    console.error('加载知识库列表失败', err)
   }
 })
 

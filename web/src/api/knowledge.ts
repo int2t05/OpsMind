@@ -5,7 +5,8 @@
  * TODO(api/knowledge): listKnowledgeBases 和 listKnowledgeBasesForPortal 有独立的接口定义，
  *                     但两者结构高度相似 — 可抽取共享的 KnowledgeBaseItem 类型。
  */
-import request from '../utils/request'
+import request from '@/utils/request'
+import type { ApiResponse, PageResponse } from '@/types/api'
 
 // =============================================================================
 // 知识库 (KnowledgeBase)
@@ -22,22 +23,31 @@ interface UpdateKBParams {
   description?: string
 }
 
+/** 知识库数据模型 */
+interface KnowledgeBaseItem {
+  id: number
+  name: string
+  description?: string
+  embedding_model?: string
+  created_at?: string
+}
+
 /** 知识库列表（后台管理用，需要 admin 权限） */
 export function listKnowledgeBases() {
-  return request.get('/api/v1/admin/knowledge-bases')
+  return request.get<ApiResponse<KnowledgeBaseItem[]>>('/api/v1/admin/knowledge-bases')
 }
 
 /** 知识库列表（门户端用，无需 admin 权限 — Chat 页知识库下拉框） */
 export function listKnowledgeBasesForPortal() {
-  return request.get('/api/v1/portal/knowledge-bases')
+  return request.get<ApiResponse<{ items: KnowledgeBaseItem[] }>>('/api/v1/portal/knowledge-bases')
 }
 
 export function createKnowledgeBase(data: CreateKBParams) {
-  return request.post('/api/v1/admin/knowledge-bases', data)
+  return request.post<ApiResponse<KnowledgeBaseItem>>('/api/v1/admin/knowledge-bases', data)
 }
 
 export function updateKnowledgeBase(id: number, data: UpdateKBParams) {
-  return request.put(`/api/v1/admin/knowledge-bases/${id}`, data)
+  return request.put<ApiResponse<KnowledgeBaseItem>>(`/api/v1/admin/knowledge-bases/${id}`, data)
 }
 
 // =============================================================================
@@ -66,44 +76,59 @@ interface ArticleListParams {
   status?: number
 }
 
+/** 知识文章数据模型 */
+interface KnowledgeArticleItem {
+  id: number
+  kb_id: number
+  title: string
+  content: string
+  source_type: number
+  category?: string
+  tags?: string[]
+  status: number
+  process_status?: number
+  created_at?: string
+  updated_at?: string
+}
+
 export function listArticles(kbID: number, params: ArticleListParams) {
-  return request.get(`/api/v1/admin/knowledge-bases/${kbID}/articles`, { params })
+  return request.get<ApiResponse<PageResponse<KnowledgeArticleItem>>>(`/api/v1/admin/knowledge-bases/${kbID}/articles`, { params })
 }
 
 export function getArticleDetail(id: number) {
-  return request.get(`/api/v1/admin/articles/${id}`)
+  return request.get<ApiResponse<KnowledgeArticleItem>>(`/api/v1/admin/articles/${id}`)
 }
 
 export function createArticle(kbID: number, data: CreateArticleParams) {
-  return request.post(`/api/v1/admin/knowledge-bases/${kbID}/articles`, data)
+  return request.post<ApiResponse<KnowledgeArticleItem>>(`/api/v1/admin/knowledge-bases/${kbID}/articles`, data)
 }
 
 export function updateArticle(id: number, data: UpdateArticleParams) {
-  return request.put(`/api/v1/admin/articles/${id}`, data)
+  return request.put<ApiResponse<KnowledgeArticleItem>>(`/api/v1/admin/articles/${id}`, data)
 }
 
 export function submitReview(id: number) {
-  return request.post(`/api/v1/admin/articles/${id}/submit-review`)
+  return request.post<ApiResponse<null>>(`/api/v1/admin/articles/${id}/submit-review`)
 }
 
 export function reviewArticle(id: number, data: { approved: boolean; review_comment?: string }) {
-  return request.post(`/api/v1/admin/articles/${id}/review`, data)
+  return request.post<ApiResponse<null>>(`/api/v1/admin/articles/${id}/review`, data)
 }
 
 export function publishArticle(id: number) {
-  return request.post(`/api/v1/admin/articles/${id}/publish`)
+  return request.post<ApiResponse<null>>(`/api/v1/admin/articles/${id}/publish`)
 }
 
 export function disableArticle(id: number) {
-  return request.post(`/api/v1/admin/articles/${id}/disable`)
+  return request.post<ApiResponse<null>>(`/api/v1/admin/articles/${id}/disable`)
 }
 
 export function enableArticle(id: number) {
-  return request.post(`/api/v1/admin/articles/${id}/enable`)
+  return request.post<ApiResponse<null>>(`/api/v1/admin/articles/${id}/enable`)
 }
 
 export function retrySyncArticle(id: number) {
-  return request.post(`/api/v1/admin/articles/${id}/retry-sync`)
+  return request.post<ApiResponse<null>>(`/api/v1/admin/articles/${id}/retry-sync`)
 }
 
 // =============================================================================
@@ -112,19 +137,19 @@ export function retrySyncArticle(id: number) {
 
 /** 上传文档到知识库（multipart form） */
 export function uploadDocuments(kbID: number, formData: FormData) {
-  return request.post(`/api/v1/admin/knowledge-bases/${kbID}/documents/upload`, formData, {
+  return request.post<ApiResponse<KnowledgeArticleItem>>(`/api/v1/admin/knowledge-bases/${kbID}/documents/upload`, formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
   })
 }
 
 /** 查询文档处理状态 */
 export function getDocumentStatus(kbID: number, articleID: number) {
-  return request.get(`/api/v1/admin/knowledge-bases/${kbID}/documents/${articleID}/status`)
+  return request.get<ApiResponse<{ status: number; status_text: string }>>(`/api/v1/admin/knowledge-bases/${kbID}/documents/${articleID}/status`)
 }
 
 /** 重试文档处理 */
 export function retryDocument(kbID: number, articleID: number) {
-  return request.post(`/api/v1/admin/knowledge-bases/${kbID}/documents/${articleID}/retry`)
+  return request.post<ApiResponse<null>>(`/api/v1/admin/knowledge-bases/${kbID}/documents/${articleID}/retry`)
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

@@ -42,7 +42,7 @@
       :current-page="page"
       :total="total"
       :page-size="pageSize"
-      @change="handlePageChange"
+      @update:current-page="handlePageChange"
     />
   </div>
 </template>
@@ -74,7 +74,8 @@ async function loadTickets() {
     const data = (res as any).data || res
     tickets.value = data?.items || []
     total.value = data?.total || 0
-  } catch {
+  } catch (err) {
+    console.error('加载申告列表失败', err)
     tickets.value = []
   } finally {
     loading.value = false

@@ -55,6 +55,11 @@ export interface ChatSessionResponse {
   duration_ms: number
   feedback: number
   created_at: string
+  /** v2: RAG 管道执行指标（由 done 事件的 metadata 携带） */
+  pipeline_metrics?: {
+    steps: Array<{ step_id: string; label: string; duration_ms: number; success: boolean }>
+    total_duration_ms: number
+  }
 }
 
 /** SSE 流式事件的回调签名 */
@@ -161,8 +166,9 @@ export async function streamChatSession(
         // 忽略尾部不完整数据
       }
     }
-  } catch (err: any) {
-    callbacks.onError(err.message || '网络连接失败')
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : '网络连接失败'
+    callbacks.onError(message)
   }
 }
 

@@ -12,7 +12,7 @@ interface UserInfo {
   first_login: boolean
 }
 
-interface MenuItem {
+export interface MenuItem {
   id: number
   name: string
   path: string

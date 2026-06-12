@@ -73,62 +73,39 @@
       </div>
 
       <!-- Toast 提示 -->
-      <div v-if="toast.message" :class="['toast', toast.type]">
-        {{ toast.message }}
+      <div v-if="toast.visible.value" :class="['toast', toast.type.value]">
+        {{ toast.message.value }}
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-// TODO(admin/ModelConfig): 与 SystemConfig 页面管理完全相同的配置项 — 应合并为统一的 AI 配置入口。
-// TODO(admin/ModelConfig): 组件超过 310 行 — 可提取滑块配置子组件。
-// TODO(admin/ModelConfig): toast 定时器未在 onUnmounted 清理 — 存在内存泄漏。
+// 使用共享 AI 配置 composable — 与 SystemConfig 页面数据同步
 import { ref, onMounted } from 'vue'
 import request from '@/utils/request'
+import { useAIConfig } from '@/composables/useAIConfig'
+import { useToast } from '@/composables/useToast'
 
-const loading = ref(true)
+const { topK, confidenceThreshold, loading, loadConfig } = useAIConfig()
 const saving = ref(false)
-const topK = ref(5)
-const confidenceThreshold = ref(0.6)
-const toast = ref<{ message: string; type: string }>({ message: '', type: 'success' })
+const toast = useToast()
 
-let toastTimer: ReturnType<typeof setTimeout> | null = null
-
-onMounted(async () => {
-  try {
-    const [topKRes, thresholdRes] = await Promise.all([
-      request.get('/api/v1/admin/configs/ai.default_top_k' as any),
-      request.get('/api/v1/admin/configs/ai.confidence_threshold' as any)
-    ])
-    const tk = (topKRes as any).data ?? topKRes
-    const ct = (thresholdRes as any).data ?? thresholdRes
-    if (tk != null) topK.value = Number(tk)
-    if (ct != null) confidenceThreshold.value = Number(ct)
-  } catch {
-    // 使用默认值
-  } finally {
-    loading.value = false
-  }
+onMounted(() => {
+  loadConfig(request)
 })
-
-function showToast(message: string, type: 'success' | 'error') {
-  toast.value = { message, type }
-  if (toastTimer) clearTimeout(toastTimer)
-  toastTimer = setTimeout(() => { toast.value = { message: '', type: 'success' } }, 3000)
-}
 
 async function handleSave() {
   saving.value = true
   try {
     await Promise.all([
       request.put('/api/v1/admin/configs/ai.default_top_k' as any, { value: topK.value }),
-      request.put('/api/v1/admin/configs/ai.confidence_threshold' as any, { value: confidenceThreshold.value })
+      request.put('/api/v1/admin/configs/ai.confidence_threshold' as any, { value: confidenceThreshold.value }),
     ])
-    showToast('配置保存成功', 'success')
-  } catch (e: any) {
-    const msg = e?.response?.data?.message || e?.message || '保存失败'
-    showToast(msg, 'error')
+    toast.showToast('配置保存成功', 'success')
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : '保存失败'
+    toast.showToast(msg, 'error')
   } finally {
     saving.value = false
   }

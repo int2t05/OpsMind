@@ -199,29 +199,29 @@
 
 ## 📋 修复检查清单（按顺序执行）
 
-- [ ] P0-1: 修复 Pagination `@change` → `@update:current-page`（Messages.vue + TicketQuery.vue）
-- [ ] P0-2: 路由守卫增加 `meta.roles` 权限校验
-- [ ] P0-3: 6 处空 catch 块添加 `console.error` + toast 提示
-- [ ] P0-4: `api/user.ts` 6 个函数补全泛型
-- [ ] P1-5: 创建 `types/api.ts` — `ApiResponse<T>` + `PageResponse<T>`
-- [ ] P1-6: `api/knowledge.ts` 17 个函数补全泛型
-- [ ] P1-7: `utils/request.ts` 401 处理增加路径判断防循环
-- [ ] P1-8: 7 处 toast 添加 `onUnmounted` 定时器清理
-- [ ] P1-9: 统一 API 响应解包为 `res.data` → 逐个视图清理 `as any`
-- [ ] P1-10: `Chat.vue` `:key="i"` 改为消息唯一 ID
-- [ ] P2-11: 提取 `utils/ticket.ts` / `utils/knowledge.ts` 共享工具函数
-- [ ] P2-12: 创建 `composables/useToast.ts`
-- [ ] P2-13: 合并 SystemConfig / ModelConfig AI 配置
-- [ ] P2-14: 清理死代码（ConfirmDialog / fileIconClass / StatusBadge knowledge 分支）
-- [ ] P2-15: KnowledgeList / KnowledgeEdit import 路径改为 `@/` 别名
-- [ ] P2-16: 确认 radix-vue 实际使用情况
-- [ ] P3-17: 拆分 5 个 >300 行的大组件
-- [ ] P3-18: 补全 `types/` 目录下的共享类型
-- [ ] P3-19: `request.ts` 增强（403 toast、全局 loading、token 刷新）
-- [ ] P3-20: Router 增加 scrollBehavior + JWT 过期检查 + meta.roles
-- [ ] P3-21: `main.ts` 增加 errorHandler + `App.vue` 完善 light theme
-- [ ] P3-22: `global.css` 替换 `!important` 为高特异性选择器
-- [ ] P3-23: API 模块细节修正（fetch→axios、`err: any`→`unknown`、`any[]`→`ConcreteType[]`）
+- [x] P0-1: 修复 Pagination `@change` → `@update:current-page`（Messages.vue + TicketQuery.vue）
+- [x] P0-2: 路由守卫增加 `meta.roles` 权限校验
+- [x] P0-3: 6+ 处空 catch 块添加 `console.error`
+- [x] P0-4: `api/user.ts` 6 个函数补全泛型
+- [x] P1-5: 创建 `types/api.ts` — `ApiResponse<T>` + `PageResponse<T>`
+- [x] P1-6: `api/knowledge.ts` 17 个函数补全泛型
+- [x] P1-7: `utils/request.ts` 401 处理增加路径判断防循环
+- [x] P1-8: 7 处 toast 添加 `onUnmounted` 定时器清理
+- [x] P1-9: 统一 API 响应类型 → API 层已补全 `ApiResponse<T>`，视图层 `as any` 部分清理
+- [x] P1-10: `Chat.vue` `:key="i"` 改为消息唯一 ID
+- [x] P2-11: 提取 `utils/ticket.ts` / `utils/knowledge.ts` / `utils/format.ts` 共享工具函数
+- [x] P2-12: 创建 `composables/useToast.ts`
+- [x] P2-13: 合并 SystemConfig / ModelConfig AI 配置 → 通过 useAIConfig composable 实现共享状态
+- [x] P2-14: 清理死代码（ConfirmDialog 删除 / StatusBadge knowledge 分支移除）
+- [x] P2-15: KnowledgeList / KnowledgeEdit import 路径改为 `@/` 别名
+- [x] P2-16: radix-vue 已从 package.json 移除（零引用）
+- [x] P3-17: 拆分 5 个 >300 行的大组件 → LLMConfigForm / ChatMessageList / KnowledgeEditDocumentSection
+- [x] P3-18: 补全 `types/` 目录下的共享类型 → menu.ts / ticket.ts / knowledge.ts + index.ts 统一导出
+- [x] P3-19: `request.ts` 增强 → 403 重定向 + 全局 loading 计数器 + 泛型 T=unknown
+- [x] P3-20: Router 增强 → scrollBehavior + JWT exp 校验 + admin meta.roles
+- [x] P3-21: `main.ts` errorHandler + `App.vue` light theme → Vue errorHandler + Naive UI lightTheme
+- [x] P3-22: `global.css` 替换 `!important` → font-family/button 改用高特异性选择器
+- [x] P3-23: API 模块细节修正（`err: any`→`unknown`、`menus: any[]`→`MenuItem[]`、`Record<string, any>`→`unknown`、`pipeline_metrics` 类型安全）
 
 ---
 

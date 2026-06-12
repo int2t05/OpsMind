@@ -61,8 +61,8 @@
     </div>
 
     <!-- Toast 提示 -->
-    <div v-if="toast.message" :class="['toast', toast.type]">
-      {{ toast.message }}
+    <div v-if="toast.visible.value" :class="['toast', toast.type.value]">
+      {{ toast.message.value }}
     </div>
   </div>
 </template>
@@ -71,8 +71,10 @@
 // TODO(admin/SystemConfig): 与 ModelConfig 页面管理完全相同的配置项（ai.default_top_k / ai.confidence_threshold），
 //                         修改一个不会同步到另一个 — 应合并为统一的 AI 配置入口或共享配置读写逻辑。
 // TODO(admin/SystemConfig): toast 定时器未在 onUnmounted 清理 — 存在内存泄漏。
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import request from '@/utils/request'
+import { useAIConfig } from '@/composables/useAIConfig'
+import { useToast } from '@/composables/useToast'
 
 interface ConfigItem {
   key: string
@@ -80,44 +82,33 @@ interface ConfigItem {
   _parsed?: any
 }
 
-const loading = ref(true)
+const aiConfig = useAIConfig()
+const toast = useToast()
 const saving = ref(false)
 const configItems = ref<ConfigItem[]>([])
 const editingKey = ref('')
 const editValue = ref<any>('')
-const toast = ref<{ message: string; type: string }>({ message: '', type: 'success' })
-let toastTimer: ReturnType<typeof setTimeout> | null = null
+const loading = aiConfig.loading
 
 // 可配置的系统配置项
 const KNOWN_KEYS = ['ai.default_top_k', 'ai.confidence_threshold']
 
 onMounted(async () => {
-  await fetchAllConfigs()
+  await aiConfig.loadConfig(request)
+  syncToItems()
 })
 
-function showToast(message: string, type: 'success' | 'error') {
-  toast.value = { message, type }
-  if (toastTimer) clearTimeout(toastTimer)
-  toastTimer = setTimeout(() => { toast.value = { message: '', type: 'success' } }, 3000)
-}
+// 当 AI 配置变化时同步到配置列表
+watch([aiConfig.topK, aiConfig.confidenceThreshold], () => {
+  syncToItems()
+})
 
-async function fetchAllConfigs() {
-  loading.value = true
-  const items: ConfigItem[] = []
-
-  for (const key of KNOWN_KEYS) {
-    try {
-      const res = await request.get(`/api/v1/admin/configs/${key}` as any)
-      const raw = (res as any)
-      const val = raw?.data !== undefined ? raw.data : raw
-      items.push({ key, value: val, _parsed: val })
-    } catch {
-      items.push({ key, value: '(未设置)' })
-    }
-  }
-
-  configItems.value = items
-  loading.value = false
+/** 将共享状态同步到本地配置项列表 */
+function syncToItems() {
+  configItems.value = [
+    { key: 'ai.default_top_k', value: aiConfig.topK.value, _parsed: aiConfig.topK.value },
+    { key: 'ai.confidence_threshold', value: aiConfig.confidenceThreshold.value, _parsed: aiConfig.confidenceThreshold.value },
+  ]
 }
 
 function formatValue(val: any): string {
@@ -145,17 +136,15 @@ async function handleSave(key: string) {
     if (!isNaN(num) && String(value).trim() !== '') value = num
 
     await request.put(`/api/v1/admin/configs/${key}` as any, { value })
-    showToast('保存成功', 'success')
+    toast.showToast('保存成功', 'success')
     editingKey.value = ''
 
-    // 刷新该配置项的值
-    const idx = configItems.value.findIndex(c => c.key === key)
-    if (idx >= 0) {
-      configItems.value[idx].value = value
-      configItems.value[idx]._parsed = value
-    }
-  } catch (e: any) {
-    showToast(e?.response?.data?.message || e?.message || '保存失败', 'error')
+    // 同步到共享 AI 配置状态
+    if (key === 'ai.default_top_k') aiConfig.setTopK(Number(value))
+    if (key === 'ai.confidence_threshold') aiConfig.setConfidenceThreshold(Number(value))
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : '保存失败'
+    toast.showToast(msg, 'error')
   } finally {
     saving.value = false
   }

@@ -1,16 +1,6 @@
 import request from '../utils/request'
-
-// 后端统一响应格式（axios 响应拦截器已提取 response.data）
-// request.post<T> 中的 T 对应 response.data 的类型
-//
-// TODO(api/auth): ApiResponse<T> 与 api/dashboard.ts 中重复定义 — 应抽取到 src/types/api.ts 共享。
-// TODO(api/auth): LoginResponse.menus 使用 any[] — 应使用 auth store 中已有的 MenuItem 类型。
-// TODO(api/auth): refreshToken() 无泛型参数，返回 any — 应补充类型声明。
-interface ApiResponse<T> {
-  code: number
-  message: string
-  data: T
-}
+import type { ApiResponse } from '@/types/api'
+import type { MenuItem } from '@/stores/auth'
 
 interface LoginParams {
   username: string
@@ -30,7 +20,7 @@ interface LoginResponse {
   }
   roles: string[]
   permissions: string[]
-  menus: any[]
+  menus: MenuItem[]
 }
 
 interface ChangePasswordParams {

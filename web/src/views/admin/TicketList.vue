@@ -37,7 +37,7 @@ const loading = ref(true); const tickets = ref<TicketItem[]>([])
 
 onMounted(async () => {
   try { const res = await listAllTickets({ page_size: 50 }) as any; tickets.value = res?.data || res?.items || [] }
-  catch { /* API error */ }
+  catch (err) { console.error('加载申告列表失败', err) }
   finally { loading.value = false }
 })
 
