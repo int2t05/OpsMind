@@ -53,7 +53,7 @@ func (h *ChatHandler) CreateChatSession(c *gin.Context) {
 		return
 	}
 
-	userID := getCurrentUserID(c)
+	userID, _ := getCurrentUserID(c)
 	resp, err := h.svc.CreateChatSession(req, userID)
 	if err != nil {
 		handleServiceError(c, err)
@@ -138,7 +138,7 @@ func (h *ChatHandler) StreamChatSession(c *gin.Context) {
 		return
 	}
 
-	userID := getCurrentUserID(c)
+	userID, _ := getCurrentUserID(c)
 
 	// 调用 Service 层获取完整答案（业务逻辑不变）
 	resp, err := h.svc.CreateChatSession(req, userID)

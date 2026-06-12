@@ -47,7 +47,7 @@ func (h *KnowledgeHandler) CreateKB(c *gin.Context) {
 		return
 	}
 
-	userID := getCurrentUserID(c)
+	userID, _ := getCurrentUserID(c)
 	if err := h.svc.CreateKB(req, userID); err != nil {
 		handleServiceError(c, err)
 		return
@@ -115,7 +115,7 @@ func (h *KnowledgeHandler) CreateArticle(c *gin.Context) {
 	}
 	req.KBID = kbID
 
-	userID := getCurrentUserID(c)
+	userID, _ := getCurrentUserID(c)
 	if svcErr := h.svc.CreateArticle(req, userID); svcErr != nil {
 		handleServiceError(c, svcErr)
 		return
@@ -139,7 +139,7 @@ func (h *KnowledgeHandler) UpdateArticle(c *gin.Context) {
 		return
 	}
 
-	userID := getCurrentUserID(c)
+	userID, _ := getCurrentUserID(c)
 	if svcErr := h.svc.UpdateArticle(id, req, userID); svcErr != nil {
 		handleServiceError(c, svcErr)
 		return
@@ -157,7 +157,7 @@ func (h *KnowledgeHandler) SubmitReview(c *gin.Context) {
 		return
 	}
 
-	userID := getCurrentUserID(c)
+	userID, _ := getCurrentUserID(c)
 	if svcErr := h.svc.SubmitReview(id, userID); svcErr != nil {
 		handleServiceError(c, svcErr)
 		return
@@ -181,7 +181,7 @@ func (h *KnowledgeHandler) Review(c *gin.Context) {
 		return
 	}
 
-	userID := getCurrentUserID(c)
+	userID, _ := getCurrentUserID(c)
 	if svcErr := h.svc.Review(id, userID, req); svcErr != nil {
 		handleServiceError(c, svcErr)
 		return
@@ -199,7 +199,7 @@ func (h *KnowledgeHandler) Publish(c *gin.Context) {
 		return
 	}
 
-	userID := getCurrentUserID(c)
+	userID, _ := getCurrentUserID(c)
 	if svcErr := h.svc.Publish(id, userID); svcErr != nil {
 		handleServiceError(c, svcErr)
 		return
@@ -341,7 +341,7 @@ func (h *KnowledgeHandler) UploadDocuments(c *gin.Context) {
 	}
 	defer src.Close()
 
-	userID := getCurrentUserID(c)
+	userID, _ := getCurrentUserID(c)
 
 	article, err := h.svc.UploadDocuments(kbID, userID, file.Filename, fileType, src)
 	if err != nil {

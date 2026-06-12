@@ -32,7 +32,7 @@ func NewMessageHandler(svc *service.MessageService) *MessageHandler {
 //
 // GET /api/v1/portal/messages
 func (h *MessageHandler) ListMessages(c *gin.Context) {
-	userID := getCurrentUserID(c)
+	userID, _ := getCurrentUserID(c)
 
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
@@ -64,7 +64,7 @@ func (h *MessageHandler) MarkAsRead(c *gin.Context) {
 		return
 	}
 
-	userID := getCurrentUserID(c)
+	userID, _ := getCurrentUserID(c)
 	if err := h.svc.MarkAsRead(id, userID); err != nil {
 		handleServiceError(c, err)
 		return
@@ -77,7 +77,7 @@ func (h *MessageHandler) MarkAsRead(c *gin.Context) {
 //
 // GET /api/v1/portal/messages/unread-count
 func (h *MessageHandler) CountUnread(c *gin.Context) {
-	userID := getCurrentUserID(c)
+	userID, _ := getCurrentUserID(c)
 
 	count, err := h.svc.CountUnread(userID)
 	if err != nil {

@@ -5,6 +5,7 @@
 package service
 
 import (
+	"errors"
 	"encoding/json"
 
 	"opsmind/internal/model"
@@ -58,7 +59,7 @@ func (s *RoleService) Create(name, description string, permissions []string) err
 func (s *RoleService) GetByID(id int64) (*model.Role, error) {
 	role, err := s.repo.GetByID(id)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, AppError{Code: errcode.ErrNotFound, Message: "角色不存在"}
 		}
 		return nil, err
@@ -78,7 +79,7 @@ func (s *RoleService) List(page, pageSize int) ([]model.Role, int64, error) {
 func (s *RoleService) Update(id int64, name, description string, permissions []string) error {
 	role, err := s.repo.GetByID(id)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return AppError{Code: errcode.ErrNotFound, Message: "角色不存在"}
 		}
 		return err
@@ -109,7 +110,7 @@ func (s *RoleService) Update(id int64, name, description string, permissions []s
 func (s *RoleService) Delete(id int64) error {
 	_, err := s.repo.GetByID(id)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return AppError{Code: errcode.ErrNotFound, Message: "角色不存在"}
 		}
 		return err
@@ -132,7 +133,7 @@ func (s *RoleService) ListMenus() ([]model.Menu, error) {
 func (s *RoleService) GetRoleMenus(roleID int64) ([]model.Menu, error) {
 	// 先确认角色存在
 	if _, err := s.repo.GetByID(roleID); err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, AppError{Code: errcode.ErrNotFound, Message: "角色不存在"}
 		}
 		return nil, err
@@ -148,7 +149,7 @@ func (s *RoleService) GetRoleMenus(roleID int64) ([]model.Menu, error) {
 func (s *RoleService) UpdateRoleMenus(roleID int64, menuIDs []int64) error {
 	// 先确认角色存在
 	if _, err := s.repo.GetByID(roleID); err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return AppError{Code: errcode.ErrNotFound, Message: "角色不存在"}
 		}
 		return err

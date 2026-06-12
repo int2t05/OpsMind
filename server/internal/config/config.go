@@ -172,7 +172,7 @@ func bindEnvs(v *viper.Viper) {
 
 	// Embedding
 	v.BindEnv("embedding.base_url", "OPSMIND_EMBEDDING_BASE_URL")
-	v.BindEnv("embedding.model", "OPSMIND_EMBEDDING_MODEL") // TODO: 缩进不一致 — 与其他行未对齐
+	v.BindEnv("embedding.model", "OPSMIND_EMBEDDING_MODEL")
 	v.BindEnv("embedding.dimension", "OPSMIND_EMBEDDING_DIMENSION")
 
 	// AI
@@ -216,7 +216,7 @@ func setDefaults(v *viper.Viper) {
 
 	// Embedding
 	v.SetDefault("embedding.base_url", "")
-	v.SetDefault("embedding.model", "bge-m3") // TODO: 缩进不一致
+	v.SetDefault("embedding.model", "bge-m3")
 	v.SetDefault("embedding.dimension", 1024)
 
 	// AI

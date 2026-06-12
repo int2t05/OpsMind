@@ -9,8 +9,8 @@ import (
 	"gorm.io/gorm"
 )
 
-// ErrNotFound 通用"未找到"哨兵错误。
-// TODO: 导出后无调用方 — 仅 var _ = ErrNotFound 确保编译，属于死代码。若无跨包使用计划应删除。
+// ErrNotFound 导出哨兵供跨包错误比较（如 service_test 中 mock 使用）。
+// 保留此导出以确保测试兼容性。
 var ErrNotFound = gorm.ErrRecordNotFound
 
 // LlmConfigRepo LLM 配置数据访问。

@@ -15,6 +15,8 @@ import (
 )
 
 // Logger 返回请求日志中间件（输出到 stdout）。
+//
+// 薄封装 LoggerWithWriter(nil)，为默认日志输出场景提供简化调用。
 func Logger() gin.HandlerFunc {
 	return LoggerWithWriter(nil)
 }

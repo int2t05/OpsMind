@@ -42,7 +42,7 @@ func (h *TicketHandler) CreateTicket(c *gin.Context) {
 		return
 	}
 
-	userID := getCurrentUserID(c)
+	userID, _ := getCurrentUserID(c)
 	if err := h.svc.CreateTicket(req, userID); err != nil {
 		handleServiceError(c, err)
 		return
@@ -55,7 +55,7 @@ func (h *TicketHandler) CreateTicket(c *gin.Context) {
 //
 // GET /api/v1/portal/tickets
 func (h *TicketHandler) ListByUser(c *gin.Context) {
-	userID := getCurrentUserID(c)
+	userID, _ := getCurrentUserID(c)
 
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
@@ -91,7 +91,7 @@ func (h *TicketHandler) SupplementTicket(c *gin.Context) {
 		return
 	}
 
-	userID := getCurrentUserID(c)
+	userID, _ := getCurrentUserID(c)
 	if svcErr := h.svc.SupplementTicket(id, userID, req); svcErr != nil {
 		handleServiceError(c, svcErr)
 		return
@@ -165,7 +165,7 @@ func (h *TicketHandler) UpdateStatus(c *gin.Context) {
 		return
 	}
 
-	userID := getCurrentUserID(c)
+	userID, _ := getCurrentUserID(c)
 	if svcErr := h.svc.UpdateStatus(id, userID, req); svcErr != nil {
 		handleServiceError(c, svcErr)
 		return
@@ -190,7 +190,7 @@ func (h *TicketHandler) AddRecord(c *gin.Context) {
 		return
 	}
 
-	userID := getCurrentUserID(c)
+	userID, _ := getCurrentUserID(c)
 	if svcErr := h.svc.AddRecord(id, userID, req); svcErr != nil {
 		handleServiceError(c, svcErr)
 		return
@@ -225,7 +225,7 @@ func (h *TicketHandler) CreateKnowledgeCandidate(c *gin.Context) {
 		return
 	}
 
-	userID := getCurrentUserID(c)
+	userID, _ := getCurrentUserID(c)
 
 	// 获取申告详情
 	detail, svcErr := h.svc.GetDetail(id)

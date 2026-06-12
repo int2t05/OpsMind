@@ -51,14 +51,12 @@ func parseID(c *gin.Context, key string) (int64, bool) {
 // getCurrentUserID 从 Gin context 中获取当前用户 ID。
 //
 // JWTAuth 中间件将当前用户 ID 以 int64 类型写入 context，key 为 "userID"。
-// 测试环境中可能不存在，返回 0 作为默认值。
-// TODO: 返回 0 静默表示「未认证」— 用于 config.Update 等操作时可能记录错误的 updatedBy=0。
-// 应添加 exists 返回值，或额外提供 requireCurrentUserID 版本在未认证时拒绝。
-func getCurrentUserID(c *gin.Context) int64 {
+// 返回 (userID, exists)，exists=false 表示未认证（测试环境或无 JWT 中间件的路由）。
+func getCurrentUserID(c *gin.Context) (int64, bool) {
 	if val, exists := c.Get("userID"); exists {
 		if id, ok := val.(int64); ok {
-			return id
+			return id, true
 		}
 	}
-	return 0
+	return 0, false
 }

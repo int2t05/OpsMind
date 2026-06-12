@@ -60,7 +60,7 @@ func (h *ConfigHandler) Update(c *gin.Context) {
 	}
 
 	// 从 JWT context 获取操作人 ID
-	updatedBy := getCurrentUserID(c)
+	updatedBy, _ := getCurrentUserID(c)
 
 	if err := h.svc.UpdateConfig(key, body.Value, updatedBy); err != nil {
 		handleServiceError(c, err)

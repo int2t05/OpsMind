@@ -6,6 +6,7 @@
 package service
 
 import (
+	"errors"
 	"opsmind/internal/dto/request"
 	"opsmind/internal/dto/response"
 	"opsmind/internal/model"
@@ -31,7 +32,7 @@ func NewUserService(repo *repository.UserRepo, db *gorm.DB) *UserService {
 func (s *UserService) GetByID(id int64) (*response.UserDetailResponse, error) {
 	user, err := s.repo.GetByID(id)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, AppError{Code: errcode.ErrNotFound, Message: "用户不存在"}
 		}
 		return nil, err
@@ -121,7 +122,7 @@ func (s *UserService) Create(req request.CreateUserRequest) error {
 func (s *UserService) Update(id int64, req request.UpdateUserRequest) error {
 	user, err := s.repo.GetByID(id)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return AppError{Code: errcode.ErrNotFound, Message: "用户不存在"}
 		}
 		return err
@@ -152,7 +153,7 @@ func (s *UserService) Update(id int64, req request.UpdateUserRequest) error {
 func (s *UserService) Freeze(id int64) error {
 	user, err := s.repo.GetByID(id)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return AppError{Code: errcode.ErrNotFound, Message: "用户不存在"}
 		}
 		return err
@@ -171,7 +172,7 @@ func (s *UserService) Freeze(id int64) error {
 func (s *UserService) Restore(id int64) error {
 	user, err := s.repo.GetByID(id)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return AppError{Code: errcode.ErrNotFound, Message: "用户不存在"}
 		}
 		return err

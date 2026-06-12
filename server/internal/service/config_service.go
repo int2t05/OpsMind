@@ -8,6 +8,7 @@
 package service
 
 import (
+	"errors"
 	"encoding/json"
 	"fmt"
 
@@ -35,7 +36,7 @@ func NewConfigService(repo *repository.ConfigRepo) *ConfigService {
 func (s *ConfigService) GetConfig(key string) (interface{}, error) {
 	cfg, err := s.repo.GetByKey(key)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, AppError{Code: errcode.ErrNotFound, Message: fmt.Sprintf("配置项 %s 不存在", key)}
 		}
 		return nil, err

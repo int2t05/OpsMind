@@ -57,24 +57,15 @@ type ChatService struct {
 // NewChatService 创建 ChatService 实例。
 //
 // pipeline/llmClient/configMgr 可以为 nil（测试或降级场景）。
-// knowledgeRepo/chatRepo 接受接口类型，repository 具体类型隐式满足。
-// TODO: 构造函数接受 interface{} 绕过编译期类型检查 — 传入错误类型时静默 nil。
-// 应直接使用具体接口类型（chatKnowledgeRepo 等），repository 具体类型隐式满足接口。
-func NewChatService(knowledgeRepo interface{}, chatRepo interface{}, pipeline interface{}, llmClient adapter.LLMClient, configMgr *LLMConfigManager) *ChatService {
-	svc := &ChatService{
-		llmClient: llmClient,
-		configMgr: configMgr,
+// knowledgeRepo/chatRepo/pipeline 直接使用具体接口类型，编译期校验传入类型。
+func NewChatService(knowledgeRepo chatKnowledgeRepo, chatRepo chatSessionRepo, pipeline chatPipeline, llmClient adapter.LLMClient, configMgr *LLMConfigManager) *ChatService {
+	return &ChatService{
+		knowledgeRepo: knowledgeRepo,
+		chatRepo:      chatRepo,
+		pipeline:      pipeline,
+		llmClient:     llmClient,
+		configMgr:     configMgr,
 	}
-	if r, ok := knowledgeRepo.(chatKnowledgeRepo); ok {
-		svc.knowledgeRepo = r
-	}
-	if r, ok := chatRepo.(chatSessionRepo); ok {
-		svc.chatRepo = r
-	}
-	if p, ok := pipeline.(chatPipeline); ok {
-		svc.pipeline = p
-	}
-	return svc
 }
 
 // =============================================================================

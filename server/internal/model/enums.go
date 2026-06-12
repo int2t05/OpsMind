@@ -91,3 +91,24 @@ const (
 	MenuTypeMenu    = "menu"    // 菜单
 	MenuTypeButton  = "button"  // 按钮
 )
+
+// TicketStatusText 返回工单状态的中文描述。
+//
+// 为什么放在 model 包而非 DTO：业务映射函数与状态常量就近维护，
+// 避免 DTO 包承担数据模型之外的职责。
+func TicketStatusText(status int16) string {
+	switch status {
+	case TicketStatusPending:
+		return "待处理"
+	case TicketStatusProcessing:
+		return "处理中"
+	case TicketStatusNeedSupplement:
+		return "需补充信息"
+	case TicketStatusResolved:
+		return "已解决"
+	case TicketStatusClosed:
+		return "已关闭"
+	default:
+		return "未知"
+	}
+}

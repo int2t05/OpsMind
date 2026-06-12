@@ -8,6 +8,7 @@
 package service
 
 import (
+	"errors"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -112,7 +113,7 @@ func (s *TicketService) CreateTicket(req request.CreateTicketRequest, userID int
 func (s *TicketService) SupplementTicket(id int64, userID int64, req request.SupplementTicketRequest) error {
 	ticket, err := s.repo.FindByID(id)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return AppError{Code: errcode.ErrNotFound, Message: "申告不存在"}
 		}
 		return err
@@ -163,7 +164,7 @@ func (s *TicketService) SupplementTicket(id int64, userID int64, req request.Sup
 func (s *TicketService) UpdateStatus(id int64, operatorID int64, req request.UpdateTicketStatusRequest) error {
 	ticket, err := s.repo.FindByID(id)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return AppError{Code: errcode.ErrNotFound, Message: "申告不存在"}
 		}
 		return err
@@ -243,7 +244,7 @@ func (s *TicketService) AddRecord(id int64, operatorID int64, req request.Create
 	// 验证申告存在
 	_, err := s.repo.FindByID(id)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return AppError{Code: errcode.ErrNotFound, Message: "申告不存在"}
 		}
 		return err
@@ -310,7 +311,7 @@ func (s *TicketService) ListAll(status, urgency, page, pageSize int) (*response.
 func (s *TicketService) GetDetail(id int64) (*response.TicketDetailResponse, error) {
 	ticket, err := s.repo.FindByID(id)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, AppError{Code: errcode.ErrNotFound, Message: "申告不存在"}
 		}
 		return nil, err
@@ -365,7 +366,7 @@ func toTicketItem(t *model.Ticket) response.TicketItem {
 		ImpactScope:     t.ImpactScope,
 		ContactPhone:    t.ContactPhone,
 		Status:          t.Status,
-		StatusText:      response.TicketStatusText(t.Status),
+		StatusText:      model.TicketStatusText(t.Status),
 		SupplementCount: t.SupplementCount,
 		CreatedAt:       t.CreatedAt.Format("2006-01-02 15:04:05"),
 		UpdatedAt:       t.UpdatedAt.Format("2006-01-02 15:04:05"),

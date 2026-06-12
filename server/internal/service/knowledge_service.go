@@ -4,6 +4,7 @@
 package service
 
 import (
+	"errors"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -63,28 +64,17 @@ type KnowledgeService struct {
 
 // NewKnowledgeService 创建 KnowledgeService 实例。
 //
-// 接受 interface{} 参数，通过类型断言适配——遵循 Go "accept interfaces, return structs"。
 // repo/chunker/embedder/store/docParser/processor 可以为 nil（测试或部分功能不需要时）。
-// TODO: 构造函数接受 interface{} 绕过编译期类型检查。
-// 传入错误类型时静默 nil，调用时 panic。应直接使用具体接口类型（knowledgeRepo 等）。
-func NewKnowledgeService(repo interface{}, chunker interface{}, embedder interface{}, store adapter.VectorStore, docParser interface{}, processor *rag.Processor) *KnowledgeService {
-	svc := &KnowledgeService{
+// 直接使用具体接口类型，编译期校验传入类型。
+func NewKnowledgeService(repo knowledgeRepo, chunker knowledgeChunker, embedder knowledgeEmbedder, store adapter.VectorStore, docParser knowledgeDocParser, processor *rag.Processor) *KnowledgeService {
+	return &KnowledgeService{
+		repo:      repo,
+		chunker:   chunker,
+		embedder:  embedder,
 		store:     store,
+		docParser: docParser,
 		processor: processor,
 	}
-	if r, ok := repo.(knowledgeRepo); ok {
-		svc.repo = r
-	}
-	if c, ok := chunker.(knowledgeChunker); ok {
-		svc.chunker = c
-	}
-	if e, ok := embedder.(knowledgeEmbedder); ok {
-		svc.embedder = e
-	}
-	if d, ok := docParser.(knowledgeDocParser); ok {
-		svc.docParser = d
-	}
-	return svc
 }
 
 // =============================================================================
@@ -105,7 +95,7 @@ func (s *KnowledgeService) CreateKB(req request.CreateKBRequest, userID int64) e
 func (s *KnowledgeService) UpdateKB(id int64, req request.UpdateKBRequest) error {
 	kb, err := s.repo.FindKBByID(id)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return errcode.AppError{Code: errcode.ErrNotFound, Message: "知识库不存在"}
 		}
 		return err
@@ -145,7 +135,7 @@ func (s *KnowledgeService) ListKBs() ([]response.KBResponse, error) {
 func (s *KnowledgeService) CreateArticle(req request.CreateArticleRequest, userID int64) error {
 	_, err := s.repo.FindKBByID(req.KBID)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return errcode.AppError{Code: errcode.ErrNotFound, Message: "知识库不存在"}
 		}
 		return err
@@ -168,7 +158,7 @@ func (s *KnowledgeService) CreateArticle(req request.CreateArticleRequest, userI
 func (s *KnowledgeService) UpdateArticle(id int64, req request.UpdateArticleRequest, userID int64) error {
 	article, err := s.repo.FindArticleByID(id)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return errcode.AppError{Code: errcode.ErrNotFound, Message: "文章不存在"}
 		}
 		return err
@@ -187,7 +177,7 @@ func (s *KnowledgeService) UpdateArticle(id int64, req request.UpdateArticleRequ
 func (s *KnowledgeService) SubmitReview(id int64, userID int64) error {
 	article, err := s.repo.FindArticleByID(id)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return errcode.AppError{Code: errcode.ErrNotFound, Message: "文章不存在"}
 		}
 		return err
@@ -202,7 +192,7 @@ func (s *KnowledgeService) SubmitReview(id int64, userID int64) error {
 func (s *KnowledgeService) Review(id int64, reviewerID int64, req request.ReviewRequest) error {
 	article, err := s.repo.FindArticleByID(id)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return errcode.AppError{Code: errcode.ErrNotFound, Message: "文章不存在"}
 		}
 		return err
@@ -247,7 +237,7 @@ func (s *KnowledgeService) Publish(id int64, publisherID int64) error {
 
 	article, err := s.repo.FindArticleByID(id)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return errcode.AppError{Code: errcode.ErrNotFound, Message: "文章不存在"}
 		}
 		return err
@@ -305,7 +295,7 @@ func (s *KnowledgeService) Publish(id int64, publisherID int64) error {
 func (s *KnowledgeService) Disable(id int64) error {
 	article, err := s.repo.FindArticleByID(id)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return errcode.AppError{Code: errcode.ErrNotFound, Message: "文章不存在"}
 		}
 		return err
@@ -327,7 +317,7 @@ func (s *KnowledgeService) Disable(id int64) error {
 func (s *KnowledgeService) Enable(id int64) error {
 	article, err := s.repo.FindArticleByID(id)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return errcode.AppError{Code: errcode.ErrNotFound, Message: "文章不存在"}
 		}
 		return err
@@ -382,7 +372,7 @@ func (s *KnowledgeService) ListArticles(kbID int64, status int, page, pageSize i
 func (s *KnowledgeService) GetArticleDetail(id int64) (*response.ArticleDetailResponse, error) {
 	article, err := s.repo.FindArticleByID(id)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errcode.AppError{Code: errcode.ErrNotFound, Message: "文章不存在"}
 		}
 		return nil, err
