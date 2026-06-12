@@ -50,6 +50,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useTheme } from '@/composables/useTheme'
 import { useToast } from '@/composables/useToast'
 import { getUnreadCount } from '@/api/message'
+import { logout as logoutApi } from '@/api/auth'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -71,8 +72,7 @@ onMounted(async () => {
 })
 
 function handleLogout() {
-  // TODO(layout/PortalLayout): 与 AdminLayout 重复 logout 逻辑，可提取到 authStore.logout()。
-  // 后续加入服务端登出时只需改一处。
+  logoutApi().catch(() => {}) // best-effort
   authStore.clearAuth()
   router.push('/login')
 }

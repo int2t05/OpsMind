@@ -3,9 +3,7 @@ import request from '@/utils/request'
 import type { ApiResponse, PageResponse } from '@/types/api'
 
 export interface TicketListParams { page?: number; page_size?: number; status?: number }
-export interface UpdateStatusParams { action: string; content?: string; operator_id?: number }
-// TODO(api/admin): 后端 UpdateTicketStatusRequest 字段是 result，不是 content/operator_id。
-// 当前后台更新状态可能提交了后端不会读取的字段。
+export interface UpdateStatusParams { action: string; result?: string }
 export interface AddRecordParams { action: string; content: string }
 
 export function listAllTickets(params?: TicketListParams) {

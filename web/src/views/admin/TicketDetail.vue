@@ -49,6 +49,22 @@
         </div>
       </div>
 
+      <!-- 添加处理记录 -->
+      <div class="card">
+        <h3>添加处理记录</h3>
+        <div class="record-form">
+          <select v-model="recordAction" class="field-select">
+            <option value="note">备注</option>
+            <option value="visit">回访</option>
+            <option value="escalate">升级</option>
+          </select>
+          <textarea v-model="recordContent" class="action-textarea" placeholder="记录内容..." rows="2" />
+          <button class="btn-primary" :disabled="savingRecord" @click="doAddRecord">
+            {{ savingRecord ? '保存中...' : '添加记录' }}
+          </button>
+        </div>
+      </div>
+
       <!-- 处理记录 -->
       <div class="card">
         <h3>处理记录</h3>
@@ -73,15 +89,17 @@
 // TODO(admin/TicketDetail): 使用 (res as any) 强制类型转换 — 等 API 泛型补全后移除。
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { getTicketDetail, updateTicketStatus } from '@/api/admin'
+import { getTicketDetail, updateTicketStatus, addTicketRecord } from '@/api/admin'
 import type { TicketDetail } from '@/api/ticket'
 import { urgencyText, ticketStatusClass as statusClass, scopeText, actionText } from '@/utils/ticket'
 import { useToast } from '@/composables/useToast'
 
 const route = useRoute()
-const loading = ref(true); const saving = ref(false)
+const loading = ref(true); const saving = ref(false); const savingRecord = ref(false)
 const ticket = ref<TicketDetail | null>(null)
 const actionContent = ref('')
+const recordAction = ref('note')
+const recordContent = ref('')
 const toast = useToast()
 
 onMounted(async () => {
@@ -94,17 +112,28 @@ onMounted(async () => {
 // toast 已通过 useToast composable 管理，自动处理定时器清理
 
 async function doAction(action: string) {
-  // TODO(admin/TicketDetail): updateTicketStatus 提交字段需要使用 result，而不是 content。
-  // 当前 api/admin.ts 类型与后端 DTO 不一致，处理结果可能不会保存到记录内容。
   saving.value = true
   try {
-    await updateTicketStatus(ticket.value!.id, { action, content: actionContent.value })
+    await updateTicketStatus(ticket.value!.id, { action, result: actionContent.value })
     toast.showToast('操作成功', 'success')
     actionContent.value = ''
     // Reload detail
     const res = await getTicketDetail(ticket.value!.id) as any; ticket.value = res?.data || res
   } catch (e: unknown) { const msg = e instanceof Error ? e.message : '操作失败'; toast.showToast(msg, 'error') }
   finally { saving.value = false }
+}
+
+async function doAddRecord() {
+  if (!recordContent.value.trim()) { toast.showToast('记录内容不能为空', 'error'); return }
+  savingRecord.value = true
+  try {
+    await addTicketRecord(ticket.value!.id, { action: recordAction.value, content: recordContent.value })
+    toast.showToast('记录已添加', 'success')
+    recordContent.value = ''
+    // Reload detail to show new record
+    const res = await getTicketDetail(ticket.value!.id) as any; ticket.value = res?.data || res
+  } catch (e: unknown) { const msg = e instanceof Error ? e.message : '操作失败'; toast.showToast(msg, 'error') }
+  finally { savingRecord.value = false }
 }
 
 // statusClass/urgencyText/scopeText/actionText → @/utils/ticket.ts
@@ -154,6 +183,9 @@ async function doAction(action: string) {
 .record-time { font-size: 11px; color: var(--text-secondary); }
 .record-content { font-size: 14px; color: var(--text-primary); margin: 4px 0 0; line-height: 1.5; }
 .empty-hint { text-align: center; padding: 20px; color: var(--text-secondary); font-size: 13px; }
+.record-form { display: flex; gap: 8px; align-items: flex-start; flex-wrap: wrap; }
+.field-select { padding: 8px 12px; border: 1px solid var(--border-default); border-radius: 6px; background: var(--bg-base); color: var(--text-primary); font-size: 13px; font-family: inherit; }
+.field-select:focus { outline: none; border-color: var(--accent); }
 .toast { position: fixed; bottom: 32px; right: 32px; padding: 12px 24px; border-radius: 8px; font-size: 14px; z-index: 9999; }
 .toast.success { background: var(--toast-success-bg); color: var(--toast-success-text); border: 1px solid var(--toast-success-border); }
 .toast.error { background: var(--toast-error-bg); color: var(--toast-error-text); border: 1px solid var(--toast-error-border); }

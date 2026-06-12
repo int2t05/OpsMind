@@ -79,6 +79,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useAppStore } from '@/stores/app'
 import { useTheme } from '@/composables/useTheme'
 import { useLoading } from '@/composables/useLoading'
+import { logout as logoutApi } from '@/api/auth'
 
 const router = useRouter()
 const route = useRoute()
@@ -136,8 +137,7 @@ const userDropdownOptions = [
 
 function handleUserDropdown(key: string) {
   if (key === 'logout') {
-    // TODO(layout/AdminLayout): 退出时应调用后端 logout 或未来的 token revoke 接口。
-    // 只清本地状态无法让已泄露 token 失效。
+    logoutApi().catch(() => {}) // best-effort，不阻塞退出
     authStore.clearAuth()
     router.push('/login')
   } else if (key === 'password') {

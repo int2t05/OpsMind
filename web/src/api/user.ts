@@ -59,7 +59,5 @@ export function freezeUser(id: number) {
 }
 
 export function restoreUser(id: number) {
-  // TODO(api/user): 后端恢复用户路由是 /unfreeze，不是 /restore。
-  // 当前按钮调用会打到不存在路径。
-  return request.patch<ApiResponse<null>>(`/api/v1/admin/users/${id}/restore`)
+  return request.patch<ApiResponse<null>>(`/api/v1/admin/users/${id}/unfreeze`)
 }
