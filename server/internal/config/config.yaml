@@ -34,6 +34,7 @@ llm:
 
 embedding:
   base_url: ""                         # Embedding 独立地址，空则回退到 llm.base_url
+  api_key: ""                          # Embedding 独立 API Key，空则回退到 llm.api_key
   model: bge-m3                        # Embedding 模型名称
   dimension: 1024                      # 向量维度
 

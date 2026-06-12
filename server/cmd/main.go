@@ -62,12 +62,16 @@ func main() {
 	llmTimeout := 60 * time.Second
 	llmClient := adapter.NewOpenAIClient(cfg.LLM.BaseURL, cfg.LLM.APIKey, llmTimeout)
 
-	// Embedding 优先使用独立 Base URL，空时回退到 LLM Base URL
+	// Embedding 优先使用独立 Base URL 和 API Key，空时回退到 LLM 配置
 	embedBaseURL := cfg.Embedding.BaseURL
 	if embedBaseURL == "" {
 		embedBaseURL = cfg.LLM.BaseURL
 	}
-	embeddingClient := adapter.NewOpenAIEmbeddingClient(embedBaseURL, cfg.LLM.APIKey, 30*time.Second)
+	embedAPIKey := cfg.Embedding.APIKey
+	if embedAPIKey == "" {
+		embedAPIKey = cfg.LLM.APIKey
+	}
+	embeddingClient := adapter.NewOpenAIEmbeddingClient(embedBaseURL, embedAPIKey, 30*time.Second)
 	slog.Info("LLM/Embedding 客户端已初始化",
 		"llm_base_url", cfg.LLM.BaseURL,
 		"embedding_base_url", embedBaseURL,

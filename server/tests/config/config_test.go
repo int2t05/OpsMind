@@ -98,6 +98,7 @@ func TestLoad_EnvOverride(t *testing.T) {
 	t.Setenv("OPSMIND_LLM_API_KEY", "env-api-key-override")
 	t.Setenv("OPSMIND_LLM_BASE_URL", "https://api.deepseek.com/v1")
 	t.Setenv("OPSMIND_EMBEDDING_MODEL", "text-embedding-3-large")
+	t.Setenv("OPSMIND_EMBEDDING_API_KEY", "sk-embedding-override-key")
 	t.Setenv("OPSMIND_JWT_SECRET", "test-jwt-secret-32chars-long!!!!!")
 
 	cfgPath := filepath.Join("..", "..", "internal", "config", "config.yaml")
@@ -129,6 +130,9 @@ func TestLoad_EnvOverride(t *testing.T) {
 	// 验证 Embedding 配置被环境变量覆盖
 	if cfg.Embedding.Model != "text-embedding-3-large" {
 		t.Errorf("Embedding.Model = %q, 期望 text-embedding-3-large（环境变量覆盖）", cfg.Embedding.Model)
+	}
+	if cfg.Embedding.APIKey != "sk-embedding-override-key" {
+		t.Errorf("Embedding.APIKey = %q, 期望 sk-embedding-override-key（环境变量覆盖）", cfg.Embedding.APIKey)
 	}
 
 	if cfg.JWT.Secret != "test-jwt-secret-32chars-long!!!!!" {
@@ -198,6 +202,8 @@ func TestLoad_StructFields(t *testing.T) {
 	if cfg.Embedding.Dimension == 0 {
 		t.Error("Embedding.Dimension 未填充")
 	}
+	// APIKey 可为空（本地 llama.cpp 不需要），但字段必须存在
+	_ = cfg.Embedding.APIKey
 
 	// 验证 AI 结构体
 	if cfg.AI.ConfidenceThreshold == 0 {

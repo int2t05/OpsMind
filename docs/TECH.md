@@ -150,6 +150,7 @@ type RAGOptions struct {
 | `OPSMIND_LLM_MODEL` | LLM 模型名称 | `qwen3-4b` |
 | `OPSMIND_LLM_MAX_TOKENS` | 最大生成 Token 数 | 8192 |
 | `OPSMIND_EMBEDDING_BASE_URL` | Embedding API 地址（空则回退到 LLM_BASE_URL） | — |
+| `OPSMIND_EMBEDDING_API_KEY` | Embedding API 密钥（空则回退到 LLM_API_KEY） | — |
 | `OPSMIND_EMBEDDING_MODEL` | Embedding 模型名称 | `bge-m3` |
 | `OPSMIND_EMBEDDING_DIMENSION` | 向量维度 | 1024 |
 | `OPSMIND_DATABASE_PASSWORD` | PostgreSQL 密码 | `opsmind_dev` |
