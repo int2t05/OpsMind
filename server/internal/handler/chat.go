@@ -8,7 +8,7 @@
 // 为什么在 Handler 层做 SSE 流式而非 Service 层：
 // SSE 是 HTTP 协议层面的传输方式，属于表示层关注点。Service 层返回完整业务结果，
 // Handler 层决定以 JSON 还是 SSE 方式交付给客户端，符合单一职责原则。
-// v2 升级：使用 LLMClient.ChatCompletionStream 实现真正的 token 级流式。
+// 使用 LLMClient.ChatCompletionStream 实现真正的 token 级流式。
 package handler
 
 import (
@@ -129,7 +129,7 @@ func (h *ChatHandler) GetChatDetail(c *gin.Context) {
 // 为什么在 Handler 层而非 Service 层做流式：
 // SSE 是 HTTP 传输层关注点。Service 层返回完整业务结果，
 // Handler 层决定以 JSON 还是 SSE 交付，符合单一职责原则。
-// v2: 通过 LLMClient.ChatCompletionStream 实现真正的 token 级流式。
+// 通过 LLMClient.ChatCompletionStream 实现真正的 token 级流式。
 func (h *ChatHandler) StreamChatSession(c *gin.Context) {
 	var req request.CreateChatRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -162,7 +162,7 @@ func (h *ChatHandler) StreamChatSession(c *gin.Context) {
 		return
 	}
 
-	// v2 升级：LLMClient 可用时使用真正的 token 级流式，不可用时降级到模拟流式
+	// LLMClient 可用时使用真正的 token 级流式，不可用时降级到模拟流式
 	if h.llmClient != nil {
 		h.streamWithLLM(c, flusher, resp.Answer, req)
 	} else {

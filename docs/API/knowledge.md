@@ -1,6 +1,6 @@
 # 知识库管理接口
 
-> 基础路径：`/api/v1/admin` | 认证：JWT + RBAC | 版本：v2.0
+> 基础路径：`/api/v1/admin` | 认证：JWT + RBAC
 
 ## 知识文章状态
 
@@ -334,7 +334,7 @@ Authorization: Bearer <token>
 
 ---
 
-## 文档上传与处理（v2 新增）
+## 文档上传与处理
 
 ### 8. 上传文档
 

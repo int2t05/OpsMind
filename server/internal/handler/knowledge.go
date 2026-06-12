@@ -1,8 +1,6 @@
 // Package handler 实现 HTTP 请求处理。
 //
-// knowledge.go 提供知识库管理相关接口。
-// v2 统一：KnowledgeService 已合并 v1 CRUD + v2 管道/文档上传，
-// 不再需要 SetV2Service 注入。
+// knowledge.go 提供知识库管理相关接口（KB/文章/审核/发布/文档上传）。
 package handler
 
 import (
@@ -189,7 +187,7 @@ func (h *KnowledgeHandler) Review(c *gin.Context) {
 	response.Success(c, nil)
 }
 
-// Publish 发布文章（v2 管道：分块→embedding→pgvector 写入）。
+// Publish 发布文章（分块→embedding→pgvector 写入）。
 //
 // POST /api/v1/admin/articles/:id/publish
 func (h *KnowledgeHandler) Publish(c *gin.Context) {
@@ -207,7 +205,7 @@ func (h *KnowledgeHandler) Publish(c *gin.Context) {
 	response.Success(c, nil)
 }
 
-// Disable 停用文章（v2：从 pgvector 删除向量）。
+// Disable 停用文章（从 pgvector 删除向量）。
 //
 // POST /api/v1/admin/articles/:id/disable
 func (h *KnowledgeHandler) Disable(c *gin.Context) {
@@ -241,7 +239,7 @@ func (h *KnowledgeHandler) Enable(c *gin.Context) {
 	response.Success(c, nil)
 }
 
-// RetrySync 重试同步（v2 占位）。
+// RetrySync 重试文档处理。
 //
 // POST /api/v1/admin/articles/:id/retry-sync
 func (h *KnowledgeHandler) RetrySync(c *gin.Context) {
@@ -298,7 +296,7 @@ func (h *KnowledgeHandler) GetArticleDetail(c *gin.Context) {
 }
 
 // =============================================================================
-// v2 文档上传/状态/重试
+// 文档上传/状态/重试
 // =============================================================================
 
 // UploadDocuments 上传文档到知识库（multipart form）。

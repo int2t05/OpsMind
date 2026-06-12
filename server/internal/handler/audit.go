@@ -1,11 +1,7 @@
 // Package handler 实现 HTTP 请求处理。
 //
 // audit.go 提供审计日志查询接口。
-// Handler 层职责：参数解析、调用 Service、组装响应。
 // 审计日志写入由各 Service 层直接调用 AuditRepo.Create，不经过 Handler。
-//
-// v2 变更：AuditHandler 改为依赖 AuditService（而非直接依赖 AuditRepo + gorm.DB），
-// 恢复 Handler→Service→Repo 分层一致性。
 package handler
 
 import (

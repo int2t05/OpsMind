@@ -87,7 +87,7 @@ Authorization: Bearer <token>
 |-----|--------|------|
 | `app_name` | OpsMind | 应用名称 |
 
-> **v2 变更：** `ai_confidence_threshold` 和 `ai_default_top_k` 移至 [llm-configs API](llm-config.md) 统一管理，不再作为独立系统配置键。LLM 配置热替换生效，无需重启。
+> `ai_confidence_threshold` 和 `ai_default_top_k` 在 [llm-configs API](llm-config.md) 中统一管理。LLM 配置热替换生效，无需重启。
 
 ### 更新配置
 

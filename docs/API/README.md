@@ -1,6 +1,6 @@
 # OpsMind API 文档
 
-> 版本：v2.0 | 基础路径：`/api/v1` | 最后更新：2026-06-11
+> 基础路径：`/api/v1` | 最后更新：2026-06-12
 
 ## 概述
 
@@ -11,16 +11,6 @@ OpsMind 后端提供 RESTful JSON API，分为三组路由：
 | 公开 | `/api/v1/auth` | 无 | 登录、刷新令牌 |
 | 门户端 | `/api/v1/portal` | JWT | 智能问答（SSE 流式 + RAG 管道）、申告提交、进度查询、站内消息 |
 | 后台管理 | `/api/v1/admin` | JWT + RBAC | 申告处理、知识库管理（含文档上传）、LLM 配置、用户/角色、看板、审计 |
-
-### v2.0 主要变更
-
-| 变更 | 说明 |
-|------|------|
-| 移除 AnythingLLM | RAG 引擎改为 Go 自建（`rag/` 包），向量存储改为 pgvector |
-| 知识模型统一 | `question`/`answer` → `title`/`content`，新增文档上传解析 |
-| SSE 流式升级 | 模拟分块 → 真正的 LLM token 级流式 + 管道步骤事件 |
-| 新增 LLM 配置 | [llm-config.md](llm-config.md) — llama.cpp / OpenAI-compatible 双支持 |
-| Embedding 配置合并 | `embedding-configs` API 移除，合并到 `llm-configs` |
 
 ## 统一响应格式
 

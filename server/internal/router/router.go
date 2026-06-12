@@ -32,7 +32,7 @@ type Handlers struct {
 	Dashboard *handler.DashboardHandler
 	Audit     *handler.AuditHandler
 	Config    *handler.ConfigHandler
-	LLMConfig *handler.LLMConfigHandler // v2 新增
+	LLMConfig *handler.LLMConfigHandler
 }
 
 // Setup 初始化 Gin 引擎并注册所有路由。

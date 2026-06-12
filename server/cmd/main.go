@@ -2,12 +2,6 @@
 //
 // 负责初始化配置、数据库连接、路由注册和 HTTP 服务启动。
 // 采用单体分层架构（Handler→Service→Repository），所有模块在同一进程内运行。
-//
-// v2 架构统一：
-//   - KnowledgeService 合并 v1+v2（CRUD + pgvector 管道 + 文档上传）
-//   - ChatService 合并 v1+v2（自建 RAG Pipeline + LLMClient）
-//   - AuditService 新增，恢复 Handler→Service→Repo 分层
-//   - 移除 SetV2Service / SetLLMClient 等 setter 注入模式
 package main
 
 import (
@@ -64,11 +58,11 @@ func main() {
 	}
 	slog.Info("数据库迁移完成")
 
-	// 4. 初始化 v2 Adapter 层（LLMClient / EmbeddingClient / VectorStore）
+	// 4. 初始化 Adapter 层（LLMClient / EmbeddingClient / VectorStore）
 	llmTimeout := 60 * time.Second
 	llmClient := adapter.NewOpenAIClient(cfg.LLM.BaseURL, cfg.LLM.APIKey, llmTimeout)
 	embeddingClient := adapter.NewOpenAIEmbeddingClient(cfg.LLM.BaseURL, cfg.LLM.APIKey, 30*time.Second)
-	slog.Info("v2 LLM/Embedding 客户端已初始化", "base_url", cfg.LLM.BaseURL, "model", cfg.LLM.Model)
+	slog.Info("LLM/Embedding 客户端已初始化", "base_url", cfg.LLM.BaseURL, "model", cfg.LLM.Model)
 
 	// pgvector 向量存储
 	pgDSN := fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=%s",
@@ -99,24 +93,24 @@ func main() {
 	dashboardService := service.NewDashboardService(db)
 	configService := service.NewConfigService(configRepo)
 
-	// v2: LLM 配置管理
+	// LLM 配置管理
 	llmConfigRepo := repository.NewLlmConfigRepo(db)
 	llmConfigSvc := service.NewLLMConfigService(llmConfigRepo)
-	slog.Info("v2 LLM 配置服务已初始化")
+	slog.Info("LLM 配置服务已初始化")
 
-	// v2: RAG 引擎组件
+	// RAG 引擎组件
 	embedder := rag.NewEmbedder(embeddingClient, 20)
 	docParser := rag.NewDocParser()
 
-	// v2: 统一 KnowledgeService（CRUD + pgvector 管道 + 文档上传）
+	// KnowledgeService（CRUD + pgvector 管道 + 文档上传）
 	knowledgeService := service.NewKnowledgeService(knowledgeRepo, nil, embedder, vectorStore, docParser, nil)
-	slog.Info("v2 KnowledgeService 已初始化（CRUD + pgvector 管道 + 文档上传）")
+	slog.Info("KnowledgeService 已初始化")
 
-	// v2: 统一 ChatService（自建 Pipeline + LLMClient）
+	// ChatService（自建 Pipeline + LLMClient）
 	chatService := service.NewChatService(knowledgeRepo, chatRepo, nil, llmClient, llmConfigSvc.GetManager())
-	slog.Info("v2 ChatService 已初始化（自建 Pipeline + LLMClient）")
+	slog.Info("ChatService 已初始化")
 
-	// v2: AuditService（恢复分层架构）
+	// AuditService
 	auditService := service.NewAuditService(auditRepo, userRepo)
 
 	// 7. 初始化 Handler 层

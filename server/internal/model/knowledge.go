@@ -44,7 +44,7 @@ func (KnowledgeArticle) TableName() string { return "knowledge_articles" }
 
 // KnowledgeChunk 知识切片表。
 // 记录知识条目发布时的切片内容和 pgvector 向量。
-// v2: embedding 向量以 halfvec 类型存储在 pgvector 中（通过 VectorStore 接口管理）。
+// embedding 向量以 halfvec 类型存储在 pgvector 中（通过 VectorStore 接口管理）。
 type KnowledgeChunk struct {
 	ID              int64      `gorm:"primaryKey;autoIncrement" json:"id"`
 	ArticleID       int64      `gorm:"not null;column:article_id;index:idx_chunks_article_id" json:"article_id"`

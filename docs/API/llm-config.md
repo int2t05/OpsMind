@@ -1,6 +1,6 @@
 # LLM 配置接口
 
-> 基础路径：`/api/v1/admin` | 认证：JWT + `config:manage` 权限 | 版本：v2.0
+> 基础路径：`/api/v1/admin` | 认证：JWT + `config:manage` 权限
 
 LLM 配置管理 llama.cpp server 和 OpenAI-compatible API 的连接参数（Base URL、模型名称、向量维度等）。配置修改后通过 `atomic.Value` 热替换**即时生效**，无需重启服务。
 

@@ -1,10 +1,10 @@
 # 智能问答接口
 
-> 基础路径：`/api/v1/portal` | 认证：JWT | 版本：v2.0 | 功能：RAG 管道增强问答 + SSE 流式输出
+> 基础路径：`/api/v1/portal` | 认证：JWT | 功能：RAG 管道增强问答 + SSE 流式输出
 
 ## RAG 管道概述
 
-v2 自建 RAG 引擎替代了 v1 的 AnythingLLM。问答请求经过以下管道步骤：
+问答请求经过以下 RAG 管道步骤：
 
 ```
 用户问题
@@ -55,7 +55,7 @@ Content-Type: application/json
 
 响应类型为 `text/event-stream`，包含三类事件：
 
-### step 事件 — 管道步骤进度（v2 新增）
+### step 事件 — 管道步骤进度
 
 ```
 data: {"type":"step","id":"query_rewrite","label":"查询改写"}
@@ -93,7 +93,7 @@ data: {"type":"token","content":"重置步骤"}
 data: {"type":"token","content":"如下：\n1."}
 ```
 
-> **v1 → v2 变更：** 不再模拟分块（每次 5 字符 + 30ms 间隔），而是 LLM 服务返回什么 token 就实时转发什么 token。输出速度取决于 LLM 推理速度。
+> LLM 服务返回的 token 实时转发，输出速度取决于 LLM 推理速度。
 
 ### done 事件 — 流式结束，含完整元数据
 
@@ -132,7 +132,7 @@ await streamChatSession(
   },
   {
     onStep(id: string, label: string) {
-      // v2 新增：展示管道步骤进度
+      // 展示管道步骤进度
       currentStep.value = label
     },
     onToken(content: string) {

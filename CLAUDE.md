@@ -5,7 +5,7 @@
 你是一名 **Go + Vue 3 全栈开发者**，精通以下技术栈：
 
 - **后端：** Go 1.22+ / Gin 1.9+ / GORM v1.25+ / PostgreSQL 18 + pgvector
-- **AI/RAG：** 自建 Go RAG 引擎（`server/internal/rag/`）— 含 BM25/向量混合检索、查询改写、重排序 / pgvector 向量存储（HNSW 索引 + halfvec 半精度）
+- **AI/RAG：** 自建 Go RAG 引擎（`server/internal/rag/`）— BM25/向量混合检索、查询改写、重排序 / pgvector 向量存储（HNSW 索引 + halfvec 半精度）
 - **LLM / Embedding：** llama.cpp server（OpenAI-compatible）或任意 OpenAI-compatible API（OpenAI / DeepSeek / Moonshot 等）
 - **中文分词：** gse（纯 Go，无 CGO），用于 BM25 检索
 - **存储：** MinIO（S3-compatible 对象存储）
@@ -14,7 +14,7 @@
 - **部署：** Docker Compose / Makefile
 - **设计系统：** Linear Design（暗色主题 / Inter Variable / Radix Vue）
 
-你在本项目中的职责是按照 `docs/v2/PRDv2.md`、`docs/v2/TECHv2.md`、`docs/v2/PLANv2.md` 和 `docs/API/` 接口文档，交付 v2 版本的运维数字员工系统。
+你在本项目中的职责是按照 `docs/PRD.md`、`docs/TECH.md` 和 `docs/API/` 接口文档，交付和迭代运维数字员工系统。
 
 ---
 
@@ -22,16 +22,13 @@
 
 **在做任何涉及 AI/RAG 的开发之前，必须先阅读以下文档：**
 
-- `docs/v2/PRDv2.md` — v2 产品需求文档（权威来源），定义了自建 RAG 引擎、文档上传、统一文章模型等功能需求
-- `docs/v2/TECHv2.md` — v2 技术架构文档，定义了分层架构、模块接口、数据库设计、ADR 决策记录
+- `docs/PRD.md` — 产品需求文档，定义了自建 RAG 引擎、文档上传、统一文章模型等功能需求
+- `docs/TECH.md` — 技术架构文档，定义了分层架构、模块接口、数据库设计
 - `docs/API/chat.md` — 智能问答 API（SSE 流式 + RAG 管道步骤）
 - `docs/API/knowledge.md` — 知识库管理 API（含文档上传/处理状态）
 - `docs/API/llm-config.md` — LLM 配置 API（llama.cpp / OpenAI-compatible）
-- `docs/v2/PLANv2.md` — v2 实施计划（24 任务/7 里程碑），指定每个文件的创建/修改/测试顺序
 
-**v1 文档（`docs/v1/`）已归档，仅作历史参考。新开发必须基于 `docs/v2/`。**
-
-**在修改任何接口或数据模型之前，必须先确认 TECHv2.md 中的定义是否需要同步更新。**
+**在修改任何接口或数据模型之前，必须先确认 TECH.md 中的定义是否需要同步更新。**
 
 ---
 
@@ -179,7 +176,7 @@ make seed
 | `server/internal/service/` | Service 层 — auth/user/role/chat/ticket/knowledge/llm_config/dashboard/config/message/scheduler |
 | `server/internal/repository/` | Repository 层 — user/role/config/ticket/knowledge/chat/audit/message/llm_config |
 | `server/internal/model/` | GORM 数据模型 — user/role/ticket/knowledge/chat/audit/system/message/llm_config/enums/common |
-| `server/internal/rag/` | **v2 新增** — RAG 引擎（pipeline / query_rewrite / multi_route / retrieval / bm25 / rerank / document_parser / chunker / embedder / processor） |
+| `server/internal/rag/` | RAG 引擎（pipeline / query_rewrite / multi_route / hybrid / bm25 / rerank / document_parser / chunker / embedder / processor） |
 | `server/internal/adapter/` | 外部适配层 — LLMClient / EmbeddingClient / VectorStore(pgvector) / StorageClient(MinIO) |
 | `server/internal/dto/` | 数据传输对象（request/ + response/） |
 | `server/pkg/` | 公共工具包（response / errcode / jwt / hash） |
@@ -206,7 +203,7 @@ make seed
 
 - **遵循三层架构：** Handler（参数校验、响应格式）→ Service（业务逻辑、事务）→ Repository（数据访问）。不允许跨层调用。RAG 模块（`rag/`）不依赖 Handler/Service/Repository 层。
 - **写中文注释：** 每个文件需要文件头注释（说明模块存在的原因），每个关键函数需要函数注释（说明为什么这样实现）。见 §7 注释规范。
-- **对齐文档：** 实现任何功能前先查看 `docs/v2/PRDv2.md` 对应需求、`docs/v2/TECHv2.md` 对应章节。实现完成后确认 TECHv2.md 和 API 文档不需要同步更新。
+- **对齐文档：** 实现任何功能前先查看 `docs/PRD.md` 对应需求、`docs/TECH.md` 对应章节。实现完成后确认 TECH.md 和 API 文档不需要同步更新。
 - **统一响应格式：** 所有 API 响应使用 `pkg/response` 封装，格式为 `{"code": 0, "message": "success", "data": {...}}`，错误码定义见 `pkg/errcode`。
 - **密码策略校验：** 所有涉及密码创建/修改的场景，必须调用 `pkg/hash.ValidatePassword` 校验正则 `^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,32}$`。
 - **RBAC 权限校验：** 后台管理接口必须经过 JWT 中间件 + RBAC 中间件双重校验。
@@ -291,16 +288,13 @@ func HashPassword(password string) (string, error) {
 
 | 文档 | 用途 |
 | --- | --- |
-| `docs/v2/PRDv2.md` | v2 产品需求文档 — 自建 RAG 引擎、文档上传解析、统一文章模型、SSE 流式升级 |
-| `docs/v2/TECHv2.md` | v2 技术架构文档 — 模块接口定义、6 份 ADR、数据库 DDL、API 设计、部署配置 |
-| `docs/v2/PLANv2.md` | v2 实施计划 — 24 个任务按 7 个里程碑组织，每个任务列出文件、测试、验证标准 |
-| `docs/prompts/prdv2.md` | v2 原始需求概要（简短版 PRD 输入） |
+| `docs/PRD.md` | 产品需求文档 — 自建 RAG 引擎、文档上传解析、统一文章模型、SSE 流式输出 |
+| `docs/TECH.md` | 技术架构文档 — 模块接口定义、数据库 DDL、API 设计、部署配置 |
 | `docs/prompts/DESIGN-linear.app.md` | Linear Design 系统约束 — 暗色主题色值、字体配置、组件样式 |
 | `docs/API/README.md` | API 文档索引 — 9 份接口文档，覆盖全部端点 |
 | `docs/API/chat.md` | 智能问答 API — SSE 流式 + RAG 管道步骤事件 + 降级规则 |
-| `docs/API/knowledge.md` | 知识库管理 API — KB/文章/审核/发布 + v2 新增文档上传/状态查询 |
+| `docs/API/knowledge.md` | 知识库管理 API — KB/文章/审核/发布 + 文档上传/状态查询 |
 | `docs/API/llm-config.md` | LLM 配置 API — llama.cpp / OpenAI-compatible 双支持 + 热替换 |
-| `docs/v1/` | v1 文档归档（AnythingLLM 架构），仅作历史参考 |
 
 ### 外部依赖文档
 
@@ -319,7 +313,7 @@ func HashPassword(password string) (string, error) {
 
 ### 环境变量模板
 
-完整 `.env` 配置见 `docs/v2/TECHv2.md §6.3`，核心变量：
+完整 `.env` 配置见 `docs/TECH.md`，核心变量：
 
 | 变量 | 说明 | 默认值 |
 | --- | --- | --- |

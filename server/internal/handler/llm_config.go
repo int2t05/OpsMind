@@ -1,7 +1,6 @@
 // Package handler 实现 HTTP 请求处理。
 //
-// llm_config.go 提供 LLM 配置管理 API（v2 新增）。
-// 替代 v1 的 embedding-configs 端点，统一管理 LLM 和 Embedding 提供商配置。
+// llm_config.go 提供 LLM 配置管理 API，统一管理 LLM 和 Embedding 提供商配置。
 package handler
 
 import (

@@ -1,15 +1,6 @@
 // Package service 实现知识库管理业务逻辑。
 //
-// v2 统一版：合并了原 knowledge_service.go（v1 CRUD + 审核）和
-// knowledge_service_v2.go（自建 pgvector 发布管道 + 文档上传）。
-//
-// 主要变更：
-//   - 移除 AnythingLLM RagClient 依赖
-//   - Publish 改为 Chunker.Split → Embedder.Embed → VectorStore.BatchInsert
-//   - Disable 增加 pgvector 向量删除
-//   - 新增 UploadDocuments / GetDocumentStatus / RetryDocument
-//   - 移除 EmbeddingConfig 方法（已迁移至 LLM 配置 API）
-//   - 移除 interface{} 构造器，使用具名类型参数
+// KnowledgeService 统一管理知识库 CRUD、文章审核发布、pgvector 管道操作和文档上传。
 package service
 
 import (
@@ -235,7 +226,7 @@ func (s *KnowledgeService) Review(id int64, reviewerID int64, req request.Review
 }
 
 // =============================================================================
-// Publish / Disable / Enable（v2 管道版）
+// Publish / Disable / Enable
 // =============================================================================
 
 // Publish 发布文章——分块→embedding→pgvector 写入。
@@ -249,7 +240,7 @@ func (s *KnowledgeService) Review(id int64, reviewerID int64, req request.Review
 //  6. 更新文章状态为已发布 status=4
 func (s *KnowledgeService) Publish(id int64, publisherID int64) error {
 	if s.chunker == nil || s.embedder == nil || s.store == nil {
-		return errcode.AppError{Code: errcode.ErrUnknown, Message: "v2 管道未初始化（chunker/embedder/store 为空）"}
+		return errcode.AppError{Code: errcode.ErrUnknown, Message: "管道未初始化（chunker/embedder/store 为空）"}
 	}
 
 	article, err := s.repo.FindArticleByID(id)

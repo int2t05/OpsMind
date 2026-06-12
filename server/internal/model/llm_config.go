@@ -1,7 +1,6 @@
 // Package model 定义 GORM 数据模型。
 //
-// llm_config.go 定义 LLM 配置模型（表 llm_configs）。
-// v2 新增，统一管理 llama.cpp 和 OpenAI-compatible API 的连接参数。
+// llm_config.go 定义 LLM 配置模型（表 llm_configs），统一管理 llama.cpp 和 OpenAI-compatible API 的连接参数。
 package model
 
 import "time"

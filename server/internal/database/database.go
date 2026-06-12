@@ -1,7 +1,7 @@
 // Package database 负责初始化 PostgreSQL 数据库连接。
 //
 // 使用 GORM 作为 ORM 框架，通过 gorm.io/driver/postgres 连接 PostgreSQL。
-// v2: RAG 向量检索由 pgvector 扩展承担，通过 adapter/pgvector_store.go 访问。
+// RAG 向量检索由 pgvector 扩展承担，通过 adapter/pgvector_store.go 访问。
 package database
 
 import (
@@ -18,7 +18,7 @@ import (
 // Init 初始化数据库连接。
 //
 // 使用 GORM 连接 PostgreSQL，配置连接池参数。
-// v2: 向量检索由 pgvector 扩展承担（通过 pgvector_store.go）。
+// 向量检索由 pgvector 扩展承担（通过 pgvector_store.go）。
 //
 // 连接池参数选择依据：
 // - MaxOpenConns=25：MVP 阶段单实例部署，25 连接足够支撑并发请求

@@ -1,11 +1,7 @@
 // Package service 实现智能问答业务逻辑。
 //
-// v2 统一版：合并了原 chat_service.go（v1 占位）和 chat_service_v2.go（自建 RAG Pipeline）。
-//
-// 主要变更：
-//   - 移除 AnythingLLM RagClient 依赖
-//   - CreateChatSession 使用自建 RAG Pipeline + LLMClient
-//   - LLMClient 用于答案生成和 token 级流式输出
+// ChatService 使用自建 RAG Pipeline（查询改写→多路检索→混合检索→重排序）
+// 和 LLMClient 进行知识增强问答生成，支持 SSE 流式输出。
 package service
 
 import (
@@ -83,14 +79,14 @@ func NewChatService(knowledgeRepo interface{}, chatRepo interface{}, pipeline in
 // CreateChatSession
 // =============================================================================
 
-// CreateChatSession 使用 v2 Pipeline 创建问答会话。
+// CreateChatSession 使用 Pipeline 创建问答会话。
 //
 // 流程：
 //  1. Pipeline.Execute（查询改写→多路检索→混合检索→重排序）
 //  2. 构造带上下文的 LLM prompt
 //  3. LLMClient.ChatCompletion 生成答案
 //  4. 保存会话
-func (s *ChatService) CreateChatSession(req request.CreateChatRequest, userID int64) (*ChatSessionResponseV2, error) {
+func (s *ChatService) CreateChatSession(req request.CreateChatRequest, userID int64) (*ChatSessionResponse, error) {
 	if strings.TrimSpace(req.Question) == "" {
 		return nil, errcode.AppError{Code: errcode.ErrParam, Message: "问题不能为空"}
 	}
@@ -199,7 +195,7 @@ func (s *ChatService) CreateChatSession(req request.CreateChatRequest, userID in
 		}
 	}
 
-	return &ChatSessionResponseV2{
+	return &ChatSessionResponse{
 		SessionID:       session.ID,
 		Question:        req.Question,
 		Answer:          llmAnswer,
@@ -260,8 +256,8 @@ func (s *ChatService) GetChatDetail(sessionID int64) (*response.ChatSessionRespo
 // 辅助类型
 // =============================================================================
 
-// ChatSessionResponseV2 v2 问答响应（供 Handler 层 SSE 流式输出使用）。
-type ChatSessionResponseV2 struct {
+// ChatSessionResponse 问答响应（供 Handler 层 SSE 流式输出使用）。
+type ChatSessionResponse struct {
 	SessionID       int64                   `json:"session_id"`
 	Question        string                  `json:"question"`
 	Answer          string                  `json:"answer"`

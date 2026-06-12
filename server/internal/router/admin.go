@@ -50,7 +50,7 @@ func registerAdminRoutes(rg *gin.RouterGroup, h *Handlers) {
 		rg.POST("/articles/:id/disable", h.Knowledge.Disable)
 		rg.POST("/articles/:id/enable", h.Knowledge.Enable)
 		rg.POST("/articles/:id/retry-sync", h.Knowledge.RetrySync)
-			// v2 文档上传
+			// 文档上传
 			rg.POST("/knowledge-bases/:kb_id/documents/upload", h.Knowledge.UploadDocuments)
 			rg.GET("/knowledge-bases/:kb_id/documents/:id/status", h.Knowledge.GetDocumentStatus)
 			rg.POST("/knowledge-bases/:kb_id/documents/:id/retry", h.Knowledge.RetryDocument)
@@ -133,7 +133,7 @@ func registerAdminRoutes(rg *gin.RouterGroup, h *Handlers) {
 		rg.GET("/audit-logs", placeholder())
 	}
 
-	// LLM 配置（v2 新增 — 替代 v1 embedding-configs）
+	// LLM 配置
 	if h != nil && h.LLMConfig != nil {
 		rg.GET("/llm-configs", h.LLMConfig.ListConfigs)
 		rg.POST("/llm-configs", h.LLMConfig.CreateConfig)
