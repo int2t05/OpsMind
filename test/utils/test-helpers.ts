@@ -151,12 +151,13 @@ export async function assertSuccess(response: APIResponse, expectedCode = 0): Pr
 
 export async function assertError(
   response: APIResponse,
-  expectedHttpStatus: number,
+  expectedHttpStatus: number | number[],
   expectedCode: number,
 ): Promise<ApiResponse> {
-  expect(response.status()).toBe(expectedHttpStatus);
+  const statuses = Array.isArray(expectedHttpStatus) ? expectedHttpStatus : [expectedHttpStatus];
+  expect(statuses, `HTTP ${response.status()} not in [${statuses}]`).toContain(response.status());
   const body: ApiResponse = await response.json();
-  expect(body.code).toBe(expectedCode);
+  expect(body.code, `期望 code=${expectedCode}`).toBe(expectedCode);
   expect(body.message).toBeTruthy();
   return body;
 }

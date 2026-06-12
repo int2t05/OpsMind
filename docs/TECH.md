@@ -89,7 +89,7 @@ OpsMind 采用**单体分层架构（Modular Monolith）**，按 Handler → Ser
 | `knowledge_chunks` | 文章分块 + halfvec 向量（HNSW 索引） |
 | `chat_sessions` / `chat_messages` | 问答会话和消息 |
 | `tickets` / `ticket_records` | 申告和操作记录 |
-| `llm_configs` | LLM/Embedding 提供商配置（最多一个默认） |
+| `llm_configs` | LLM/Embedding 提供商配置（独立 Base URL，最多一个默认） |
 | `audit_logs` | 操作审计日志 |
 | `configs` | 系统配置键值对（如 `app_name`） |
 | `messages` | 站内消息通知 |
@@ -143,10 +143,11 @@ type RAGOptions struct {
 | 变量 | 说明 | 默认值 |
 |------|------|--------|
 | `JWT_SECRET` | JWT 签名密钥 | 生产环境必须设置 |
-| `LLM_BASE_URL` | LLM/Embedding API 地址 | `http://llama-cpp:8080/v1` |
+| `LLM_BASE_URL` | LLM API 地址 | `http://llama-cpp:8080/v1` |
 | `LLM_API_KEY` | API 密钥（OpenAI 需要；llama.cpp 留空） | — |
 | `LLM_MODEL` | LLM 模型名称 | `qwen3-4b` |
 | `LLM_MAX_TOKENS` | 最大生成 Token 数 | 8192 |
+| `EMBEDDING_BASE_URL` | Embedding API 地址（空则回退到 LLM_BASE_URL） | — |
 | `EMBEDDING_MODEL` | Embedding 模型名称 | `bge-m3` |
 | `EMBEDDING_DIMENSION` | 向量维度 | 1024 |
 | `POSTGRES_PASSWORD` | PostgreSQL 密码 | `opsmind_dev` |

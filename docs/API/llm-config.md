@@ -2,16 +2,18 @@
 
 > 基础路径：`/api/v1/admin` | 认证：JWT + `config:manage` 权限
 
-LLM 配置管理 llama.cpp server 和 OpenAI-compatible API 的连接参数（Base URL、模型名称、向量维度等）。配置修改后通过 `atomic.Value` 热替换**即时生效**，无需重启服务。
+LLM 配置管理 llama.cpp server 和 OpenAI-compatible API 的连接参数。配置修改后通过 `atomic.Value` 热替换**即时生效**，无需重启服务。
 
 ## 配置模型
 
-LLM 配置统一了文本生成和 Embedding 生成两个场景的连接参数（两者通常指向同一服务，但模型名称可独立指定）：
+LLM 和 Embedding 各自拥有独立的 Base URL。两个端点可指向同一服务或不同服务。提供两种方案：
 
-| 提供商类型 | `provider_type` | 说明 |
-|------------|-----------------|------|
-| llama.cpp | 1 | 本地 llama.cpp server（OpenAI-compatible），默认不需 API Key |
-| OpenAI-compatible | 2 | OpenAI / DeepSeek / Moonshot 等，需要 API Key |
+| 方案 | `provider_type` | LLM | Embedding | 说明 |
+|------|----------------|-----|-----------|------|
+| **方案 A** — llama.cpp 本地 | 1 | llama.cpp server | llama.cpp server | 本地部署，两者共用同一服务，无需 API Key |
+| **方案 B** — OpenAI-compatible | 2 | OpenAI / DeepSeek / Moonshot | 任意 OpenAI-compatible API | LLM 和 Embedding 可分别指向不同服务 |
+
+> `embedding_base_url` 为空时回退到 `base_url`，保持向后兼容。
 
 ---
 
@@ -32,9 +34,9 @@ Authorization: Bearer <token>
       "id": 1,
       "name": "本地 llama.cpp",
       "provider_type": 1,
-      "provider_type_text": "llama.cpp",
       "base_url": "http://llama-cpp:8080/v1",
-      "api_key_masked": "",
+      "embedding_base_url": "",
+      "api_key": "",
       "llm_model": "qwen3-4b",
       "embedding_model": "bge-m3",
       "max_tokens": 8192,
@@ -45,15 +47,15 @@ Authorization: Bearer <token>
     },
     {
       "id": 2,
-      "name": "OpenAI GPT-4o-mini",
+      "name": "OpenAI GPT-4o-mini + 本地 bge-m3",
       "provider_type": 2,
-      "provider_type_text": "OpenAI-compatible",
       "base_url": "https://api.openai.com/v1",
-      "api_key_masked": "sk-****Ab12",
+      "embedding_base_url": "http://llama-cpp:8080/v1",
+      "api_key": "sk-****Ab12",
       "llm_model": "gpt-4o-mini",
-      "embedding_model": "text-embedding-3-small",
+      "embedding_model": "bge-m3",
       "max_tokens": 16384,
-      "vector_dimension": 1536,
+      "vector_dimension": 1024,
       "is_default": false,
       "created_at": "2026-06-11T19:30:00Z",
       "updated_at": "2026-06-11T19:30:00Z"
@@ -67,8 +69,9 @@ Authorization: Bearer <token>
 | id | int64 | 配置 ID |
 | name | string | 配置名称（用户自定义标签） |
 | provider_type | int | 1=llama.cpp, 2=OpenAI-compatible |
-| base_url | string | API 基础地址（如 `http://llama-cpp:8080/v1`） |
-| api_key_masked | string | API 密钥掩码（如 `sk-****Ab12`，空表示无密钥） |
+| base_url | string | LLM API 基础地址 |
+| embedding_base_url | string | Embedding API 地址（空时回退到 base_url） |
+| api_key | string | API 密钥掩码（如 `****`，空表示无密钥） |
 | llm_model | string | 文本生成模型名称 |
 | embedding_model | string | Embedding 模型名称 |
 | max_tokens | int | 最大生成 Token 数 |
@@ -84,13 +87,14 @@ POST /api/v1/admin/llm-configs
 Authorization: Bearer <token>
 ```
 
-**llama.cpp 本地部署：**
+**方案 A — llama.cpp 本地部署：**
 
 ```json
 {
   "name": "本地 llama.cpp",
   "provider_type": 1,
   "base_url": "http://llama-cpp:8080/v1",
+  "embedding_base_url": "",
   "api_key": "",
   "llm_model": "qwen3-4b",
   "embedding_model": "bge-m3",
@@ -100,18 +104,19 @@ Authorization: Bearer <token>
 }
 ```
 
-**OpenAI API：**
+**方案 B — OpenAI LLM + 本地 Embedding（混合部署）：**
 
 ```json
 {
-  "name": "OpenAI GPT-4o-mini",
+  "name": "OpenAI + 本地 Embedding",
   "provider_type": 2,
   "base_url": "https://api.openai.com/v1",
+  "embedding_base_url": "http://llama-cpp:8080/v1",
   "api_key": "sk-your-openai-api-key",
   "llm_model": "gpt-4o-mini",
-  "embedding_model": "text-embedding-3-small",
+  "embedding_model": "bge-m3",
   "max_tokens": 16384,
-  "vector_dimension": 1536,
+  "vector_dimension": 1024,
   "is_default": false
 }
 ```
@@ -120,7 +125,8 @@ Authorization: Bearer <token>
 |------|------|------|------|
 | name | string | ✓ | 配置名称 |
 | provider_type | int | ✓ | 1=llama.cpp, 2=OpenAI-compatible |
-| base_url | string | ✓ | API 基础地址 |
+| base_url | string | ✓ | LLM API 基础地址 |
+| embedding_base_url | string | | Embedding API 地址（空则复用 base_url） |
 | api_key | string | | API 密钥（llama.cpp 通常为空；数据库 AES-256 加密存储） |
 | llm_model | string | ✓ | 文本生成模型名称 |
 | embedding_model | string | ✓ | Embedding 模型名称 |

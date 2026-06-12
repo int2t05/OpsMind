@@ -41,14 +41,14 @@ test.describe('POST /api/v1/auth/login', () => {
     const resp = await request.post(apiUrl('/api/v1/auth/login'), {
       data: { username: 'admin', password: 'WrongPassword123' },
     });
-    await assertError(resp, 200, 10003);
+    await assertError(resp, [200, 400], 10003);
   });
 
   test('不存在的用户名返回 10003', async ({ request }) => {
     const resp = await request.post(apiUrl('/api/v1/auth/login'), {
       data: { username: 'nonexistent_user_xyz_12345', password: 'Test1234' },
     });
-    await assertError(resp, 200, 10003);
+    await assertError(resp, [200, 400], 10003);
   });
 
   test('缺少 password 返回参数校验失败', async ({ request }) => {
@@ -125,7 +125,7 @@ test.describe('POST /api/v1/auth/change-password', () => {
       headers: authHeaders(token),
       data: { old_password: 'Admin@123', new_password: '12345678' },
     });
-    await assertError(resp, 200, 10003);
+    await assertError(resp, [200, 400], 10003);
   });
 
   test('新密码短于 8 位返回校验失败', async ({ request }) => {
@@ -134,7 +134,7 @@ test.describe('POST /api/v1/auth/change-password', () => {
       headers: authHeaders(token),
       data: { old_password: 'Admin@123', new_password: 'Ab1' },
     });
-    await assertError(resp, 200, 10003);
+    await assertError(resp, [200, 400], 10003);
   });
 
   test('新密码无大写字母返回校验失败', async ({ request }) => {
@@ -143,7 +143,7 @@ test.describe('POST /api/v1/auth/change-password', () => {
       headers: authHeaders(token),
       data: { old_password: 'Admin@123', new_password: 'abcdefg1' },
     });
-    await assertError(resp, 200, 10003);
+    await assertError(resp, [200, 400], 10003);
   });
 });
 

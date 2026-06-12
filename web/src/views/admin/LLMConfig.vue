@@ -36,7 +36,8 @@
               <span class="meta-sep">·</span>
               <span>维度 {{ cfg.vector_dimension }}</span>
             </div>
-            <div v-if="cfg.base_url" class="card-url">{{ cfg.base_url }}</div>
+            <div v-if="cfg.base_url" class="card-url">LLM: {{ cfg.base_url }}</div>
+            <div v-if="cfg.embedding_base_url" class="card-url">Emb: {{ cfg.embedding_base_url }}</div>
           </div>
           <div class="card-actions">
             <button class="btn-action" @click="handleTestConnection(cfg)">测试连接</button>
@@ -66,8 +67,13 @@
         </div>
 
         <div class="form-group">
-          <label class="form-label">Base URL</label>
+          <label class="form-label">LLM Base URL</label>
           <input v-model="form.base_url" class="form-input" placeholder="http://llama-cpp:8080/v1" />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Embedding Base URL <span class="label-hint">（空则复用 LLM Base URL）</span></label>
+          <input v-model="form.embedding_base_url" class="form-input" placeholder="留空则与 LLM Base URL 相同" />
         </div>
 
         <div class="form-group">
@@ -181,6 +187,7 @@ const form = reactive({
   name: '',
   provider_type: 1,
   base_url: '',
+  embedding_base_url: '',
   api_key: '',
   llm_model: '',
   embedding_model: '',
@@ -214,6 +221,7 @@ function resetForm() {
   form.name = ''
   form.provider_type = 1
   form.base_url = ''
+  form.embedding_base_url = ''
   form.api_key = ''
   form.llm_model = ''
   form.embedding_model = ''
@@ -233,6 +241,7 @@ function startEdit(cfg: LLMConfigItem) {
   form.name = cfg.name
   form.provider_type = cfg.provider_type
   form.base_url = cfg.base_url
+  form.embedding_base_url = cfg.embedding_base_url || ''
   form.api_key = ''  // API Key 不回显（后端返回脱敏值）
   form.llm_model = cfg.llm_model
   form.embedding_model = cfg.embedding_model
@@ -259,6 +268,7 @@ async function handleSubmit() {
       name: form.name,
       provider_type: form.provider_type,
       base_url: form.base_url,
+      embedding_base_url: form.embedding_base_url || '',
       api_key: form.api_key,
       llm_model: form.llm_model,
       embedding_model: form.embedding_model,
@@ -517,6 +527,7 @@ function providerText(type: number) {
   font-size: 14px;
   font-family: inherit;
 }
+.label-hint { font-size: 11px; font-weight: 400; opacity: 0.6; }
 .form-input:focus, .form-select:focus { outline: none; border-color: var(--accent); }
 
 .form-row {

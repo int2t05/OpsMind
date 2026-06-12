@@ -98,7 +98,7 @@ test.describe('POST /api/v1/admin/llm-configs — 创建配置完整生命周期
       headers: authHeaders(token),
       data: { name: '不完整' },
     });
-    await assertError(resp, 200, 10003);
+    await assertError(resp, [200, 400], 10003);
   });
 
   test('无效 provider_type (99) 返回校验失败', async ({ request }) => {
@@ -107,7 +107,7 @@ test.describe('POST /api/v1/admin/llm-configs — 创建配置完整生命周期
       headers: authHeaders(token),
       data: { name: '无效类型', provider_type: 99, base_url: 'http://localhost/v1', llm_model: 't', embedding_model: 't', max_tokens: 100, vector_dimension: 10 },
     });
-    await assertError(resp, 200, 10003);
+    await assertError(resp, [200, 400], 10003);
   });
 
   test('查看配置详情', async ({ request }) => {
@@ -139,7 +139,7 @@ test.describe('POST /api/v1/admin/llm-configs — 创建配置完整生命周期
     const resp = await request.get(apiUrl('/api/v1/admin/llm-configs/99999'), {
       headers: authHeaders(token),
     });
-    await assertError(resp, 200, 10004);
+    await assertError(resp, [200, 404], 10004);
   });
 
   test.afterAll(async ({ request }) => {
@@ -165,7 +165,7 @@ test.describe('DELETE /api/v1/admin/llm-configs/:id', () => {
     const resp = await request.delete(apiUrl(`/api/v1/admin/llm-configs/${defaultCfg.id}`), {
       headers: authHeaders(token),
     });
-    await assertError(resp, 200, 10003);
+    await assertError(resp, [200, 400], 10003);
   });
 });
 

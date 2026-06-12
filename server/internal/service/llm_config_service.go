@@ -116,7 +116,7 @@ func (s *LLMConfigService) GetManager() *LLMConfigManager {
 // CreateConfig 创建 LLM 配置。
 //
 // 业务规则：is_default=true 时先清空其他默认配置（保证唯一性）。
-func (s *LLMConfigService) CreateConfig(name string, providerType int16, baseURL, apiKey, llmModel, embeddingModel string, maxTokens, vectorDimension int, isDefault bool) error {
+func (s *LLMConfigService) CreateConfig(name string, providerType int16, baseURL, embeddingBaseURL, apiKey, llmModel, embeddingModel string, maxTokens, vectorDimension int, isDefault bool) error {
 	if strings.TrimSpace(name) == "" {
 		return AppError{Code: errcode.ErrParam, Message: "名称不能为空"}
 	}
@@ -128,15 +128,16 @@ func (s *LLMConfigService) CreateConfig(name string, providerType int16, baseURL
 	}
 
 	cfg := &model.LlmConfig{
-		Name:            name,
-		ProviderType:    providerType,
-		BaseURL:         baseURL,
-		APIKey:          apiKey,
-		LLMModel:        llmModel,
-		EmbeddingModel:  embeddingModel,
-		MaxTokens:       maxTokens,
-		VectorDimension: vectorDimension,
-		IsDefault:       isDefault,
+		Name:             name,
+		ProviderType:     providerType,
+		BaseURL:          baseURL,
+		EmbeddingBaseURL: embeddingBaseURL,
+		APIKey:           apiKey,
+		LLMModel:         llmModel,
+		EmbeddingModel:   embeddingModel,
+		MaxTokens:        maxTokens,
+		VectorDimension:  vectorDimension,
+		IsDefault:        isDefault,
 	}
 
 	if err := s.repo.Create(cfg); err != nil {
@@ -183,16 +184,17 @@ func (s *LLMConfigService) ListConfigs() ([]LlmConfigResponse, error) {
 	result := make([]LlmConfigResponse, len(configs))
 	for i, c := range configs {
 		result[i] = LlmConfigResponse{
-			ID:              c.ID,
-			Name:            c.Name,
-			ProviderType:    c.ProviderType,
-			BaseURL:         c.BaseURL,
-			APIKey:          maskAPIKey(c.APIKey),
-			LLMModel:        c.LLMModel,
-			EmbeddingModel:  c.EmbeddingModel,
-			MaxTokens:       c.MaxTokens,
-			VectorDimension: c.VectorDimension,
-			IsDefault:       c.IsDefault,
+			ID:               c.ID,
+			Name:             c.Name,
+			ProviderType:     c.ProviderType,
+			BaseURL:          c.BaseURL,
+			EmbeddingBaseURL: c.EmbeddingBaseURL,
+			APIKey:           maskAPIKey(c.APIKey),
+			LLMModel:         c.LLMModel,
+			EmbeddingModel:   c.EmbeddingModel,
+			MaxTokens:        c.MaxTokens,
+			VectorDimension:  c.VectorDimension,
+			IsDefault:        c.IsDefault,
 		}
 	}
 	return result, nil
@@ -227,16 +229,17 @@ func (s *LLMConfigService) DeleteConfig(id int64) error {
 
 // LlmConfigResponse 列表响应（API Key 脱敏）。
 type LlmConfigResponse struct {
-	ID              int64  `json:"id"`
-	Name            string `json:"name"`
-	ProviderType    int16  `json:"provider_type"`
-	BaseURL         string `json:"base_url"`
-	APIKey          string `json:"api_key"`
-	LLMModel        string `json:"llm_model"`
-	EmbeddingModel  string `json:"embedding_model"`
-	MaxTokens       int    `json:"max_tokens"`
-	VectorDimension int    `json:"vector_dimension"`
-	IsDefault       bool   `json:"is_default"`
+	ID               int64  `json:"id"`
+	Name             string `json:"name"`
+	ProviderType     int16  `json:"provider_type"`
+	BaseURL          string `json:"base_url"`
+	EmbeddingBaseURL string `json:"embedding_base_url"`
+	APIKey           string `json:"api_key"`
+	LLMModel         string `json:"llm_model"`
+	EmbeddingModel   string `json:"embedding_model"`
+	MaxTokens        int    `json:"max_tokens"`
+	VectorDimension  int    `json:"vector_dimension"`
+	IsDefault        bool   `json:"is_default"`
 }
 
 // maskAPIKey 对 API Key 进行脱敏处理。

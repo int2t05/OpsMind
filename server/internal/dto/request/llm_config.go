@@ -5,26 +5,28 @@ package request
 
 // CreateLLMConfigRequest 创建 LLM 配置请求。
 type CreateLLMConfigRequest struct {
-	Name            string `json:"name" binding:"required"`
-	ProviderType    int16  `json:"provider_type" binding:"required"`
-	BaseURL         string `json:"base_url" binding:"required"`
-	APIKey          string `json:"api_key"`
-	LLMModel        string `json:"llm_model" binding:"required"`
-	EmbeddingModel  string `json:"embedding_model" binding:"required"`
-	MaxTokens       int    `json:"max_tokens"`
-	VectorDimension int    `json:"vector_dimension"`
-	IsDefault       bool   `json:"is_default"`
+	Name             string `json:"name" binding:"required"`
+	ProviderType     int16  `json:"provider_type" binding:"required"`
+	BaseURL          string `json:"base_url" binding:"required"`
+	EmbeddingBaseURL string `json:"embedding_base_url"`
+	APIKey           string `json:"api_key"`
+	LLMModel         string `json:"llm_model" binding:"required"`
+	EmbeddingModel   string `json:"embedding_model" binding:"required"`
+	MaxTokens        int    `json:"max_tokens"`
+	VectorDimension  int    `json:"vector_dimension"`
+	IsDefault        bool   `json:"is_default"`
 }
 
 // UpdateLLMConfigRequest 更新 LLM 配置请求。
 type UpdateLLMConfigRequest struct {
-	Name            string `json:"name" binding:"required"`
-	ProviderType    int16  `json:"provider_type" binding:"required"`
-	BaseURL         string `json:"base_url" binding:"required"`
-	APIKey          string `json:"api_key"`
-	LLMModel        string `json:"llm_model" binding:"required"`
-	EmbeddingModel  string `json:"embedding_model" binding:"required"`
-	MaxTokens       int    `json:"max_tokens"`
-	VectorDimension int    `json:"vector_dimension"`
-	IsDefault       bool   `json:"is_default"`
+	Name             string `json:"name" binding:"required"`
+	ProviderType     int16  `json:"provider_type" binding:"required"`
+	BaseURL          string `json:"base_url" binding:"required"`
+	EmbeddingBaseURL string `json:"embedding_base_url"`
+	APIKey           string `json:"api_key"`
+	LLMModel         string `json:"llm_model" binding:"required"`
+	EmbeddingModel   string `json:"embedding_model" binding:"required"`
+	MaxTokens        int    `json:"max_tokens"`
+	VectorDimension  int    `json:"vector_dimension"`
+	IsDefault        bool   `json:"is_default"`
 }

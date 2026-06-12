@@ -68,9 +68,12 @@ type LLMConfig struct {
 
 // EmbeddingConfig 是文本向量化配置。
 //
-// 与 LLM 共用 BaseURL（同一服务商），但模型名称和向量维度独立配置。
-// 支持任意 OpenAI-compatible /v1/embeddings 端点。
+// LLM 和 Embedding 可独立配置 Base URL，支持以下场景：
+//   - OpenAI LLM + 本地 bge-m3 Embedding
+//   - DeepSeek LLM + Moonshot Embedding
+// BaseURL 为空时回退到 llm.base_url。
 type EmbeddingConfig struct {
+	BaseURL   string `mapstructure:"base_url"`
 	Model     string `mapstructure:"model"`
 	Dimension int    `mapstructure:"dimension"`
 }
@@ -159,7 +162,8 @@ func bindEnvs(v *viper.Viper) {
 	v.BindEnv("llm.max_tokens", "OPSMIND_LLM_MAX_TOKENS")
 
 	// Embedding
-	v.BindEnv("embedding.model", "OPSMIND_EMBEDDING_MODEL")
+	v.BindEnv("embedding.base_url", "OPSMIND_EMBEDDING_BASE_URL")
+		v.BindEnv("embedding.model", "OPSMIND_EMBEDDING_MODEL")
 	v.BindEnv("embedding.dimension", "OPSMIND_EMBEDDING_DIMENSION")
 
 	// AI
@@ -199,7 +203,8 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("llm.max_tokens", 8192)
 
 	// Embedding
-	v.SetDefault("embedding.model", "bge-m3")
+	v.SetDefault("embedding.base_url", "")
+		v.SetDefault("embedding.model", "bge-m3")
 	v.SetDefault("embedding.dimension", 1024)
 
 	// AI

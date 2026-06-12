@@ -14,9 +14,10 @@ import request from '../utils/request'
 export interface LLMConfigItem {
   id: number
   name: string
-  provider_type: number   // 1=llama.cpp, 2=OpenAI-compatible
+  provider_type: number      // 1=llama.cpp, 2=OpenAI-compatible
   base_url: string
-  api_key: string         // 返回时仅显示脱敏后的值（前4 + **** + 后4）
+  embedding_base_url: string  // Embedding 独立地址，空则回退到 base_url
+  api_key: string            // 返回时仅显示脱敏后的值（前4 + **** + 后4）
   llm_model: string
   embedding_model: string
   max_tokens: number
@@ -31,6 +32,7 @@ export interface CreateLLMConfigParams {
   name: string
   provider_type: number
   base_url: string
+  embedding_base_url?: string  // 可选，空则回退到 base_url
   api_key: string
   llm_model: string
   embedding_model: string
@@ -44,6 +46,7 @@ export interface UpdateLLMConfigParams {
   name: string
   provider_type: number
   base_url: string
+  embedding_base_url?: string
   api_key: string
   llm_model: string
   embedding_model: string

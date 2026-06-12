@@ -33,7 +33,8 @@ llm:
   max_tokens: 8192                     # 最大生成 Token 数
 
 embedding:
-  model: bge-m3                        # Embedding 模型名称（与 LLM 共用 BaseURL）
+  base_url: ""                         # Embedding 独立地址，空则回退到 llm.base_url
+  model: bge-m3                        # Embedding 模型名称
   dimension: 1024                      # 向量维度
 
 ai:

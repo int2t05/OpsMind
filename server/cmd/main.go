@@ -61,8 +61,18 @@ func main() {
 	// 4. 初始化 Adapter 层（LLMClient / EmbeddingClient / VectorStore）
 	llmTimeout := 60 * time.Second
 	llmClient := adapter.NewOpenAIClient(cfg.LLM.BaseURL, cfg.LLM.APIKey, llmTimeout)
-	embeddingClient := adapter.NewOpenAIEmbeddingClient(cfg.LLM.BaseURL, cfg.LLM.APIKey, 30*time.Second)
-	slog.Info("LLM/Embedding 客户端已初始化", "base_url", cfg.LLM.BaseURL, "model", cfg.LLM.Model)
+
+	// Embedding 优先使用独立 Base URL，空时回退到 LLM Base URL
+	embedBaseURL := cfg.Embedding.BaseURL
+	if embedBaseURL == "" {
+		embedBaseURL = cfg.LLM.BaseURL
+	}
+	embeddingClient := adapter.NewOpenAIEmbeddingClient(embedBaseURL, cfg.LLM.APIKey, 30*time.Second)
+	slog.Info("LLM/Embedding 客户端已初始化",
+		"llm_base_url", cfg.LLM.BaseURL,
+		"embedding_base_url", embedBaseURL,
+		"llm_model", cfg.LLM.Model,
+		"embedding_model", cfg.Embedding.Model)
 
 	// pgvector 向量存储
 	pgDSN := fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=%s",

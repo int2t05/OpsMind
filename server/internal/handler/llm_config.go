@@ -30,7 +30,7 @@ type LLMConfigHandler struct {
 
 // llmConfigService 定义 Handler 需要的 Service 方法（消费者定义接口）。
 type llmConfigService interface {
-	CreateConfig(name string, providerType int16, baseURL, apiKey, llmModel, embeddingModel string, maxTokens, vectorDimension int, isDefault bool) error
+	CreateConfig(name string, providerType int16, baseURL, embeddingBaseURL, apiKey, llmModel, embeddingModel string, maxTokens, vectorDimension int, isDefault bool) error
 	ListConfigs() ([]service.LlmConfigResponse, error)
 	GetConfig(id int64) (*model.LlmConfig, error)
 	UpdateConfig(cfg *model.LlmConfig) error
@@ -86,7 +86,7 @@ func (h *LLMConfigHandler) CreateConfig(c *gin.Context) {
 		req.VectorDimension = 1024
 	}
 
-	err := h.svc.CreateConfig(req.Name, req.ProviderType, req.BaseURL, req.APIKey,
+	err := h.svc.CreateConfig(req.Name, req.ProviderType, req.BaseURL, req.EmbeddingBaseURL, req.APIKey,
 		req.LLMModel, req.EmbeddingModel, req.MaxTokens, req.VectorDimension, req.IsDefault)
 	if err != nil {
 		handleServiceError(c, err)
@@ -136,15 +136,16 @@ func (h *LLMConfigHandler) UpdateConfig(c *gin.Context) {
 	}
 
 	cfg := &model.LlmConfig{
-		ID:              id,
-		Name:            req.Name,
-		ProviderType:    req.ProviderType,
-		BaseURL:         req.BaseURL,
-		APIKey:          req.APIKey,
-		LLMModel:        req.LLMModel,
-		EmbeddingModel:  req.EmbeddingModel,
-		MaxTokens:       req.MaxTokens,
-		VectorDimension: req.VectorDimension,
+		ID:               id,
+		Name:             req.Name,
+		ProviderType:     req.ProviderType,
+		BaseURL:          req.BaseURL,
+		EmbeddingBaseURL: req.EmbeddingBaseURL,
+		APIKey:           req.APIKey,
+		LLMModel:         req.LLMModel,
+		EmbeddingModel:   req.EmbeddingModel,
+		MaxTokens:        req.MaxTokens,
+		VectorDimension:  req.VectorDimension,
 		IsDefault:       req.IsDefault,
 	}
 
