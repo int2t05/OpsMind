@@ -303,12 +303,27 @@ func (r LlmConfigResponse) MarshalJSON() ([]byte, error) {
 	})
 }
 
+// NewLlmConfigResponse 从 model 构造脱敏后的响应 DTO。
+func NewLlmConfigResponse(cfg *model.LlmConfig) LlmConfigResponse {
+	return LlmConfigResponse{
+		ID:               cfg.ID,
+		Name:             cfg.Name,
+		ProviderType:     cfg.ProviderType,
+		BaseURL:          cfg.BaseURL,
+		EmbeddingBaseURL: cfg.EmbeddingBaseURL,
+		APIKey:           cfg.APIKey, // MarshalJSON 自动脱敏
+		LLMModel:         cfg.LLMModel,
+		EmbeddingModel:   cfg.EmbeddingModel,
+		MaxTokens:        cfg.MaxTokens,
+		VectorDimension:  cfg.VectorDimension,
+		IsDefault:        cfg.IsDefault,
+	}
+}
+
 // maskAPIKey 对 API Key 进行脱敏处理。
 //
 // 规则：显示前 4 位 + **** + 后 4 位，长度 ≤ 8 时全部替换为 ****。
 func maskAPIKey(key string) string {
-	// TODO(service/llm_config): 对不同供应商的 key 做更细粒度脱敏。
-	// 例如 sk- 前缀保留能帮助识别供应商，但也要避免短 key 泄露过多信息。
 	if key == "" {
 		return ""
 	}

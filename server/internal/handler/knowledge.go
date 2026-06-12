@@ -56,8 +56,6 @@ func (h *KnowledgeHandler) ListKBsForPortal(c *gin.Context) {
 //
 // POST /api/v1/admin/knowledge-bases
 func (h *KnowledgeHandler) CreateKB(c *gin.Context) {
-	// TODO(handler/knowledge): CreateKB 请求 DTO 缺少 vector_dimension/llm_config_id，与 API 文档不一致。
-	// Handler 层应先对齐请求结构，再交给 Service 写入完整知识库配置。
 	var req request.CreateKBRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, errcode.ErrParam, "参数校验失败: "+err.Error())

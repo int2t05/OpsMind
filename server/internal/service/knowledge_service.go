@@ -179,8 +179,6 @@ func (s *KnowledgeService) UpdateArticle(id int64, req request.UpdateArticleRequ
 		return err
 	}
 	if article.Status != model.ArticleStatusDraft && article.Status != model.ArticleStatusRejected {
-		// TODO(service/knowledge): 这里的 5 被当作驳回，但 enums.go 中 ArticleStatusRejected=5，API 文档中驳回=6。
-		// 应统一状态枚举，避免前后端对文章生命周期理解不一致。
 		return errcode.AppError{Code: errcode.ErrParam, Message: "仅草稿和驳回状态可编辑"}
 	}
 	article.Title = req.Title

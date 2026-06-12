@@ -96,8 +96,6 @@ func (h *LLMConfigHandler) CreateConfig(c *gin.Context) {
 //
 // GET /api/v1/admin/llm-configs/:id
 func (h *LLMConfigHandler) GetConfig(c *gin.Context) {
-	// TODO(handler/llm_config): GetConfig 直接返回 model.LlmConfig，会暴露完整 api_key。
-	// 应返回和列表相同的脱敏 DTO，编辑时通过“不传保留原密钥”机制处理。
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
 		response.Error(c, errcode.ErrParam, "无效的配置 ID")

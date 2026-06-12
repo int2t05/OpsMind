@@ -79,6 +79,17 @@ func (s *MessageService) MarkAsRead(id int64, userID int64) error {
 	return nil
 }
 
+// MarkAsReadAndCount 标记消息已读并返回最新未读计数。
+//
+// 合并两次操作减少前端请求数：标记已读后直接返回 unread_count，
+// 前端无需额外调用 CountUnread 即可更新未读角标。
+func (s *MessageService) MarkAsReadAndCount(id int64, userID int64) (int64, error) {
+	if err := s.MarkAsRead(id, userID); err != nil {
+		return 0, err
+	}
+	return s.repo.CountUnread(userID)
+}
+
 // CountUnread 查询指定用户的未读消息数。
 func (s *MessageService) CountUnread(userID int64) (int64, error) {
 	// TODO(service/message): 未读数适合缓存或通过 WebSocket/SSE 推送。

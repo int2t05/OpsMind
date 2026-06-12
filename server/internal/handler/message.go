@@ -51,8 +51,6 @@ func (h *MessageHandler) ListMessages(c *gin.Context) {
 // PUT /api/v1/portal/messages/:id/read
 // 校验消息归属（currentUserID），防止水平越权。
 func (h *MessageHandler) MarkAsRead(c *gin.Context) {
-	// TODO(handler/message): 标记已读建议返回最新 unread_count。
-	// 前端布局可以少发一次 CountUnread 请求，用户体验也更即时。
 	idStr := c.Param("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
@@ -61,12 +59,13 @@ func (h *MessageHandler) MarkAsRead(c *gin.Context) {
 	}
 
 	userID, _ := getCurrentUserID(c)
-	if err := h.svc.MarkAsRead(id, userID); err != nil {
+	count, err := h.svc.MarkAsReadAndCount(id, userID)
+	if err != nil {
 		handleServiceError(c, err)
 		return
 	}
 
-	response.Success(c, nil)
+	response.Success(c, gin.H{"unread_count": count})
 }
 
 // CountUnread 查询未读消息数。
