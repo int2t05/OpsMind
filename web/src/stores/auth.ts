@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { getToken, setToken as saveToken, removeToken } from '../utils/auth'
+import type { MenuItem } from '@/types/menu'
 
 interface UserInfo {
   id: number
@@ -12,13 +13,7 @@ interface UserInfo {
   first_login: boolean
 }
 
-export interface MenuItem {
-  id: number
-  name: string
-  path: string
-  icon: string
-  children?: MenuItem[]
-}
+export type { MenuItem }
 
 export const useAuthStore = defineStore('auth', () => {
   // State

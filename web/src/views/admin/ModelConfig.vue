@@ -83,24 +83,24 @@
 <script setup lang="ts">
 // 使用共享 AI 配置 composable — 与 SystemConfig 页面数据同步
 import { ref, onMounted } from 'vue'
-import request from '@/utils/request'
 import { useAIConfig } from '@/composables/useAIConfig'
 import { useToast } from '@/composables/useToast'
+import { getConfig, setConfig } from '@/api/config'
 
 const { topK, confidenceThreshold, loading, loadConfig } = useAIConfig()
 const saving = ref(false)
 const toast = useToast()
 
 onMounted(() => {
-  loadConfig(request)
+  loadConfig(getConfig)
 })
 
 async function handleSave() {
   saving.value = true
   try {
     await Promise.all([
-      request.put('/api/v1/admin/configs/ai.default_top_k' as any, { value: topK.value }),
-      request.put('/api/v1/admin/configs/ai.confidence_threshold' as any, { value: confidenceThreshold.value }),
+      setConfig('ai.default_top_k', topK.value),
+      setConfig('ai.confidence_threshold', confidenceThreshold.value),
     ])
     toast.showToast('配置保存成功', 'success')
   } catch (e: unknown) {

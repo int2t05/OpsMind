@@ -10,7 +10,8 @@
  *                 应评估是否可改用 axios（需确认 SSE 流式兼容性）。
  * TODO(api/chat): catch 子句中 err 类型为 any — 应改为 unknown + 类型守卫 (err instanceof Error)。
  */
-import request from '../utils/request'
+import request from '@/utils/request'
+import type { ApiResponse } from '@/types/api'
 import { getToken } from '../utils/auth'
 
 // =============================================================================
@@ -80,7 +81,7 @@ export interface StreamCallbacks {
 
 /** 创建问答会话（非流式） */
 export function createChatSession(data: CreateChatParams) {
-  return request.post<ChatSessionResponse>('/api/v1/portal/chat-sessions', data)
+  return request.post<ApiResponse<ChatSessionResponse>>('/api/v1/portal/chat-sessions', data)
 }
 
 /**
@@ -174,5 +175,5 @@ export async function streamChatSession(
 
 /** 提交反馈 */
 export function submitFeedback(sessionID: number, feedback: number) {
-  return request.post(`/api/v1/portal/chat-sessions/${sessionID}/feedback`, { feedback })
+  return request.post<ApiResponse<null>>(`/api/v1/portal/chat-sessions/${sessionID}/feedback`, { feedback })
 }

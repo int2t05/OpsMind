@@ -1,4 +1,4 @@
-import request from '../utils/request'
+import request from '@/utils/request'
 import type { ApiResponse } from '@/types/api'
 import type { MenuItem } from '@/stores/auth'
 
@@ -33,13 +33,13 @@ export function login(data: LoginParams) {
 }
 
 export function refreshToken(refresh_token: string) {
-  return request.post('/api/v1/auth/refresh', { refresh_token })
+  return request.post<ApiResponse<{ access_token: string; refresh_token: string }>>('/api/v1/auth/refresh', { refresh_token })
 }
 
 export function changePassword(data: ChangePasswordParams) {
-  return request.post('/api/v1/auth/change-password', data)
+  return request.post<ApiResponse<null>>('/api/v1/auth/change-password', data)
 }
 
 export function logout() {
-  return request.post('/api/v1/auth/logout')
+  return request.post<ApiResponse<null>>('/api/v1/auth/logout')
 }

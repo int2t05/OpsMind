@@ -23,6 +23,9 @@
       />
     </n-layout-sider>
 
+    <!-- 全局加载进度条 -->
+    <div v-if="isLoading" class="global-loading-bar"></div>
+
     <!-- 主内容区 -->
     <n-layout>
       <n-layout-header bordered class="topbar">
@@ -75,12 +78,14 @@ import {
 import { useAuthStore } from '@/stores/auth'
 import { useAppStore } from '@/stores/app'
 import { useTheme } from '@/composables/useTheme'
+import { useLoading } from '@/composables/useLoading'
 
 const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
 const appStore = useAppStore()
 const { toggleTheme, isDark } = useTheme()
+const { isLoading } = useLoading()
 
 // 菜单渲染函数 —— 用 Naive UI Icon 组件渲染 vicons
 function renderIcon(icon: Component) {
@@ -140,6 +145,24 @@ function handleUserDropdown(key: string) {
 <style scoped>
 .admin-layout {
   min-height: 100vh;
+}
+
+/* 全局加载进度条 — 基于 useLoading composable */
+.global-loading-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--accent);
+  z-index: 9999;
+  animation: loadingBar 1.5s ease-in-out infinite;
+}
+
+@keyframes loadingBar {
+  0% { transform: translateX(-100%); }
+  50% { transform: translateX(0%); }
+  100% { transform: translateX(100%); }
 }
 
 .sider-header {

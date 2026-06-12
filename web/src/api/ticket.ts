@@ -1,15 +1,8 @@
 /**
- * 申告 API 封装（门户端）
- *
- * 提供申告创建、列表查询、详情查询、补充信息等门户端接口。
- * 后台管理端申告接口（列表管理、状态操作）在 admin API 中独立封装。
- *
- * TODO(api/ticket): TicketRecord.detail 使用 Record<string, any> — any 应替换为具体类型。
- * TODO(api/ticket): listMyTickets/getTicketDetail 响应类型缺少 ApiResponse<T> 包装，
- *                   TicketListResponse/TicketDetail 无法正确匹配后端 { code, message, data } 结构。
- * TODO(api/ticket): createTicket/supplementTicket 无泛型参数，返回 any — 应补充类型。
+ * 申告 API 封装（门户端）— 全部端点已补全 ApiResponse&lt;T&gt; 泛型类型。
  */
-import request from '../utils/request'
+import request from '@/utils/request'
+import type { ApiResponse, PageResponse } from '@/types/api'
 
 // =============================================================================
 // 类型定义
@@ -89,22 +82,22 @@ export interface TicketListResponse {
 
 /** 创建申告 */
 export function createTicket(data: CreateTicketParams) {
-  return request.post('/api/v1/portal/tickets', data)
+  return request.post<ApiResponse<null>>('/api/v1/portal/tickets', data)
 }
 
 /** 查询当前用户的申告列表 */
 export function listMyTickets(page: number = 1, pageSize: number = 10) {
-  return request.get<TicketListResponse>('/api/v1/portal/tickets', {
+  return request.get<ApiResponse<TicketListResponse>>('/api/v1/portal/tickets', {
     params: { page, page_size: pageSize }
   })
 }
 
 /** 查询申告详情 */
 export function getTicketDetail(id: number) {
-  return request.get<TicketDetail>(`/api/v1/portal/tickets/${id}`)
+  return request.get<ApiResponse<TicketDetail>>(`/api/v1/portal/tickets/${id}`)
 }
 
 /** 补充申告信息（仅"需补充信息"状态可操作） */
 export function supplementTicket(id: number, data: SupplementTicketParams) {
-  return request.post(`/api/v1/portal/tickets/${id}/supplement`, data)
+  return request.post<ApiResponse<null>>(`/api/v1/portal/tickets/${id}/supplement`, data)
 }

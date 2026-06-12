@@ -156,8 +156,8 @@
     </div>
 
     <!-- Toast -->
-    <div v-if="toast.message" :class="['toast', toast.type]">
-      {{ toast.message }}
+    <div v-if="toast.visible.value" :class="['toast', toast.type.value]">
+      {{ toast.message.value }}
     </div>
   </div>
 </template>
@@ -168,7 +168,8 @@
 //                       增加了认知负担。建议统一使用 ref + 整体对象替换。
 // TODO(admin/LLMConfig): toast 定时器未在 onUnmounted 清理 — 存在内存泄漏。
 // TODO(admin/LLMConfig): Base URL 无 URL 格式校验；API Key 编辑模式下清空但无提示说明留空则保留原值。
-import { ref, reactive, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
+import { useToast } from '@/composables/useToast'
 import {
   getLLMConfigs, createLLMConfig, updateLLMConfig, deleteLLMConfig, testLLMConnection,
   type LLMConfigItem,
@@ -185,8 +186,7 @@ const testing = ref(false)
 const editingId = ref<number | null>(null)
 const deleteTarget = ref<LLMConfigItem | null>(null)
 const testResult = ref<{ success: boolean; model?: string; latency?: number } | null>(null)
-const toast = ref<{ message: string; type: string }>({ message: '', type: 'success' })
-let toastTimer: ReturnType<typeof setTimeout> | null = null
+const toast = useToast()
 
 const form = reactive({
   name: '',
@@ -203,14 +203,7 @@ const form = reactive({
 
 onMounted(() => { fetchConfigs() })
 
-function showToast(message: string, type: 'success' | 'error') {
-  toast.value = { message, type }
-  if (toastTimer) clearTimeout(toastTimer)
-  toastTimer = setTimeout(() => { toast.value = { message: '', type: 'success' } }, 3000)
-}
-
-// 组件卸载时清理定时器，防止内存泄漏
-onUnmounted(() => { if (toastTimer) clearTimeout(toastTimer) })
+// toast 已通过 useToast composable 管理，自动处理定时器清理
 
 async function fetchConfigs() {
   loading.value = true
@@ -265,10 +258,10 @@ function closeModal() {
 }
 
 async function handleSubmit() {
-  if (!form.name) { showToast('名称不能为空', 'error'); return }
-  if (!form.base_url) { showToast('Base URL 不能为空', 'error'); return }
-  if (!form.llm_model) { showToast('LLM 模型不能为空', 'error'); return }
-  if (!form.embedding_model) { showToast('Embedding 模型不能为空', 'error'); return }
+  if (!form.name) { toast.showToast('名称不能为空', 'error'); return }
+  if (!form.base_url) { toast.showToast('Base URL 不能为空', 'error'); return }
+  if (!form.llm_model) { toast.showToast('LLM 模型不能为空', 'error'); return }
+  if (!form.embedding_model) { toast.showToast('Embedding 模型不能为空', 'error'); return }
 
   submitting.value = true
   try {
@@ -289,11 +282,11 @@ async function handleSubmit() {
     } else {
       await createLLMConfig(body)
     }
-    showToast(editingId.value ? '更新成功' : '创建成功', 'success')
+    toast.showToast(editingId.value ? '更新成功' : '创建成功', 'success')
     closeModal()
     fetchConfigs()
   } catch (e: any) {
-    showToast(e?.response?.data?.message || e?.message || '操作失败', 'error')
+    toast.showToast(e?.response?.data?.message || e?.message || '操作失败', 'error')
   } finally {
     submitting.value = false
   }
@@ -324,11 +317,11 @@ async function handleDelete() {
   deleting.value = true
   try {
     await deleteLLMConfig(deleteTarget.value.id)
-    showToast('删除成功', 'success')
+    toast.showToast('删除成功', 'success')
     showDeleteConfirm.value = false
     fetchConfigs()
   } catch (e: any) {
-    showToast(e?.response?.data?.message || e?.message || '删除失败', 'error')
+    toast.showToast(e?.response?.data?.message || e?.message || '删除失败', 'error')
   } finally {
     deleting.value = false
   }

@@ -72,9 +72,9 @@
 //                         修改一个不会同步到另一个 — 应合并为统一的 AI 配置入口或共享配置读写逻辑。
 // TODO(admin/SystemConfig): toast 定时器未在 onUnmounted 清理 — 存在内存泄漏。
 import { ref, onMounted, watch } from 'vue'
-import request from '@/utils/request'
 import { useAIConfig } from '@/composables/useAIConfig'
 import { useToast } from '@/composables/useToast'
+import { getConfig, setConfig } from '@/api/config'
 
 interface ConfigItem {
   key: string
@@ -94,7 +94,7 @@ const loading = aiConfig.loading
 const KNOWN_KEYS = ['ai.default_top_k', 'ai.confidence_threshold']
 
 onMounted(async () => {
-  await aiConfig.loadConfig(request)
+  await aiConfig.loadConfig(getConfig)
   syncToItems()
 })
 
@@ -135,7 +135,7 @@ async function handleSave(key: string) {
     const num = Number(value)
     if (!isNaN(num) && String(value).trim() !== '') value = num
 
-    await request.put(`/api/v1/admin/configs/${key}` as any, { value })
+    await setConfig(key, value)
     toast.showToast('保存成功', 'success')
     editingKey.value = ''
 

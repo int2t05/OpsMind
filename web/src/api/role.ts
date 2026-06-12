@@ -1,4 +1,5 @@
-import request from '../utils/request'
+import request from '@/utils/request'
+import type { ApiResponse } from '@/types/api'
 
 export interface RoleItem {
   id: number
@@ -10,5 +11,5 @@ export interface RoleItem {
 }
 
 export function getRoleList() {
-  return request.get<{ data: RoleItem[] }>('/api/v1/admin/roles')
+  return request.get<ApiResponse<RoleItem[]>>('/api/v1/admin/roles')
 }

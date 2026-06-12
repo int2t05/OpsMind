@@ -65,7 +65,7 @@
       </div>
     </div>
 
-    <div v-if="toast.message" :class="['toast', toast.type]">{{ toast.message }}</div>
+    <div v-if="toast.visible.value" :class="['toast', toast.type.value]">{{ toast.message.value }}</div>
   </div>
 </template>
 
@@ -74,43 +74,36 @@
 //                         应提取到 utils/ticket.ts 共享。
 // TODO(admin/TicketDetail): toast 使用 window.setTimeout 但 onUnmounted 未清理定时器 — 组件卸载时存在内存泄漏风险。
 // TODO(admin/TicketDetail): 使用 (res as any) 强制类型转换 — 等 API 泛型补全后移除。
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { getTicketDetail, updateTicketStatus } from '@/api/admin'
 import type { TicketDetail } from '@/api/ticket'
+import { useToast } from '@/composables/useToast'
 
 const route = useRoute()
 const loading = ref(true); const saving = ref(false)
 const ticket = ref<TicketDetail | null>(null)
 const actionContent = ref('')
-const toast = ref<{ message: string; type: string }>({ message: '', type: 'success' })
-let toastTimer: number | null = null
+const toast = useToast()
 
 onMounted(async () => {
   const id = Number(route.params.id)
   try { const res = await getTicketDetail(id) as any; ticket.value = res?.data || res }
-  catch { showToast('加载申告失败', 'error') }
+  catch (err) { console.error('加载申告失败', err); toast.showToast('加载申告失败', 'error') }
   finally { loading.value = false }
 })
 
-function showToast(message: string, type: 'success' | 'error') {
-  toast.value = { message, type }
-  if (toastTimer) clearTimeout(toastTimer)
-  toastTimer = window.setTimeout(() => { toast.value = { message: '', type: 'success' } }, 3000)
-}
-
-// 组件卸载时清理定时器，防止内存泄漏
-onUnmounted(() => { if (toastTimer) clearTimeout(toastTimer) })
+// toast 已通过 useToast composable 管理，自动处理定时器清理
 
 async function doAction(action: string) {
   saving.value = true
   try {
     await updateTicketStatus(ticket.value!.id, { action, content: actionContent.value })
-    showToast('操作成功', 'success')
+    toast.showToast('操作成功', 'success')
     actionContent.value = ''
     // Reload detail
     const res = await getTicketDetail(ticket.value!.id) as any; ticket.value = res?.data || res
-  } catch (e: any) { showToast(e?.response?.data?.message || e?.message || '操作失败', 'error') }
+  } catch (e: unknown) { const msg = e instanceof Error ? e.message : '操作失败'; toast.showToast(msg, 'error') }
   finally { saving.value = false }
 }
 

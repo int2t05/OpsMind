@@ -55,42 +55,13 @@
         </div>
       </div>
 
-      <!-- 消息列表 -->
-      <div class="messages-area" ref="messagesContainer">
-        <div v-if="chatStore.messages.length === 0 && !chatStore.loading" class="empty-chat">
-          <p>欢迎使用智能问答</p>
-          <p class="sub-text">选择一个知识库，输入您的问题开始对话</p>
-        </div>
-
-        <div
-          v-for="msg in chatStore.messages"
-          :key="msg.id"
-          :class="['message', msg.role === 'user' ? 'message--user' : 'message--assistant']"
-        >
-          <div class="message-bubble">
-            <div class="message-content">
-              {{ msg.content }}
-              <!-- 流式输出中的光标动画 -->
-              <span v-if="msg.isStreaming && chatStore.streaming" class="streaming-cursor">▊</span>
-            </div>
-            <!-- 来源（仅流式完成后展示） -->
-            <div v-if="msg.sources && msg.sources.length > 0 && !msg.isStreaming" class="sources">
-              <div class="sources-title">参考来源：</div>
-              <div v-for="(src, si) in msg.sources" :key="si" class="source-item">
-                <span class="source-name">{{ src.doc_name }}</span>
-                <span class="source-confidence">{{ (src.confidence * 100).toFixed(0) }}%</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- 首次等待 AI 响应时的加载指示器 -->
-        <div v-if="chatStore.loading && !chatStore.streaming" class="loading-indicator">
-          <span class="loading-dot"></span>
-          <span class="loading-dot"></span>
-          <span class="loading-dot"></span>
-        </div>
-      </div>
+      <!-- 消息列表（子组件） -->
+      <ChatMessageList
+        ref="msgListRef"
+        :messages="chatStore.messages"
+        :loading="chatStore.loading"
+        :is-streaming="chatStore.streaming"
+      />
 
       <!-- 输入区域 -->
       <div class="input-area">
@@ -146,12 +117,13 @@
 import { ref, onMounted, nextTick } from 'vue'
 import { useChatStore } from '@/stores/chat'
 import { listKnowledgeBasesForPortal } from '@/api/knowledge'
+import ChatMessageList from './ChatMessageList.vue'
 
 const chatStore = useChatStore()
 const question = ref('')
 const selectedKB = ref<number | null>(null)
 const knowledgeBases = ref<Array<{ id: number; name: string }>>([])
-const messagesContainer = ref<HTMLElement | null>(null)
+const msgListRef = ref<InstanceType<typeof ChatMessageList> | null>(null)
 const showAdvanced = ref(false)
 
 onMounted(async () => {
@@ -184,8 +156,8 @@ async function handleFeedback(value: number) {
 }
 
 function scrollToBottom() {
-  if (messagesContainer.value) {
-    messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
+  if (msgListRef.value) {
+    msgListRef.value.scrollToBottom()
   }
 }
 </script>

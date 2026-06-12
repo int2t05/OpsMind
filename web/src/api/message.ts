@@ -7,7 +7,8 @@
  *                   当前直接使用 MessageListResponse/UnreadCountResponse，无法匹配后端实际
  *                   { code, message, data: {...} } 的响应结构。
  */
-import request from '../utils/request'
+import request from '@/utils/request'
+import type { ApiResponse } from '@/types/api'
 
 // =============================================================================
 // 类型定义
@@ -40,17 +41,17 @@ export interface UnreadCountResponse {
 
 /** 查询当前用户的消息列表 */
 export function listMessages(page: number = 1, pageSize: number = 10) {
-  return request.get<MessageListResponse>('/api/v1/portal/messages', {
+  return request.get<ApiResponse<MessageListResponse>>('/api/v1/portal/messages', {
     params: { page, page_size: pageSize }
   })
 }
 
 /** 标记消息为已读 */
 export function markAsRead(id: number) {
-  return request.put(`/api/v1/portal/messages/${id}/read`)
+  return request.put<ApiResponse<null>>(`/api/v1/portal/messages/${id}/read`)
 }
 
 /** 获取未读消息数 */
 export function getUnreadCount() {
-  return request.get<UnreadCountResponse>('/api/v1/portal/messages/unread-count')
+  return request.get<ApiResponse<UnreadCountResponse>>('/api/v1/portal/messages/unread-count')
 }

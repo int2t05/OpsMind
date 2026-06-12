@@ -4,7 +4,8 @@
  * v2 新增：替代 v1 的 embedding-configs 端点，
  * 统一管理 LLM 和 Embedding 提供商配置（llama.cpp / OpenAI-compatible）。
  */
-import request from '../utils/request'
+import request from '@/utils/request'
+import type { ApiResponse } from '@/types/api'
 
 // =============================================================================
 // 类型定义
@@ -68,30 +69,30 @@ export interface TestConnectionResponse {
 
 /** 列出全部 LLM 配置 */
 export function getLLMConfigs() {
-  return request.get<{ code: number; data: LLMConfigItem[] }>('/api/v1/admin/llm-configs')
+  return request.get<ApiResponse<LLMConfigItem[]>>('/api/v1/admin/llm-configs')
 }
 
 /** 获取单个 LLM 配置详情 */
 export function getLLMConfig(id: number) {
-  return request.get<{ code: number; data: LLMConfigItem }>(`/api/v1/admin/llm-configs/${id}`)
+  return request.get<ApiResponse<LLMConfigItem>>(`/api/v1/admin/llm-configs/${id}`)
 }
 
 /** 创建 LLM 配置 */
 export function createLLMConfig(data: CreateLLMConfigParams) {
-  return request.post<{ code: number; data: null }>('/api/v1/admin/llm-configs', data)
+  return request.post<ApiResponse<null>>('/api/v1/admin/llm-configs', data)
 }
 
 /** 更新 LLM 配置 */
 export function updateLLMConfig(id: number, data: UpdateLLMConfigParams) {
-  return request.put<{ code: number; data: null }>(`/api/v1/admin/llm-configs/${id}`, data)
+  return request.put<ApiResponse<null>>(`/api/v1/admin/llm-configs/${id}`, data)
 }
 
 /** 删除 LLM 配置 */
 export function deleteLLMConfig(id: number) {
-  return request.delete<{ code: number; data: null }>(`/api/v1/admin/llm-configs/${id}`)
+  return request.delete<ApiResponse<null>>(`/api/v1/admin/llm-configs/${id}`)
 }
 
 /** 测试 LLM 连接 */
 export function testLLMConnection(id: number) {
-  return request.post<{ code: number; data: TestConnectionResponse }>(`/api/v1/admin/llm-configs/${id}/test`)
+  return request.post<ApiResponse<TestConnectionResponse>>(`/api/v1/admin/llm-configs/${id}/test`)
 }

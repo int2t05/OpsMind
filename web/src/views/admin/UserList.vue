@@ -67,7 +67,7 @@
       </div>
     </div>
 
-    <div v-if="toast.message" :class="['toast', toast.type]">{{ toast.message }}</div>
+    <div v-if="toast.visible.value" :class="['toast', toast.type.value]">{{ toast.message.value }}</div>
   </div>
 </template>
 
@@ -76,10 +76,11 @@
 // TODO(admin/UserList): 创建/编辑用户表单缺少手机号、邮箱格式校验，密码无强度指示器。
 // TODO(admin/UserList): toast 定时器未在 onUnmounted 清理 — 存在内存泄漏。
 // TODO(admin/UserList): 使用 res?.items || res?.data?.items || res || [] 链式解包，待 API 泛型补全。
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted } from 'vue'
 import { getUserList, createUser, updateUser, freezeUser, restoreUser } from '@/api/user'
 import { getRoleList } from '@/api/role'
 import type { RoleItem } from '@/api/role'
+import { useToast } from '@/composables/useToast'
 
 interface UserItem { id: number; username: string; real_name: string; phone: string; email: string; status: number; roles: string[]; role_ids?: number[] }
 
@@ -88,26 +89,18 @@ const users = ref<UserItem[]>([]); const allRoles = ref<RoleItem[]>([])
 const showDialog = ref(false); const isEdit = ref(false); const editingId = ref<number | null>(null)
 const selectedRoles = ref<number[]>([])
 const form = ref({ username: '', password: '', real_name: '', phone: '', email: '' })
-const toast = ref<{ message: string; type: string }>({ message: '', type: 'success' })
-let toastTimer: number | null = null
+const toast = useToast()
 
 onMounted(async () => { await Promise.all([fetchUsers(), fetchRoles()]) })
 
-function showToast(message: string, type: 'success' | 'error') {
-  toast.value = { message, type }
-  if (toastTimer) clearTimeout(toastTimer)
-  toastTimer = window.setTimeout(() => { toast.value = { message: '', type: 'success' } }, 3000)
-}
-
-// 组件卸载时清理定时器，防止内存泄漏
-onUnmounted(() => { if (toastTimer) clearTimeout(toastTimer) })
+// toast 已通过 useToast composable 管理，自动处理定时器清理
 
 async function fetchUsers() {
   loading.value = true
   try {
     const res = await getUserList({ page: 1, page_size: 100 }) as any
     users.value = res?.items || res?.data?.items || res || []
-  } catch (err) { console.error('加载用户列表失败', err); showToast('加载用户失败', 'error') } finally { loading.value = false }
+  } catch (err) { console.error('加载用户列表失败', err); toast.showToast('加载用户失败', 'error') } finally { loading.value = false }
 }
 
 async function fetchRoles() {
@@ -132,24 +125,24 @@ async function handleSave() {
   try {
     if (isEdit.value && editingId.value) {
       await updateUser(editingId.value, { real_name: form.value.real_name, phone: form.value.phone, email: form.value.email, role_ids: selectedRoles.value })
-      showToast('更新成功', 'success')
+      toast.showToast('更新成功', 'success')
     } else {
       await createUser({ ...form.value, role_ids: selectedRoles.value })
-      showToast('创建成功', 'success')
+      toast.showToast('创建成功', 'success')
     }
     closeDialog(); await fetchUsers()
-  } catch (e: any) { showToast(e?.response?.data?.message || e?.message || '操作失败', 'error') }
+  } catch (e: any) { toast.showToast(e?.response?.data?.message || e?.message || '操作失败', 'error') }
   finally { saving.value = false }
 }
 
 async function handleFreeze(id: number) {
-  try { await freezeUser(id); showToast('已冻结', 'success'); await fetchUsers() }
-  catch (e: any) { showToast(e?.response?.data?.message || '冻结失败', 'error') }
+  try { await freezeUser(id); toast.showToast('已冻结', 'success'); await fetchUsers() }
+  catch (e: any) { toast.showToast(e?.response?.data?.message || '冻结失败', 'error') }
 }
 
 async function handleRestore(id: number) {
-  try { await restoreUser(id); showToast('已恢复', 'success'); await fetchUsers() }
-  catch (e: any) { showToast(e?.response?.data?.message || '恢复失败', 'error') }
+  try { await restoreUser(id); toast.showToast('已恢复', 'success'); await fetchUsers() }
+  catch (e: any) { toast.showToast(e?.response?.data?.message || '恢复失败', 'error') }
 }
 </script>
 

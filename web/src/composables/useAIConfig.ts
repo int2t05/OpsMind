@@ -44,12 +44,12 @@ export function useAIConfig() {
   }
 
   /** 从后端加载配置值 */
-  async function loadConfig(request: any) {
+  async function loadConfig(getConfig: (key: string) => Promise<{ data: unknown }>) {
     loading.value = true
     try {
       const [topKRes, thresholdRes] = await Promise.all([
-        request.get('/api/v1/admin/configs/ai.default_top_k'),
-        request.get('/api/v1/admin/configs/ai.confidence_threshold'),
+        getConfig('ai.default_top_k'),
+        getConfig('ai.confidence_threshold'),
       ])
       const tk = (topKRes as any).data ?? topKRes
       const ct = (thresholdRes as any).data ?? thresholdRes

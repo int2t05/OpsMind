@@ -5,7 +5,7 @@
  *
  * TODO(api/dashboard): ApiResponse<T> 与 api/auth.ts 中重复定义 — 应使用 src/types/api.ts 共享类型。
  */
-import request from '../utils/request'
+import request from '@/utils/request'
 import type { ApiResponse } from '@/types/api'
 
 export interface StatsData {

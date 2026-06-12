@@ -30,19 +30,14 @@
 // TODO(admin/AuditLog): 使用 (res as any) 绕过类型检查 — 应使用审计日志 API 模块的泛型声明。
 // TODO(admin/AuditLog): page 和 page_size 硬编码 — 应支持分页参数。
 import { ref, onMounted } from 'vue'
-import request from '@/utils/request'
-
-interface AuditLogItem {
-  id: number; username?: string; operator_name?: string; action: string
-  target_type?: string; target_id?: number; detail?: string; ip?: string; created_at?: string
-}
+import { listAuditLogs, type AuditLogItem } from '@/api/audit'
 
 const loading = ref(true); const logs = ref<AuditLogItem[]>([])
 
 onMounted(async () => {
   try {
-    const res = await request.get('/api/v1/admin/audit-logs', { params: { page: 1, page_size: 100 } }) as any
-    logs.value = res?.data || res?.items || []
+    const res = await listAuditLogs({ page: 1, page_size: 100 })
+    logs.value = res.data?.items || []
   } catch (err) { console.error('加载审计日志失败', err) }
   finally { loading.value = false }
 })
