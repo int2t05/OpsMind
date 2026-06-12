@@ -132,6 +132,17 @@
 - 🟡 [router/router.go](server/internal/router/router.go) — placeholder 路由生产环境应 fail fast
 - 🟢 [service/scheduler.go](server/internal/service/scheduler.go) — Start 应防重复调用
 
+## 10. 整表空数据（架构性变更）
+
+以下表仅定义了 model 和 repository，但无任何 Service 层代码写入数据：
+
+- 🔴 `audit_logs` — `AuditRepo.Create` 存在但零调用方，所有敏感操作无审计记录
+- 🔴 `chat_messages` — `ChatRepo.CreateBatch` 存在但零调用方，对话历史从未持久化
+- 🔴 `chat_sessions.sources` — `CreateChatSession` 未填充 `Sources` 字段，检索引用证据永远为空
+- 🟡 `system_configs.description` — `Upsert` 未设置 `Description`，配置说明永远为空
+
 ---
+
+**统计**: 共 212 条，覆盖 76 个源文件 | 🔴 P0: 61 · 🟡 P1: 108 · 🟢 P2: 43
 
 **统计**: 共 208 条 TODO，覆盖 76 个源文件 | 🔴 P0: 58 · 🟡 P1: 107 · 🟢 P2: 43
