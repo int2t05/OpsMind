@@ -60,6 +60,9 @@ func SuccessWithPage(c *gin.Context, data interface{}, total int64, page, pageSi
 }
 
 // mapHTTPStatus 将业务错误码映射为 HTTP 状态码
+//
+// TODO: ErrAIUnavailable(20001)、ErrRAGUnavailable(20002)、ErrStorageUnavailable(20003)
+// 应映射为 503 Service Unavailable，当前 fallthrough 到 500 对客户端语义不明确。
 func mapHTTPStatus(code int) int {
 	switch code {
 	case errcode.ErrAuth:

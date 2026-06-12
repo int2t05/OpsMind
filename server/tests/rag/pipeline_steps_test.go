@@ -44,11 +44,12 @@ func TestQueryRewrite_LLMFail(t *testing.T) {
 	original := "账号冻结如何处理"
 	rewritten, err := rag.QueryRewrite(context.Background(), llm, original, nil)
 
-	if err != nil {
-		t.Fatalf("LLM 失败不应报错（应降级）: %v", err)
-	}
+	// LLM 失败时：返回原始查询 + error。Pipeline 层通过 track() 记录失败但不阻塞。
 	if rewritten != original {
-		t.Errorf("LLM 失败应返回原始查询, 期望 %q, 实际 %q", original, rewritten)
+		t.Fatalf("LLM 失败应返回原始查询, 期望 %q, 实际 %q", original, rewritten)
+	}
+	if err == nil {
+		t.Error("LLM 失败应返回 error 以标记管道步骤失败状态")
 	}
 }
 

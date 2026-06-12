@@ -24,16 +24,9 @@ type CurrentUser struct {
 	Permissions []string `json:"permissions"`
 }
 
-// rolePermissions 定义角色到权限的映射。
-//
-// 为什么硬编码在中间件中而非数据库：MVP 阶段角色固定（4 个），
-// 硬编码避免每次请求查数据库，后续如角色可配置再迁移到数据库查询。
-var rolePermissions = map[string][]string{
-	"系统管理员":   {"ticket:read", "ticket:write", "ticket:assign", "knowledge:read", "knowledge:write", "knowledge:review", "system:config", "user:manage", "audit:read"},
-	"运维人员":    {"ticket:read", "ticket:write", "knowledge:read", "knowledge:write"},
-	"知识库管理员": {"knowledge:read", "knowledge:write", "knowledge:review"},
-	"报障人":     {},
-}
+// 权限解析从 JWT Claims.Permissions 读取，不再使用硬编码映射。
+// 权限在登录时由 AuthService 从 Role.Permissions（数据库 JSONB 字段）解析后写入 JWT，
+// 中间件只需从 Claims 中读取即可，新增角色/修改权限无需改代码。
 
 // JWTAuth 返回 JWT 认证中间件。
 //
@@ -60,8 +53,11 @@ func JWTAuth(secret string) gin.HandlerFunc {
 			return
 		}
 
-		// 根据角色映射权限
-		permissions := resolvePermissions(claims.Roles)
+		// 从 JWT Claims 读取权限（登录时已从 Role.Permissions DB 字段解析）
+		permissions := claims.Permissions
+		if permissions == nil {
+			permissions = []string{}
+		}
 
 		// 写入 context，供下游 Handler 使用
 		c.Set("currentUser", CurrentUser{
@@ -76,22 +72,6 @@ func JWTAuth(secret string) gin.HandlerFunc {
 	}
 }
 
-// resolvePermissions 根据角色列表解析出权限列表。
-//
-// 使用 Set 去重，原因是同一权限可能被多个角色拥有（如系统管理员和运维人员都有 ticket:read）。
-func resolvePermissions(roles []string) []string {
-	seen := make(map[string]struct{})
-	for _, role := range roles {
-		for _, perm := range rolePermissions[role] {
-			seen[perm] = struct{}{}
-		}
-	}
-	result := make([]string, 0, len(seen))
-	for perm := range seen {
-		result = append(result, perm)
-	}
-	return result
-}
 
 // abortWithError 中断请求并返回统一错误响应。
 func abortWithError(c *gin.Context, code int, msg string) {

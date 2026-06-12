@@ -6,6 +6,8 @@
 package repository
 
 import (
+	"encoding/json"
+
 	"opsmind/internal/model"
 
 	"gorm.io/gorm"
@@ -194,39 +196,28 @@ func (r *UserRepo) UpdateRoleMenus(roleID int64, menuIDs []int64) error {
 }
 
 // GetUserPermissions 聚合用户所有角色的权限列表（去重）。
+//
+// 权限从 Role.Permissions (jsonb) 字段解析，不再使用硬编码映射。
+// 新增角色或修改权限无需改代码，只需更新数据库 role 记录即可生效。
 func (r *UserRepo) GetUserPermissions(userID int64) ([]string, error) {
-	roles, err := r.GetUserRoles(userID)
-	if err != nil {
+	// 从数据库 Role.Permissions (jsonb) 字段读取实际权限
+	var roles []model.Role
+	if err := r.db.Model(&model.Role{}).
+		Joins("JOIN user_roles ON user_roles.role_id = roles.id").
+		Where("user_roles.user_id = ?", userID).
+		Find(&roles).Error; err != nil {
 		return nil, err
 	}
 
 	seen := make(map[string]struct{})
 	for _, role := range roles {
-		// Permissions 是 datatypes.JSON，需要从 Go 侧解析
-		// 这里直接返回角色名列表，由 Service 层根据角色名映射权限
-		_ = role
-	}
-
-	// 查询角色名列表
-	var roleNames []string
-	err = r.db.Model(&model.Role{}).
-		Joins("JOIN user_roles ON user_roles.role_id = roles.id").
-		Where("user_roles.user_id = ?", userID).
-		Pluck("roles.name", &roleNames).Error
-	if err != nil {
-		return nil, err
-	}
-
-	// 根据角色名映射权限（与 middleware/rolePermissions 保持一致）
-	permMap := map[string][]string{
-		"系统管理员":   {"ticket:read", "ticket:write", "ticket:assign", "knowledge:read", "knowledge:write", "knowledge:review", "system:config", "user:manage", "audit:read"},
-		"运维人员":    {"ticket:read", "ticket:write", "knowledge:read", "knowledge:write"},
-		"知识库管理员": {"knowledge:read", "knowledge:write", "knowledge:review"},
-		"报障人":     {},
-	}
-
-	for _, name := range roleNames {
-		for _, perm := range permMap[name] {
+		var perms []string
+		if len(role.Permissions) > 0 {
+			if err := json.Unmarshal(role.Permissions, &perms); err != nil {
+				continue // 跳过解析失败的角色权限
+			}
+		}
+		for _, perm := range perms {
 			seen[perm] = struct{}{}
 		}
 	}

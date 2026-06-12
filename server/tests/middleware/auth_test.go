@@ -48,7 +48,7 @@ func setupAuthRouter() *gin.Engine {
 func TestJWTAuth_ValidToken(t *testing.T) {
 	r := setupAuthRouter()
 
-	token, err := pkgjwt.GenerateAccessToken(42, "testuser", []string{"admin"}, testSecret, time.Hour)
+	token, err := pkgjwt.GenerateAccessToken(42, "testuser", []string{"admin"}, nil, nil, testSecret, time.Hour)
 	require.NoError(t, err)
 
 	w := httptest.NewRecorder()
@@ -72,7 +72,7 @@ func TestJWTAuth_ExpiredToken(t *testing.T) {
 	r := setupAuthRouter()
 
 	// 生成已过期的令牌（-1 小时）
-	token, err := pkgjwt.GenerateAccessToken(42, "testuser", []string{"admin"}, testSecret, -1*time.Hour)
+	token, err := pkgjwt.GenerateAccessToken(42, "testuser", []string{"admin"}, nil, nil, testSecret, -1*time.Hour)
 	require.NoError(t, err)
 
 	w := httptest.NewRecorder()
@@ -106,7 +106,7 @@ func TestJWTAuth_MissingAuthorization(t *testing.T) {
 func TestJWTAuth_WrongFormat(t *testing.T) {
 	r := setupAuthRouter()
 
-	token, err := pkgjwt.GenerateAccessToken(42, "testuser", []string{"admin"}, testSecret, time.Hour)
+	token, err := pkgjwt.GenerateAccessToken(42, "testuser", []string{"admin"}, nil, nil, testSecret, time.Hour)
 	require.NoError(t, err)
 
 	w := httptest.NewRecorder()

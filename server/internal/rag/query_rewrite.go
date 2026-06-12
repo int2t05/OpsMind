@@ -49,8 +49,8 @@ func QueryRewrite(ctx context.Context, llm adapter.LLMClient, query string, hist
 		Temperature: 0.1, // 低温度保证输出稳定
 	})
 	if err != nil {
-		// 降级：返回原始查询
-		return query, nil
+		// 降级：返回原始查询，但上报错误让管道步骤显示失败状态
+		return query, fmt.Errorf("查询改写 LLM 调用失败: %w", err)
 	}
 	result := strings.TrimSpace(resp.Content)
 	if result == "" {

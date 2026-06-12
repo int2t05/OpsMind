@@ -144,7 +144,7 @@ func (s *AuthService) buildLoginResponse(user *model.User) (*response.LoginRespo
 	}
 
 	accessToken, err := jwt.GenerateAccessToken(
-		user.ID, user.Username, roleNames,
+		user.ID, user.Username, roleNames, permissions,
 		jwtSecret(), 2*time.Hour,
 	)
 	if err != nil {
@@ -152,7 +152,7 @@ func (s *AuthService) buildLoginResponse(user *model.User) (*response.LoginRespo
 	}
 
 	refreshToken, err := jwt.GenerateRefreshToken(
-		user.ID, user.Username, roleNames,
+		user.ID, user.Username, roleNames, permissions,
 		jwtSecret(), 7*24*time.Hour,
 	)
 	if err != nil {

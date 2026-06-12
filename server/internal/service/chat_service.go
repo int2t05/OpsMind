@@ -106,6 +106,8 @@ func (s *ChatService) CreateChatSession(req request.CreateChatRequest, userID in
 	// Step 1: Pipeline 检索（如果 pipeline 可用）
 	var pipelineChunks []rag.RetrievalResult
 	if s.pipeline != nil {
+		// TODO: TopK 和各步骤开关均硬编码，未使用 AI_DEFAULT_TOP_K 配置。
+		// 应支持：1) 从 config 读取默认值；2) 按知识库粒度覆盖；3) 请求级覆盖。
 		result, pipeErr := s.pipeline.Execute(ctx, req.Question, req.KBID, rag.RAGOptions{
 			TopK:         5,
 			QueryRewrite: true,
@@ -129,8 +131,12 @@ func (s *ChatService) CreateChatSession(req request.CreateChatRequest, userID in
 		canSubmit = true
 	} else if s.llmClient != nil {
 		// Step 2: 构造带上下文的 prompt
+		// TODO: system prompt 硬编码，不同知识库可能需要不同角色设定（如「网络运维」「DBA」）。
+		// 应在知识库或 LLM 配置中支持 prompt_template 字段。
 		systemPrompt := "你是一个运维知识助手。根据以下知识库内容回答用户问题。如果知识库中没有相关信息，请如实说明。"
 		var contextBuilder strings.Builder
+		// TODO: 仅取前 3 个 chunk 注入 LLM，而检索返回 TopK=5，浪费了后 2 个结果。
+		// 应改为可配置的 context_chunk_count 或全部使用 TopK 的结果。
 		for i, chunk := range pipelineChunks {
 			if i >= 3 {
 				break
@@ -180,6 +186,10 @@ func (s *ChatService) CreateChatSession(req request.CreateChatRequest, userID in
 	durationMS := int(time.Since(start).Milliseconds())
 
 	// Step 4: 保存会话
+	//
+	// TODO: 当前置信度仅按检索命中 chunk 数量 × 0.3 计算，过于粗糙。
+	// 问题：5 个不相关 chunk 可得 1.5（不触发申告），1 个高相关 chunk 只得 0.3（触发申告）。
+	// 应改为取 RRF 融合后的最高分或平均分作为置信度，更能反映检索质量。
 	confidence := float64(len(pipelineChunks)) * 0.3
 	session := &model.ChatSession{
 		UserID:     userID,

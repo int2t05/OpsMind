@@ -117,6 +117,10 @@ type bm25Posting struct {
 // MVP 阶段知识库规模有限（< 10万篇），
 // Go 原生 map 的 O(1) 查询性能足够，
 // 后续如数据量增长可考虑 B-Tree 或 Roaring Bitmap 优化。
+//
+// TODO: 知识库超 10 万篇后 map[string][]bm25Posting 内存压力大。
+// 方案：1) 定期清除低频词（TF < 2）；2) Roaring Bitmap 压缩 posting list；
+// 3) 索引持久化到磁盘避免每次启动全量重建。
 type BM25Index struct {
 	// 倒排索引：token → posting list
 	inverted map[string][]bm25Posting
@@ -230,6 +234,8 @@ func (r *BM25Retriever) buildIndex(docs []BM25Document) *BM25Index {
 // Retrieve 执行 BM25 检索，返回 topK 个结果。
 //
 // 如果知识库索引不存在或已过期，返回空结果（不报错）。
+// TODO: ctx 参数未使用——分词和评分操作不支持 context 取消。
+// 大知识库检索可能耗时数秒，应通过 context 支持超时和取消。
 func (r *BM25Retriever) Retrieve(ctx context.Context, query string, kbID int64, topK int) ([]RetrievalResult, error) {
 	r.mu.RLock()
 	entry, exists := r.indexes[kbID]
@@ -241,8 +247,7 @@ func (r *BM25Retriever) Retrieve(ctx context.Context, query string, kbID int64, 
 
 	// TTL 检查：过期时自动重建索引（使用存储的文档副本）
 	if r.ttl > 0 && time.Since(entry.builtAt) > r.ttl {
-		r.mu.RUnlock()
-		// 升级为写锁并重建
+		// 升级为写锁并重建（RLock 已在入口处释放，直接获取写锁即可；原 r.mu.RUnlock() 为重复释放 bug）
 		r.mu.Lock()
 		// 双重检查（其他 goroutine 可能已重建）
 		if e, stillExists := r.indexes[kbID]; stillExists && time.Since(e.builtAt) > r.ttl {
@@ -257,6 +262,7 @@ func (r *BM25Retriever) Retrieve(ctx context.Context, query string, kbID int64, 
 		}
 		r.mu.Unlock()
 		r.mu.RLock()
+		defer r.mu.RUnlock() // 确保函数退出时释放读锁（此前遗漏，导致 TTL 过期后死锁）
 		// 重新获取（可能已更新）
 		entry = r.indexes[kbID]
 		if entry == nil || entry.index.docCount == 0 {

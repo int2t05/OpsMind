@@ -14,7 +14,7 @@ const testSecret = "test-secret-key-for-unit-testing"
 
 // TestGenerateAccessToken 测试访问令牌生成
 func TestGenerateAccessToken(t *testing.T) {
-	token, err := jwt.GenerateAccessToken(1, "admin", []string{"admin"}, testSecret, 15*time.Minute)
+	token, err := jwt.GenerateAccessToken(1, "admin", []string{"admin"}, nil, testSecret, 15*time.Minute)
 	if err != nil {
 		t.Fatalf("GenerateAccessToken 失败: %v", err)
 	}
@@ -28,7 +28,7 @@ func TestGenerateAccessToken(t *testing.T) {
 // TestParseToken 测试令牌解析
 func TestParseToken(t *testing.T) {
 	// 生成令牌
-	token, err := jwt.GenerateAccessToken(1, "admin", []string{"admin"}, testSecret, 15*time.Minute)
+	token, err := jwt.GenerateAccessToken(1, "admin", []string{"admin"}, nil, testSecret, 15*time.Minute)
 	if err != nil {
 		t.Fatalf("GenerateAccessToken 失败: %v", err)
 	}
@@ -54,7 +54,7 @@ func TestParseToken(t *testing.T) {
 // TestParseTokenExpired 测试过期令牌解析
 func TestParseTokenExpired(t *testing.T) {
 	// 生成一个过期的令牌（过期时间为负数）
-	token, err := jwt.GenerateAccessToken(1, "admin", []string{"admin"}, testSecret, -1*time.Hour)
+	token, err := jwt.GenerateAccessToken(1, "admin", []string{"admin"}, nil, testSecret, -1*time.Hour)
 	if err != nil {
 		t.Fatalf("GenerateAccessToken 失败: %v", err)
 	}
@@ -69,7 +69,7 @@ func TestParseTokenExpired(t *testing.T) {
 // TestParseTokenInvalidSecret 测试使用错误密钥解析
 func TestParseTokenInvalidSecret(t *testing.T) {
 	// 生成令牌
-	token, err := jwt.GenerateAccessToken(1, "admin", []string{"admin"}, testSecret, 15*time.Minute)
+	token, err := jwt.GenerateAccessToken(1, "admin", []string{"admin"}, nil, testSecret, 15*time.Minute)
 	if err != nil {
 		t.Fatalf("GenerateAccessToken 失败: %v", err)
 	}
@@ -83,7 +83,7 @@ func TestParseTokenInvalidSecret(t *testing.T) {
 
 // TestGenerateRefreshToken 测试刷新令牌生成
 func TestGenerateRefreshToken(t *testing.T) {
-	token, err := jwt.GenerateRefreshToken(1, "admin", []string{"admin"}, testSecret, 7*24*time.Hour)
+	token, err := jwt.GenerateRefreshToken(1, "admin", []string{"admin"}, nil, testSecret, 7*24*time.Hour)
 	if err != nil {
 		t.Fatalf("GenerateRefreshToken 失败: %v", err)
 	}

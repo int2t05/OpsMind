@@ -89,6 +89,8 @@ func (p *Pipeline) Execute(ctx context.Context, query string, kbID int64, opts R
 	rewrittenQuery := query
 	if opts.QueryRewrite {
 		_ = track("query_rewrite", "查询改写", func() error {
+			// TODO: history 始终传 nil，QueryRewrite 的上下文消歧功能从未生效。
+			// 应由调用方通过 RAGOptions 传入最近 N 轮对话历史。
 			rw, err := QueryRewrite(ctx, p.llmClient, query, nil)
 			if err != nil {
 				return err
@@ -194,6 +196,9 @@ func (p *Pipeline) Execute(ctx context.Context, query string, kbID int64, opts R
 	}
 
 	// 截取 TopK
+	//
+	// TODO: 应校验 RerankCount >= TopK，否则重排序候选池小于目标数，
+	// 重排序后截断 TopK 形同虚设（候选池本身不足）。
 	if len(allChunks) > opts.TopK {
 		allChunks = allChunks[:opts.TopK]
 	}

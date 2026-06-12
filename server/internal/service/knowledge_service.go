@@ -285,7 +285,7 @@ func (s *KnowledgeService) Publish(id int64, publisherID int64) error {
 			Content:         chunk,
 			ChunkIndex:      i,
 			Embedding:       vectors[i],
-			EmbeddingModel:  "bge-m3",
+			EmbeddingModel:  "bge-m3", // TODO: 模型名硬编码，应从知识库或系统配置读取 embedding_model
 			VectorDimension: dimension,
 		}
 	}

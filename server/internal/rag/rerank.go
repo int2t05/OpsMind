@@ -21,7 +21,10 @@ import (
 )
 
 // Rerank 使用 LLM 对候选文档重新排序。
-// todo : 交叉编码器 调用 Python 服务 / 开源 Rerank 服务（最推荐、成本最低）
+//
+// TODO: 当前用 LLM 做重排序，每次消耗 token 且延迟 500ms-2s。
+// 应改用交叉编码器 Rerank 模型（如 bge-reranker、Cohere Rerank API），
+// 通过调用 Python 推理服务或 SaaS API 实现，成本更低、速度更快。
 // candidates 为待重排序的候选文档列表，
 // 返回重新排序后的列表（保持相同数量）。
 // LLM 调用失败时降级返回原始排序。

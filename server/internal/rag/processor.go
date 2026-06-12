@@ -85,6 +85,9 @@ func (p *Processor) Submit(task ProcessTask) {
 	case p.taskCh <- task:
 	default:
 		// 队列满时丢弃（生产环境应由调用方重试）
+		// TODO: Submit 不应静默丢弃任务——调用方无法区分「提交成功」和「队列满丢弃」。
+		// 应返回 error 或改用阻塞发送 + context 超时。
+		// 当前 OnStatusChange 回调设置了 failed 状态，但 UploadDocuments 的 HTTP 响应已 200 返回。
 		if task.OnStatusChange != nil {
 			task.OnStatusChange(task.ArticleID, "failed", "处理队列已满")
 		}
@@ -148,7 +151,7 @@ func (p *Processor) processTask(task ProcessTask) {
 			Content:         chunk,
 			ChunkIndex:      i,
 			Embedding:       vectors[i],
-			EmbeddingModel:  "", // 从配置读取
+			EmbeddingModel:  "", // TODO: 应从知识库或系统配置读取 embedding_model，当前硬编码为空字符串
 			VectorDimension: len(vectors[i]),
 		}
 	}

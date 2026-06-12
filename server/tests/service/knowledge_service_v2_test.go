@@ -52,6 +52,39 @@ func (m *mockKnowledgeRepoV2) UpdateArticleStatus(id int64, status int) error {
 	return fmt.Errorf("not found")
 }
 
+func (m *mockKnowledgeRepoV2) CreateKB(kb *model.KnowledgeBase) error {
+	kb.ID = int64(len(m.kbs) + 1)
+	m.kbs[kb.ID] = kb
+	return nil
+}
+
+func (m *mockKnowledgeRepoV2) UpdateKB(kb *model.KnowledgeBase) error {
+	m.kbs[kb.ID] = kb
+	return nil
+}
+
+func (m *mockKnowledgeRepoV2) ListKBs() ([]model.KnowledgeBase, error) {
+	var result []model.KnowledgeBase
+	for _, kb := range m.kbs {
+		result = append(result, *kb)
+	}
+	return result, nil
+}
+
+func (m *mockKnowledgeRepoV2) ListArticles(kbID int64, status int, page, pageSize int) ([]model.KnowledgeArticle, int64, error) {
+	var result []model.KnowledgeArticle
+	for _, a := range m.articles {
+		if a.KBID == kbID && (status == -1 || int(a.Status) == status) {
+			result = append(result, *a)
+		}
+	}
+	return result, int64(len(result)), nil
+}
+
+func (m *mockKnowledgeRepoV2) FindChunksByArticleID(articleID int64) ([]model.KnowledgeChunk, error) {
+	return nil, nil
+}
+
 type mockChunkerV2 struct {
 	chunks []string
 }

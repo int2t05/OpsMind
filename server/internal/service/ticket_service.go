@@ -63,6 +63,8 @@ func (s *TicketService) CreateTicket(req request.CreateTicketRequest, userID int
 	now := time.Now()
 	datePart := now.Format("20060102")
 	// MVP: 使用时间戳毫秒后4位 + 随机数确保唯一
+	// TODO: rand.Intn(10000) 在高并发下碰撞风险较高（仅 10000 种组合）。
+	// 应改用雪花算法或数据库自增序列 + 日期前缀保证唯一性。
 	suffix := fmt.Sprintf("%04d", rand.Intn(10000))
 	ticketNo := fmt.Sprintf("TK-%s-%s", datePart, suffix)
 

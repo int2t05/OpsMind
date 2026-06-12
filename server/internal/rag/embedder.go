@@ -63,12 +63,14 @@ func (e *Embedder) Embed(ctx context.Context, texts []string) ([][]float32, int,
 		batch := texts[i:end]
 
 		resp, err := e.client.CreateEmbeddings(ctx, adapter.EmbeddingRequest{
-			Model: "", // 模型名由 EmbeddingClient 决定（从配置读取）
+			Model: "", // TODO: 模型名应从配置显式传入，而非依赖 EmbeddingClient 底层默认值
 			Input: batch,
 		})
 		if err != nil {
 			failed += len(batch)
-			continue // 跳过失败批次，继续后续批次
+			// TODO: 部分批次失败时静默跳过，调用方无法知道哪些文本的 embedding 丢失。
+			// 应返回失败索引列表或允许调用方配置「失败即中止」策略。
+			continue
 		}
 
 		if dimension == 0 && resp.Dimension > 0 {

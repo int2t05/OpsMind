@@ -53,6 +53,8 @@ func (p *DocParser) Parse(reader io.Reader, fileType string) (string, error) {
 }
 
 // parseTxt 读取纯文本/Markdown 文件。
+//
+// TODO: io.ReadAll 无大小限制，恶意大文件可导致 OOM。应使用 io.LimitReader 设置上限（如 100MB）。
 func (p *DocParser) parseTxt(reader io.Reader) (string, error) {
 	b, err := io.ReadAll(reader)
 	if err != nil {
@@ -136,21 +138,24 @@ func parseDocxFromBytes(data []byte) (string, error) {
 }
 
 // docxDocument DOCX document.xml 的 XML 结构（仅提取 w:t 内容）。
+//
+// 使用命名空间 URL 匹配 OOXML 元素（<w:document xmlns:w="...">），
+// Go encoding/xml 以完整 URL 形式写在 tag 中即可匹配 namespaced 元素。
 type docxDocument struct {
-	XMLName xml.Name       `xml:"document"`
-	Body    docxBody       `xml:"body"`
+	XMLName xml.Name       `xml:"http://schemas.openxmlformats.org/wordprocessingml/2006/main document"`
+	Body    docxBody       `xml:"http://schemas.openxmlformats.org/wordprocessingml/2006/main body"`
 }
 
 type docxBody struct {
-	Paragraphs []docxParagraph `xml:"p"`
+	Paragraphs []docxParagraph `xml:"http://schemas.openxmlformats.org/wordprocessingml/2006/main p"`
 }
 
 type docxParagraph struct {
-	Runs []docxRun `xml:"r"`
+	Runs []docxRun `xml:"http://schemas.openxmlformats.org/wordprocessingml/2006/main r"`
 }
 
 type docxRun struct {
-	Text string `xml:"t"`
+	Text string `xml:"http://schemas.openxmlformats.org/wordprocessingml/2006/main t"`
 }
 
 // extractDocxText 从 DOCX XML 中提取所有 <w:t> 文本。
