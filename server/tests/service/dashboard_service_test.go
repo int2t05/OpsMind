@@ -28,7 +28,7 @@ var dashboardDB *gorm.DB
 
 func init() {
 	cfg := config.DatabaseConfig{
-		Host: "localhost", Port: 5432, User: "opsmind", Password: "opsmind123",
+		Host: "localhost", Port: 5432, User: "opsmind", Password: "opsmind_dev",
 		DBName: "opsmind_test", SSLMode: "disable",
 	}
 	db, err := database.Init(cfg)
@@ -85,7 +85,7 @@ func setupDashboardTest(t *testing.T) *service.DashboardService {
 func seedDashboardData(t *testing.T) {
 	t.Helper()
 
-	now := time.Now()
+	now := time.Now().UTC().Truncate(24 * time.Hour) // UTC 当天零点，消除时区偏差
 	yesterday := now.AddDate(0, 0, -1)
 	twoDaysAgo := now.AddDate(0, 0, -2)
 
@@ -254,7 +254,7 @@ func TestDashboardService_GetTrends(t *testing.T) {
 	svc := setupDashboardTest(t)
 	seedDashboardData(t)
 
-	now := time.Now()
+	now := time.Now().UTC()
 	startDate := now.Format("2006-01-02")
 	endDate := now.Format("2006-01-02")
 
@@ -288,7 +288,7 @@ func TestDashboardService_GetTrends_DateRange(t *testing.T) {
 	svc := setupDashboardTest(t)
 	seedDashboardData(t)
 
-	now := time.Now()
+	now := time.Now().UTC()
 	twoDaysAgo := now.AddDate(0, 0, -2)
 
 	req := request.TrendRequest{
@@ -320,7 +320,7 @@ func TestDashboardService_GetTrends_InvalidGranularity(t *testing.T) {
 	svc := setupDashboardTest(t)
 	seedDashboardData(t)
 
-	now := time.Now()
+	now := time.Now().UTC()
 	req := request.TrendRequest{
 		StartDate:   now.Format("2006-01-02"),
 		EndDate:     now.Format("2006-01-02"),

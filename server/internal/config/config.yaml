@@ -12,7 +12,7 @@ database:
   host: localhost        # Docker 内: postgres
   port: 5432
   user: opsmind
-  password: ""           # 通过环境变量 OPSMIND_DATABASE_PASSWORD 设置
+  password: "opsmind_dev"  # 通过环境变量 OPSMIND_DATABASE_PASSWORD 覆盖
   dbname: opsmind
   sslmode: disable
   # TODO(config): 增加 max_open_conns/max_idle_conns/conn_max_lifetime，生产环境需要按数据库规格调优。

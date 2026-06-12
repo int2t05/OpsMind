@@ -26,7 +26,7 @@ import (
 func dbConn() (*sql.DB, error) {
 	host := "localhost"
 	user := "opsmind"
-	password := "opsmind123"
+	password := "opsmind_dev"
 	dbname := "opsmind_test"
 	if env := os.Getenv("DB_HOST"); env != "" {
 		host = env

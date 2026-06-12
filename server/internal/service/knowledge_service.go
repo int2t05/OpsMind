@@ -46,6 +46,7 @@ type knowledgeRepo interface {
 	UpdateArticle(article *model.KnowledgeArticle) error
 	UpdateArticleStatus(id int64, status int) error
 	UpdateArticleProcessStatus(id int64, processStatus, processError string) error
+	UpdateArticleMetrics(id int64, wordCount, chunkCount int) error
 	CreateKB(kb *model.KnowledgeBase) error
 	UpdateKB(kb *model.KnowledgeBase) error
 	ListKBs() ([]model.KnowledgeBase, error)
@@ -115,6 +116,12 @@ func (s *KnowledgeService) UpdateKB(id int64, req request.UpdateKBRequest) error
 	}
 	kb.Name = req.Name
 	kb.Description = req.Description
+	if req.EmbeddingModel != "" {
+		kb.EmbeddingModel = req.EmbeddingModel
+	}
+	if req.VectorDimension > 0 {
+		kb.VectorDimension = req.VectorDimension
+	}
 	return s.repo.UpdateKB(kb)
 }
 
@@ -155,14 +162,20 @@ func (s *KnowledgeService) CreateArticle(req request.CreateArticleRequest, userI
 	}
 
 	tagsJSON := marshalTags(req.Tags)
+	sourceType := req.SourceType
+	if sourceType == 0 {
+		sourceType = 1 // 默认手动创建
+	}
 	article := &model.KnowledgeArticle{
-		KBID:      req.KBID,
-		Title:     req.Title,
-		Content:   req.Content,
-		Category:  req.Category,
-		Tags:      tagsJSON,
-		Status:    1, // 草稿
-		CreatedBy: userID,
+		KBID:       req.KBID,
+		Title:      req.Title,
+		Content:    req.Content,
+		SourceType: sourceType,
+		Category:   req.Category,
+		Tags:       tagsJSON,
+		Status:     1, // 草稿
+		CreatedBy:  userID,
+		WordCount:  len([]rune(req.Content)),
 	}
 	return s.repo.CreateArticle(article)
 }
@@ -266,13 +279,13 @@ func (s *KnowledgeService) Publish(id int64, publisherID int64) error {
 	}
 
 	// Step 1: 分块
-	// TODO(service/knowledge): 应将标题和正文一起进入分块，例如 title + "\n\n" + content。
-	// 只对 Answer 分块会丢失标题语义，影响短问答类知识的召回。
 	content := article.Content
 	chunks := s.chunker.Split(content)
 	if len(chunks) == 0 {
 		return errcode.AppError{Code: errcode.ErrUnknown, Message: "分块结果为空"}
 	}
+	article.WordCount = len([]rune(content))
+	article.ChunkCount = len(chunks)
 
 	// Step 2: Embedding
 	// TODO(service/knowledge): 使用 context.Background 会忽略 HTTP 请求取消和超时。
@@ -387,8 +400,16 @@ func (s *KnowledgeService) ListArticles(kbID int64, status int, page, pageSize i
 			Tags:          unmarshalTags(a.Tags),
 			Status:        a.Status,
 			StatusText:    statusText(a.Status),
+			SourceType:    a.SourceType,
+			FileType:      a.FileType,
+			MinioPath:     a.MinioPath,
+			WordCount:     a.WordCount,
+			ChunkCount:    a.ChunkCount,
+			ProcessStatus: a.ProcessStatus,
+			ProcessError:  a.ProcessError,
 			CreatedBy:     a.CreatedBy,
 			ReviewedBy:    a.ReviewedBy,
+			PublishedBy:   a.PublishedBy,
 			ReviewComment: a.ReviewComment,
 			CreatedAt:     a.CreatedAt,
 			UpdatedAt:     a.UpdatedAt,
@@ -441,8 +462,16 @@ func (s *KnowledgeService) GetArticleDetail(id int64) (*response.ArticleDetailRe
 			Tags:          unmarshalTags(article.Tags),
 			Status:        article.Status,
 			StatusText:    statusText(article.Status),
+			SourceType:    article.SourceType,
+			FileType:      article.FileType,
+			MinioPath:     article.MinioPath,
+			WordCount:     article.WordCount,
+			ChunkCount:    article.ChunkCount,
+			ProcessStatus: article.ProcessStatus,
+			ProcessError:  article.ProcessError,
 			CreatedBy:     article.CreatedBy,
 			ReviewedBy:    article.ReviewedBy,
+			PublishedBy:   article.PublishedBy,
 			ReviewComment: article.ReviewComment,
 			CreatedAt:     article.CreatedAt,
 			UpdatedAt:     article.UpdatedAt,
@@ -508,6 +537,9 @@ func (s *KnowledgeService) UploadDocuments(kbID int64, userID int64, filename st
 				_ = s.repo.UpdateArticleProcessStatus(aID, status, errMsg)
 				_ = s.repo.UpdateArticleStatus(aID, mapProcessStatus(status))
 			},
+			OnMetrics: func(aID int64, wordCount, chunkCount int) {
+				_ = s.repo.UpdateArticleMetrics(aID, wordCount, chunkCount)
+			},
 		}
 	} else {
 		// 无 StorageClient 时降级：同步解析文本，processor 直接分块
@@ -529,6 +561,9 @@ func (s *KnowledgeService) UploadDocuments(kbID int64, userID int64, filename st
 			OnStatusChange: func(aID int64, status, errMsg string) {
 				_ = s.repo.UpdateArticleProcessStatus(aID, status, errMsg)
 				_ = s.repo.UpdateArticleStatus(aID, mapProcessStatus(status))
+			},
+			OnMetrics: func(aID int64, wordCount, chunkCount int) {
+				_ = s.repo.UpdateArticleMetrics(aID, wordCount, chunkCount)
 			},
 		}
 	}
@@ -589,6 +624,9 @@ func (s *KnowledgeService) RetryDocument(articleID int64) error {
 				_ = s.repo.UpdateArticleProcessStatus(aID, status, errMsg)
 				_ = s.repo.UpdateArticleStatus(aID, mapProcessStatus(status))
 			},
+			OnMetrics: func(aID int64, wordCount, chunkCount int) {
+				_ = s.repo.UpdateArticleMetrics(aID, wordCount, chunkCount)
+			},
 		}
 	} else {
 		task = rag.ProcessTask{
@@ -598,6 +636,9 @@ func (s *KnowledgeService) RetryDocument(articleID int64) error {
 			OnStatusChange: func(aID int64, status, errMsg string) {
 				_ = s.repo.UpdateArticleProcessStatus(aID, status, errMsg)
 				_ = s.repo.UpdateArticleStatus(aID, mapProcessStatus(status))
+			},
+			OnMetrics: func(aID int64, wordCount, chunkCount int) {
+				_ = s.repo.UpdateArticleMetrics(aID, wordCount, chunkCount)
 			},
 		}
 	}

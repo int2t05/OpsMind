@@ -22,7 +22,7 @@ func init() {
 		Host:     "localhost",
 		Port:     5432,
 		User:     "opsmind",
-		Password: "opsmind123",
+		Password: "opsmind_dev",
 		DBName:   "opsmind_test",
 		SSLMode:  "disable",
 	}

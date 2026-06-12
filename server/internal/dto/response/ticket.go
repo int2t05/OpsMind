@@ -44,7 +44,6 @@ type TicketRecordItem struct {
 	OperatorID int64  `json:"operator_id"`
 	Action     string `json:"action"`
 	Content    string `json:"content"`
-	// TODO(dto/ticket): 处理记录响应缺少 detail/operator_name。
-	// 后台详情页需要展示结构化回访信息和操作人姓名，避免再发额外请求。
+	Detail     string `json:"detail"`
 	CreatedAt  string `json:"created_at"`
 }

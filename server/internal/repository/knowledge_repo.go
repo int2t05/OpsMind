@@ -157,6 +157,16 @@ func (r *KnowledgeRepo) UpdateArticleProcessStatus(id int64, processStatus, proc
 	return r.db.Model(&model.KnowledgeArticle{}).Where("id = ?", id).Updates(updates).Error
 }
 
+// UpdateArticleMetrics 更新文档的字数和分块数。
+//
+// 分块完成后由 Processor 和 Publish 路径调用，确保前端实时反映处理进度。
+func (r *KnowledgeRepo) UpdateArticleMetrics(id int64, wordCount, chunkCount int) error {
+	return r.db.Model(&model.KnowledgeArticle{}).Where("id = ?", id).Updates(map[string]interface{}{
+		"word_count":  wordCount,
+		"chunk_count": chunkCount,
+	}).Error
+}
+
 // =============================================================================
 // KnowledgeChunk
 // =============================================================================

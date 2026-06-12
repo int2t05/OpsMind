@@ -18,7 +18,7 @@ import (
 func TestPaginateScope(t *testing.T) {
 	db, err := database.Init(config.DatabaseConfig{
 		Host: "localhost", Port: 5432,
-		User: "opsmind", Password: "opsmind123",
+		User: "opsmind", Password: "opsmind_dev",
 		DBName: "opsmind_test", SSLMode: "disable",
 	})
 	if err != nil {

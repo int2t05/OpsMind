@@ -30,7 +30,7 @@ var chatSvcDB *gorm.DB
 
 func init() {
 	cfg := config.DatabaseConfig{
-		Host: "localhost", Port: 5432, User: "opsmind", Password: "opsmind123",
+		Host: "localhost", Port: 5432, User: "opsmind", Password: "opsmind_dev",
 		DBName: "opsmind_test", SSLMode: "disable",
 	}
 	db, err := database.Init(cfg)

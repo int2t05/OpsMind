@@ -13,8 +13,10 @@ type CreateKBRequest struct {
 
 // UpdateKBRequest 更新知识库请求。
 type UpdateKBRequest struct {
-	Name        string `json:"name" binding:"required"` // 知识库名称
-	Description string `json:"description"`              // 知识库描述
+	Name             string `json:"name" binding:"required"` // 知识库名称
+	Description      string `json:"description"`              // 知识库描述
+	EmbeddingModel   string `json:"embedding_model"`          // Embedding 模型名称（空则不更新）
+	VectorDimension  int    `json:"vector_dimension"`         // 向量维度（0 则不更新）
 }
 
 // CreateArticleRequest 创建知识文章请求。

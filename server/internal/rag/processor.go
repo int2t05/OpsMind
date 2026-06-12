@@ -38,6 +38,7 @@ type ProcessTask struct {
 	Key            string                                         `json:"key"`      // MinIO object key
 	FileType       string                                         `json:"file_type"` // 文件类型扩展名（用于选择解析器）
 	OnStatusChange func(articleID int64, status, errMsg string) `json:"-"`        // 状态变更回调
+	OnMetrics      func(articleID int64, wordCount, chunkCount int) `json:"-"`    // 分块后回调（写 WordCount/ChunkCount）
 }
 
 // =============================================================================
@@ -183,6 +184,10 @@ func (p *Processor) processTask(task ProcessTask) {
 	if len(chunks) == 0 {
 		p.updateStatus(task, "failed", "分块结果为空")
 		return
+	}
+	// 写回字数和分块数
+	if task.OnMetrics != nil {
+		task.OnMetrics(articleID, len([]rune(content)), len(chunks))
 	}
 
 	// 阶段 2: Embedding

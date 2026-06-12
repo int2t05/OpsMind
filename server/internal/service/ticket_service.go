@@ -345,6 +345,7 @@ func (s *TicketService) GetDetail(id int64) (*response.TicketDetailResponse, err
 			OperatorID: r.OperatorID,
 			Action:     r.Action,
 			Content:    r.Content,
+			Detail:     string(r.Detail),
 			CreatedAt:  r.CreatedAt.Format("2006-01-02 15:04:05"),
 		}
 	}

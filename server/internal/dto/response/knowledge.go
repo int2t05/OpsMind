@@ -43,11 +43,15 @@ type ArticleResponse struct {
 	Status        int16     `json:"status"`
 	StatusText    string    `json:"status_text"`
 	SourceType    int16     `json:"source_type"`
+	FileType      string    `json:"file_type"`
+	MinioPath     string    `json:"minio_path"`
 	WordCount     int       `json:"word_count"`
 	ChunkCount    int       `json:"chunk_count"`
 	ProcessStatus string    `json:"process_status"`
+	ProcessError  string    `json:"process_error"`
 	CreatedBy     int64     `json:"created_by"`
 	ReviewedBy    *int64    `json:"reviewed_by"`
+	PublishedBy   *int64    `json:"published_by"`
 	ReviewComment string    `json:"review_comment"`
 	CreatedAt     time.Time `json:"created_at"`
 	UpdatedAt     time.Time `json:"updated_at"`

@@ -41,7 +41,7 @@ func jsonEqual(t *testing.T, got datatypes.JSON, expected string) {
 func setupTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
 	dbCfg := config.DatabaseConfig{
-		Host: "localhost", Port: 5432, User: "opsmind", Password: "opsmind123",
+		Host: "localhost", Port: 5432, User: "opsmind", Password: "opsmind_dev",
 		DBName: "opsmind_test", SSLMode: "disable",
 	}
 	db, err := database.Init(dbCfg)
