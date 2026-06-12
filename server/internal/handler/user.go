@@ -48,6 +48,7 @@ func (h *UserHandler) Create(c *gin.Context) {
 //
 // GET /api/v1/admin/users/:id
 func (h *UserHandler) GetByID(c *gin.Context) {
+	// TODO(handler/user): 这里和 Update/Freeze/Restore 可复用 parseID，减少重复错误信息。
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
 		response.Error(c, errcode.ErrParam, "无效的用户 ID")
@@ -67,6 +68,7 @@ func (h *UserHandler) GetByID(c *gin.Context) {
 //
 // GET /api/v1/admin/users
 func (h *UserHandler) List(c *gin.Context) {
+	// TODO(handler/user): 复用 parsePagination，避免分页默认值和上限在多个 Handler 中漂移。
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
 	keyword := c.Query("keyword")

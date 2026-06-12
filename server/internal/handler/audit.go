@@ -27,6 +27,8 @@ func NewAuditHandler(svc *service.AuditService) *AuditHandler {
 //
 // GET /api/v1/admin/audit-logs?operator_id=1&action=user.create&page=1&page_size=10
 func (h *AuditHandler) List(c *gin.Context) {
+	// TODO(handler/audit): 支持 target_type/target_id/date_range 过滤。
+	// 审计排障常按资源维度检索，只有 operator/action 不足以定位具体对象历史。
 	var req request.AuditLogListRequest
 	if err := c.ShouldBindQuery(&req); err != nil {
 		response.Error(c, errcode.ErrParam, "参数校验失败: "+err.Error())

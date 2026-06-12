@@ -61,6 +61,8 @@ func (p *DocParser) parseTxt(reader io.Reader) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("读取文本文件失败: %w", err)
 	}
+	// TODO(rag/parser): LimitReader 到达 maxDocumentSize 时不会报错。
+	// 应检测是否还有额外字节，超限文件返回明确错误，避免静默截断文档。
 	return string(b), nil
 }
 
@@ -73,6 +75,8 @@ func (p *DocParser) parsePDF(reader io.Reader) (string, error) {
 		return "", fmt.Errorf("读取 PDF 文件失败: %w", err)
 	}
 
+	// TODO(rag/parser): 这里把 []byte 转 string 再 strings.NewReader，会破坏二进制 PDF 内容。
+	// 应使用 bytes.NewReader(b) 作为 io.ReaderAt，避免非 UTF-8 字节被转换。
 	pdfReader, err := pdf.NewReader(strings.NewReader(string(b)), int64(len(b)))
 	if err != nil {
 		return "", fmt.Errorf("打开 PDF 失败: %w", err)
@@ -161,6 +165,8 @@ type docxRun struct {
 
 // extractDocxText 从 DOCX XML 中提取所有 <w:t> 文本。
 func extractDocxText(xmlData []byte) (string, error) {
+	// TODO(rag/parser): 只读取 w:t 会丢失表格、页眉页脚、超链接和换行语义。
+	// 运维文档常包含表格步骤，后续应补充 w:tab/w:br/table 提取。
 	var doc docxDocument
 	if err := xml.Unmarshal(xmlData, &doc); err != nil {
 		return "", fmt.Errorf("解析 DOCX XML 失败: %w", err)

@@ -10,7 +10,9 @@
 package service_test
 
 import (
+	"fmt"
 	"testing"
+	"time"
 
 	"opsmind/internal/config"
 	"opsmind/internal/database"
@@ -69,20 +71,22 @@ func setupChatServiceTest(t *testing.T) (*service.ChatService, *model.KnowledgeB
 		confidence DOUBLE PRECISION DEFAULT 0, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 	)`)
 
-	// 清理旧数据
+	// 清理旧数据（按 FK 依赖逆序）
 	chatSvcDB.Exec("DELETE FROM chat_messages")
 	chatSvcDB.Exec("DELETE FROM chat_sessions")
+	chatSvcDB.Exec("DELETE FROM knowledge_chunks")
+	chatSvcDB.Exec("DELETE FROM knowledge_articles")
 	chatSvcDB.Exec("DELETE FROM knowledge_bases")
 
 	knowledgeRepo := repository.NewKnowledgeRepo(chatSvcDB)
 	chatRepo := repository.NewChatRepo(chatSvcDB)
 	svc := service.NewChatService(knowledgeRepo, chatRepo, nil, nil, nil, 5)
 
-	// 创建测试知识库
+	// 创建测试知识库（使用唯一 slug 避免冲突）
 	kb := &model.KnowledgeBase{
 		Name:             "运维知识库",
 		Description:      "测试",
-		RAGWorkspaceSlug: "ops-workspace",
+		RAGWorkspaceSlug: fmt.Sprintf("ops-workspace-%d", time.Now().UnixNano()),
 		EmbeddingModel:   "text-embedding-ada-002",
 		VectorDimension:  1536,
 		CreatedBy:        1,

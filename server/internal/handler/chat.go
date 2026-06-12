@@ -46,6 +46,7 @@ func NewChatHandler(svc *service.ChatService, llmClient adapter.LLMClient) *Chat
 //
 // POST /api/v1/portal/chat-sessions
 func (h *ChatHandler) CreateChatSession(c *gin.Context) {
+	// TODO(handler/chat): 需要把 c.Request.Context() 传入 Service，避免问答请求断开后仍继续调用 RAG/LLM。
 	var req request.CreateChatRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, errcode.ErrParam, "参数校验失败: "+err.Error())
@@ -66,6 +67,7 @@ func (h *ChatHandler) CreateChatSession(c *gin.Context) {
 //
 // POST /api/v1/portal/chat-sessions/:id/feedback
 func (h *ChatHandler) SubmitFeedback(c *gin.Context) {
+	// TODO(handler/chat): 复用 parseID，并在 Service 层校验会话归属当前用户。
 	idStr := c.Param("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
@@ -155,6 +157,8 @@ func writeSSEEvent(w gin.ResponseWriter, evt sseEvent) error {
 // Handler 层决定以 JSON 还是 SSE 交付，符合单一职责原则。
 // 通过 LLMClient.ChatCompletionStream 实现真正的 token 级流式。
 func (h *ChatHandler) StreamChatSession(c *gin.Context) {
+	// TODO(handler/chat): 当前先调用 CreateChatSession 完整生成答案，再把答案模拟/二次 LLM 流式输出。
+	// 这不是真正的端到端 token 流式，也无法实时发送 RAG step 事件；应把 RAG 和 LLM 流式编排下沉到 Service。
 	var req request.CreateChatRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, errcode.ErrParam, "参数校验失败: "+err.Error())
@@ -188,6 +192,8 @@ func (h *ChatHandler) StreamChatSession(c *gin.Context) {
 
 	// LLMClient 可用时使用真正的 token 级流式，不可用时降级到模拟流式
 	if h.llmClient != nil {
+		// TODO(handler/chat): streamWithLLM 只把用户问题发给 LLM，没有带 RAG 检索上下文。
+		// 因此流式 token 可能与 resp.Answer 的 RAG 增强答案完全不一致。
 		h.streamWithLLM(c, flusher, resp.Answer, req)
 	} else {
 		h.streamSimulated(c, flusher, resp.Answer)
@@ -207,6 +213,8 @@ func (h *ChatHandler) StreamChatSession(c *gin.Context) {
 func (h *ChatHandler) streamWithLLM(c *gin.Context, flusher http.Flusher, fallbackAnswer string, req request.CreateChatRequest) {
 	ctx := c.Request.Context()
 	streamReq := adapter.ChatRequest{
+		// TODO(handler/chat): 这里应使用当前默认 LLM 配置中的 model/max_tokens，而不是空 model + 2048。
+		// 否则不同提供商可能直接拒绝请求。
 		Messages: []adapter.ChatMessage{
 			{Role: "user", Content: req.Question},
 		},
@@ -228,6 +236,8 @@ func (h *ChatHandler) streamWithLLM(c *gin.Context, flusher http.Flusher, fallba
 		default:
 		}
 		if chunk.Error != nil || chunk.Content == "" {
+			// TODO(handler/chat): 流式 chunk.Error 被静默忽略，前端无法得知 LLM 中途失败。
+			// 应发送 type=error 事件并停止流式输出。
 			continue
 		}
 		writeSSEEvent(c.Writer, sseEvent{Type: "token", Content: chunk.Content})
@@ -242,6 +252,8 @@ func (h *ChatHandler) streamWithLLM(c *gin.Context, flusher http.Flusher, fallba
 
 // streamSimulated 降级方案：将完整答案按 rune 分块模拟流式输出。
 func (h *ChatHandler) streamSimulated(c *gin.Context, flusher http.Flusher, answer string) {
+	// TODO(handler/chat): 模拟流式的 time.Sleep 会占用请求 goroutine。
+	// 如果只剩完整答案，建议直接返回 done 或让前端自行做打字机效果。
 	runes := []rune(answer)
 	chunkSize := 5
 	rc := http.NewResponseController(c.Writer)

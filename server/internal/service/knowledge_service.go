@@ -68,6 +68,8 @@ type KnowledgeService struct {
 // repo/chunker/embedder/store/docParser/processor 可以为 nil（测试或部分功能不需要时）。
 // 直接使用具体接口类型，编译期校验传入类型。
 func NewKnowledgeService(repo knowledgeRepo, chunker knowledgeChunker, embedder knowledgeEmbedder, store adapter.VectorStore, docParser knowledgeDocParser, processor *rag.Processor) *KnowledgeService {
+	// TODO(service/knowledge): 明确哪些依赖在生产路径必须非 nil，哪些仅测试可 nil。
+	// 当前 Publish/Upload/Retry 到运行时才发现依赖缺失，启动期无法暴露装配错误。
 	return &KnowledgeService{
 		repo:      repo,
 		chunker:   chunker,
@@ -84,6 +86,8 @@ func NewKnowledgeService(repo knowledgeRepo, chunker knowledgeChunker, embedder 
 
 // CreateKB 创建知识库（仅写 PostgreSQL）。
 func (s *KnowledgeService) CreateKB(req request.CreateKBRequest, userID int64) error {
+	// TODO(service/knowledge): CreateKB 未写入 EmbeddingModel、VectorDimension、LLMConfigID。
+	// 与 docs/API/knowledge.md 的 v2 知识库模型不一致，后续发布向量时会拿到空模型配置。
 	kb := &model.KnowledgeBase{
 		Name:        req.Name,
 		Description: req.Description,
@@ -134,6 +138,8 @@ func (s *KnowledgeService) ListKBs() ([]response.KBResponse, error) {
 
 // CreateArticle 创建知识文章（草稿状态）。
 func (s *KnowledgeService) CreateArticle(req request.CreateArticleRequest, userID int64) error {
+	// TODO(service/knowledge): DTO 仍使用 question/answer，PRD/API v2 已改为 title/content/source_type。
+	// 应统一模型语言，否则前端 KnowledgeEdit 的 title/content 会和后端字段错位。
 	_, err := s.repo.FindKBByID(req.KBID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -157,6 +163,8 @@ func (s *KnowledgeService) CreateArticle(req request.CreateArticleRequest, userI
 
 // UpdateArticle 更新文章（仅草稿/驳回状态可编辑）。
 func (s *KnowledgeService) UpdateArticle(id int64, req request.UpdateArticleRequest, userID int64) error {
+	// TODO(service/knowledge): userID 参数当前未使用。
+	// 如果需要审计或作者权限校验，应在这里使用；否则从签名移除避免误导调用方。
 	article, err := s.repo.FindArticleByID(id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -165,6 +173,8 @@ func (s *KnowledgeService) UpdateArticle(id int64, req request.UpdateArticleRequ
 		return err
 	}
 	if article.Status != 1 && article.Status != 5 {
+		// TODO(service/knowledge): 这里的 5 被当作驳回，但 enums.go 中 ArticleStatusRejected=5，API 文档中驳回=6。
+		// 应统一状态枚举，避免前后端对文章生命周期理解不一致。
 		return errcode.AppError{Code: errcode.ErrParam, Message: "仅草稿和驳回状态可编辑"}
 	}
 	article.Question = req.Question
@@ -233,6 +243,8 @@ func (s *KnowledgeService) Review(id int64, reviewerID int64, req request.Review
 //  6. 更新文章状态为已发布 status=4
 func (s *KnowledgeService) Publish(id int64, publisherID int64) error {
 	if s.chunker == nil || s.embedder == nil || s.store == nil {
+		// TODO(service/knowledge): 管道未初始化应映射为 ErrRAGUnavailable，而不是 ErrUnknown。
+		// 调用方可以据此展示“RAG 服务不可用”并触发运维排查。
 		return errcode.AppError{Code: errcode.ErrUnknown, Message: "管道未初始化（chunker/embedder/store 为空）"}
 	}
 
@@ -244,10 +256,14 @@ func (s *KnowledgeService) Publish(id int64, publisherID int64) error {
 		return err
 	}
 	if article.Status != 3 {
+		// TODO(service/knowledge): status=3 在 enums.go 表示已发布，但这里被当作审核通过。
+		// 需要增加 ArticleStatusApproved 或调整现有枚举，避免发布逻辑和状态文案冲突。
 		return errcode.AppError{Code: errcode.ErrParam, Message: "仅已审核通过的文章可发布"}
 	}
 
 	// Step 1: 分块
+	// TODO(service/knowledge): 应将标题和正文一起进入分块，例如 title + "\n\n" + content。
+	// 只对 Answer 分块会丢失标题语义，影响短问答类知识的召回。
 	content := article.Answer
 	chunks := s.chunker.Split(content)
 	if len(chunks) == 0 {
@@ -255,6 +271,8 @@ func (s *KnowledgeService) Publish(id int64, publisherID int64) error {
 	}
 
 	// Step 2: Embedding
+	// TODO(service/knowledge): 使用 context.Background 会忽略 HTTP 请求取消和超时。
+	// Publish 应接收 ctx，由 Handler 传入 c.Request.Context()，避免用户断开后继续消耗 LLM/DB 资源。
 	ctx := context.Background()
 	vectors, dimension, err := s.embedder.Embed(ctx, chunks)
 	if err != nil {
@@ -265,6 +283,8 @@ func (s *KnowledgeService) Publish(id int64, publisherID int64) error {
 	}
 
 	// Step 3: 清除旧向量
+	// TODO(service/knowledge): DeleteByArticle 和 BatchInsert 应处于同一事务或采用先写临时版本再切换。
+	// 当前先删后写失败会导致已发布文章丢失全部向量。
 	if err := s.store.DeleteByArticle(ctx, id); err != nil {
 		return errcode.AppError{Code: errcode.ErrRAGUnavailable, Message: "清除旧向量失败: " + err.Error()}
 	}
@@ -283,6 +303,8 @@ func (s *KnowledgeService) Publish(id int64, publisherID int64) error {
 		}
 	}
 	if err := s.store.BatchInsert(ctx, vc); err != nil {
+		// TODO(service/knowledge): 发布失败时应按 API 文档写 process_status=failed/process_error。
+		// 当前只返回错误，文章状态和错误原因不会持久化，前端无法展示可重试原因。
 		return errcode.AppError{Code: errcode.ErrRAGUnavailable, Message: "写入向量失败: " + err.Error()}
 	}
 
@@ -294,6 +316,8 @@ func (s *KnowledgeService) Publish(id int64, publisherID int64) error {
 
 // Disable 停用文章——从 pgvector 删除向量并更新状态。
 func (s *KnowledgeService) Disable(id int64) error {
+	// TODO(service/knowledge): Disable 未校验当前状态是否为已发布。
+	// 草稿/驳回文章停用会让状态机绕过审核流程。
 	article, err := s.repo.FindArticleByID(id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -304,6 +328,8 @@ func (s *KnowledgeService) Disable(id int64) error {
 
 	// 从 pgvector 删除向量（如果有 vector store）
 	if s.store != nil {
+		// TODO(service/knowledge): Disable 使用 context.Background，同样应接收请求 ctx。
+		// 向量删除是外部 I/O，必须可取消并受超时控制。
 		ctx := context.Background()
 		if err := s.store.DeleteByArticle(ctx, id); err != nil {
 			return errcode.AppError{Code: errcode.ErrRAGUnavailable, Message: "删除向量失败: " + err.Error()}
@@ -316,6 +342,8 @@ func (s *KnowledgeService) Disable(id int64) error {
 
 // Enable 恢复已停用文章为草稿状态。
 func (s *KnowledgeService) Enable(id int64) error {
+	// TODO(service/knowledge): docs/API 要求启用停用文章后重新分块→embedding→写入向量并恢复发布。
+	// 当前只把状态改回草稿，行为和接口文档不一致。
 	article, err := s.repo.FindArticleByID(id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -336,6 +364,8 @@ func (s *KnowledgeService) Enable(id int64) error {
 
 // ListArticles 分页查询文章列表。
 func (s *KnowledgeService) ListArticles(kbID int64, status int, page, pageSize int) (*response.ArticleListResponse, error) {
+	// TODO(service/knowledge): source_type/process_status 筛选未实现。
+	// API 文档已经定义这些查询参数，后端忽略会导致后台列表筛选失效。
 	articles, total, err := s.repo.ListArticles(kbID, status, page, pageSize)
 	if err != nil {
 		return nil, err
@@ -343,7 +373,6 @@ func (s *KnowledgeService) ListArticles(kbID int64, status int, page, pageSize i
 
 	result := make([]response.ArticleResponse, len(articles))
 	for i, a := range articles {
-		syncStatus := getAggregateSyncStatus(&a)
 		result[i] = response.ArticleResponse{
 			ID:            a.ID,
 			KBID:          a.KBID,
@@ -357,7 +386,6 @@ func (s *KnowledgeService) ListArticles(kbID int64, status int, page, pageSize i
 			CreatedBy:     a.CreatedBy,
 			ReviewedBy:    a.ReviewedBy,
 			ReviewComment: a.ReviewComment,
-			SyncStatus:    syncStatus,
 			CreatedAt:     a.CreatedAt,
 			UpdatedAt:     a.UpdatedAt,
 		}
@@ -371,6 +399,8 @@ func (s *KnowledgeService) ListArticles(kbID int64, status int, page, pageSize i
 
 // GetArticleDetail 获取文章详情。
 func (s *KnowledgeService) GetArticleDetail(id int64) (*response.ArticleDetailResponse, error) {
+	// TODO(service/knowledge): 详情响应仍返回 sync_status/sync_error/synced_at。
+	// v2 文档已移除 AnythingLLM 同步概念，应改为 process_status/process_error/chunk_index。
 	article, err := s.repo.FindArticleByID(id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -388,18 +418,12 @@ func (s *KnowledgeService) GetArticleDetail(id int64) (*response.ArticleDetailRe
 	for i, c := range chunks {
 		chunkResponses[i] = response.ChunkResponse{
 			ID:              c.ID,
+			KBID:            c.KBID,
 			Content:         c.Content,
+			ChunkIndex:      c.ChunkIndex,
 			EmbeddingModel:  c.EmbeddingModel,
 			VectorDimension: c.VectorDimension,
-			SyncStatus:      c.SyncStatus,
-			SyncError:       c.SyncError,
-			SyncedAt:        c.SyncedAt,
 		}
-	}
-
-	syncStatus := "none"
-	if len(chunks) > 0 {
-		syncStatus = chunks[0].SyncStatus
 	}
 
 	return &response.ArticleDetailResponse{
@@ -416,7 +440,6 @@ func (s *KnowledgeService) GetArticleDetail(id int64) (*response.ArticleDetailRe
 			CreatedBy:     article.CreatedBy,
 			ReviewedBy:    article.ReviewedBy,
 			ReviewComment: article.ReviewComment,
-			SyncStatus:    syncStatus,
 			CreatedAt:     article.CreatedAt,
 			UpdatedAt:     article.UpdatedAt,
 		},
@@ -432,6 +455,8 @@ func (s *KnowledgeService) GetArticleDetail(id int64) (*response.ArticleDetailRe
 //
 // fileSize 用于大小上限校验（最大 50MB），fileType 用于格式白名单校验。
 func (s *KnowledgeService) UploadDocuments(kbID int64, userID int64, filename string, fileType string, fileSize int64, content io.Reader) (*model.KnowledgeArticle, error) {
+	// TODO(service/knowledge): 上传流程当前没有使用 StorageClient/MinIO，直接解析 multipart 内容。
+	// 与 PRD 的“上传到对象存储后异步解析”不一致，服务重启后也无法重试原始文件。
 	// 格式白名单校验
 	allowedTypes := map[string]bool{"pdf": true, "docx": true, "md": true, "txt": true}
 	if !allowedTypes[fileType] {
@@ -439,6 +464,8 @@ func (s *KnowledgeService) UploadDocuments(kbID int64, userID int64, filename st
 	}
 
 	// 文件大小上限校验
+	// TODO(service/knowledge): API 文档写单文件最大 20MB，这里实际限制 50MB。
+	// 应统一前后端提示、后端校验和文档约束。
 	const maxSize = 50 * 1024 * 1024
 	if fileSize > maxSize {
 		return nil, errcode.AppError{Code: errcode.ErrParam, Message: "文件大小超过限制（最大 50MB）"}
@@ -452,6 +479,8 @@ func (s *KnowledgeService) UploadDocuments(kbID int64, userID int64, filename st
 	if err != nil {
 		return nil, errcode.AppError{Code: errcode.ErrParam, Message: "文档解析失败: " + err.Error()}
 	}
+	// TODO(service/knowledge): 解析在 HTTP 请求内同步完成，较大 PDF/DOCX 会阻塞上传接口。
+	// 更符合设计的做法是先落对象存储和 pending 记录，再由 Processor 异步下载解析。
 	if strings.TrimSpace(text) == "" {
 		return nil, errcode.AppError{Code: errcode.ErrParam, Message: "文档内容为空"}
 	}
@@ -469,6 +498,8 @@ func (s *KnowledgeService) UploadDocuments(kbID int64, userID int64, filename st
 	}
 
 	if s.processor != nil {
+		// TODO(service/knowledge): Processor 回调只更新 status 数字，丢弃 errMsg。
+		// 需要持久化 process_error，前端才能展示失败原因和重试指导。
 		task := rag.ProcessTask{
 			ArticleID: article.ID,
 			KBID:      kbID,
@@ -496,6 +527,8 @@ func (s *KnowledgeService) GetDocumentStatus(articleID int64) (string, error) {
 
 // RetryDocument 重试文档处理（重新入队）。
 func (s *KnowledgeService) RetryDocument(articleID int64) error {
+	// TODO(service/knowledge): RetryDocument 未校验当前处理状态是否 failed。
+	// 非失败状态重复入队可能造成同一文章重复写入向量分块。
 	article, err := s.repo.FindArticleByID(articleID)
 	if err != nil {
 		return errcode.AppError{Code: errcode.ErrNotFound, Message: "文章不存在"}
@@ -523,6 +556,8 @@ func (s *KnowledgeService) RetryDocument(articleID int64) error {
 // =============================================================================
 
 func marshalTags(tags []string) datatypes.JSON {
+	// TODO(service/knowledge): tags 应 trim、去重、限制数量和单个长度。
+	// 标签直接写入 JSONB 会让前端和检索筛选承受脏数据。
 	if len(tags) == 0 {
 		return datatypes.JSON(`[]`)
 	}
@@ -561,19 +596,10 @@ func statusText(status int16) string {
 	}
 }
 
-func getAggregateSyncStatus(article *model.KnowledgeArticle) string {
-	switch article.Status {
-	case 4:
-		return "synced"
-	case 0:
-		return "disabled"
-	default:
-		return "pending"
-	}
-}
-
 // mapProcessStatus 将 Processor 阶段映射为文章状态。
 func mapProcessStatus(status string) int {
+	// TODO(service/knowledge): 用文章 status 承载文档处理进度会混淆“审核状态”和“处理状态”两个状态机。
+	// 模型应增加 process_status/process_error 字段，保持两个生命周期独立。
 	switch status {
 	case "chunking", "embedding", "indexing":
 		return 1

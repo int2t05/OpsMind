@@ -154,6 +154,7 @@ func TestRoleHandler_List_Success(t *testing.T) {
 func TestRoleHandler_Update_Success(t *testing.T) {
 	h := setupRoleHandler(t)
 	r := setupRoleRouter(h)
+	roleHandlerDB.Where("name = ?", "test_handler_role_updated").Delete(&model.Role{})
 	role := seedHandlerRole(t, "test_handler_role_update")
 
 	body := `{"name":"test_handler_role_updated","description":"已更新","permissions":["ticket:read","ticket:write"]}`

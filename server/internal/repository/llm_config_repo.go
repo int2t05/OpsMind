@@ -45,6 +45,8 @@ func (r *LlmConfigRepo) FindByID(id int64) (*model.LlmConfig, error) {
 
 // FindDefault 查询默认配置。
 func (r *LlmConfigRepo) FindDefault() (*model.LlmConfig, error) {
+	// TODO(repository/llm_config): 数据库层应增加唯一约束保证最多一个 is_default=true。
+	// 仅靠 Service ClearDefault 在并发请求下仍可能短暂产生多个默认配置。
 	var cfg model.LlmConfig
 	err := r.db.Where("is_default = ?", true).First(&cfg).Error
 	if err != nil {

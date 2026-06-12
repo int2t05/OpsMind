@@ -49,6 +49,8 @@ func (m *LLMConfigManager) GetConfig() *model.LlmConfig {
 
 // store 原子替换当前配置。
 func (m *LLMConfigManager) store(cfg *model.LlmConfig) {
+	// TODO(service/llm_config): store 前应复制 cfg，避免调用方后续修改同一指针导致热配置被意外改变。
+	// atomic.Value 只保证指针替换原子，不保证指向对象不可变。
 	m.current.Store(cfg)
 }
 
@@ -98,6 +100,8 @@ func NewLLMConfigService(repo interface{}) *LLMConfigService {
 	case llmConfigRepo:
 		svc.repo = r
 	default:
+		// TODO(service/llm_config): 构造函数不应 panic，建议返回 (*LLMConfigService, error)。
+		// 启动装配错误应由 main 统一记录并退出，测试也更容易断言。
 		panic("NewLLMConfigService: unsupported repo type")
 	}
 
@@ -122,6 +126,8 @@ func (s *LLMConfigService) GetManager() *LLMConfigManager {
 //
 // 业务规则：is_default=true 时先清空其他默认配置（保证唯一性）。
 func (s *LLMConfigService) CreateConfig(name string, providerType int16, baseURL, embeddingBaseURL, apiKey, llmModel, embeddingModel string, maxTokens, vectorDimension int, isDefault bool) error {
+	// TODO(service/llm_config): 校验 providerType、baseURL URL 格式、maxTokens/vectorDimension 范围。
+	// 目前非法配置可写入数据库，直到问答时才暴露为外部服务错误。
 	if strings.TrimSpace(name) == "" {
 		return AppError{Code: errcode.ErrParam, Message: "名称不能为空"}
 	}
@@ -142,6 +148,8 @@ func (s *LLMConfigService) CreateConfig(name string, providerType int16, baseURL
 	// ClearDefault + Create 包裹在事务中，保证默认配置唯一性约束不被破坏
 	if s.db != nil && isDefault {
 		err := s.db.Transaction(func(tx *gorm.DB) error {
+			// TODO(service/llm_config): 事务内仍调用 s.repo，真实 repo 持有的是原始 db 而不是 tx。
+			// ClearDefault/Create 可能没有进入同一个事务，应创建 txRepo 或让 repo 方法接收 tx。
 			if err := s.repo.ClearDefault(); err != nil {
 				return AppError{Code: errcode.ErrUnknown, Message: "清空默认配置失败"}
 			}
@@ -163,6 +171,8 @@ func (s *LLMConfigService) CreateConfig(name string, providerType int16, baseURL
 
 	// 新默认配置立即生效
 	if isDefault {
+		// TODO(service/llm_config): 默认配置切换后只更新 Manager 中的 model 配置，没有重建 LLM/Embedding 客户端。
+		// ChatService/Handler 注入的 llmClient 仍指向启动时 baseURL，热替换没有真正覆盖 HTTP 目标。
 		s.manager.store(cfg)
 	}
 
@@ -173,6 +183,8 @@ func (s *LLMConfigService) CreateConfig(name string, providerType int16, baseURL
 //
 // 更新为默认时先清空其他默认，更新后立即热替换。
 func (s *LLMConfigService) UpdateConfig(cfg *model.LlmConfig) error {
+	// TODO(service/llm_config): 更新时 api_key 为空应保留原密钥的规则在 API 文档中存在，但这里会覆盖为空。
+	// 需要先读旧配置并区分“不传”“传空字符串清空”两种语义。
 	// ClearDefault + Update 包裹在事务中
 	if s.db != nil && cfg.IsDefault {
 		err := s.db.Transaction(func(tx *gorm.DB) error {
@@ -242,6 +254,8 @@ func (s *LLMConfigService) GetConfig(id int64) (*model.LlmConfig, error) {
 //
 // 业务规则：不允许删除默认配置。
 func (s *LLMConfigService) DeleteConfig(id int64) error {
+	// TODO(service/llm_config): 删除前应检查 knowledge_bases 是否引用该配置。
+	// 否则知识库可能保留悬空 llm_config_id，后续发布或问答找不到模型参数。
 	cfg, err := s.repo.FindByID(id)
 	if err != nil {
 		return AppError{Code: errcode.ErrNotFound, Message: "LLM 配置不存在"}
@@ -292,6 +306,8 @@ func (r LlmConfigResponse) MarshalJSON() ([]byte, error) {
 //
 // 规则：显示前 4 位 + **** + 后 4 位，长度 ≤ 8 时全部替换为 ****。
 func maskAPIKey(key string) string {
+	// TODO(service/llm_config): 对不同供应商的 key 做更细粒度脱敏。
+	// 例如 sk- 前缀保留能帮助识别供应商，但也要避免短 key 泄露过多信息。
 	if key == "" {
 		return ""
 	}

@@ -24,6 +24,8 @@ import (
 // history 为最近 N 轮对话（每轮含 role/content），用于上下文消歧。
 // LLM 调用失败时降级返回原始 query。
 func QueryRewrite(ctx context.Context, llm adapter.LLMClient, query string, history []map[string]string) (string, error) {
+	// TODO(rag/query_rewrite): llm 为 nil 时应直接降级返回 query。
+	// 让辅助步骤天然可选，避免测试或纯检索模式下出现 nil pointer。
 	// 构造 prompt
 	systemMsg := "你是一个查询改写助手。将用户的口语化问题改写为更适合知识库检索的正式查询。只输出改写后的查询文本，不要添加解释。"
 	userMsg := fmt.Sprintf("原始查询：%s", query)

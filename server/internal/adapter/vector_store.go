@@ -92,6 +92,8 @@ type PgvectorStore struct {
 //
 // dsn 格式：postgres://user:password@host:port/dbname?sslmode=disable
 func NewPgvectorStore(dsn string) (*PgvectorStore, error) {
+	// TODO(adapter/vector): PgvectorStore 应配置连接池并暴露 Close()。
+	// 当前单独 sql.DB 不会在 main 优雅关闭时关闭，连接池参数也和 GORM DB 不一致。
 	db, err := sql.Open("pgx", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("连接 pgvector 失败: %w", err)
@@ -117,6 +119,8 @@ func (s *PgvectorStore) BatchInsert(ctx context.Context, chunks []VectorChunk) e
 	if len(chunks) == 0 {
 		return nil
 	}
+	// TODO(adapter/vector): 批量 INSERT 应校验每个 chunk 的向量维度一致且等于 VectorDimension。
+	// 维度不匹配会到 pgvector 层才失败，错误定位不够清晰。
 
 	// 构建批量 INSERT
 	query := `INSERT INTO knowledge_chunks
@@ -158,6 +162,8 @@ func (s *PgvectorStore) BatchInsert(ctx context.Context, chunks []VectorChunk) e
 //
 // <=> 算子返回余弦距离（越小越相似），1 - distance 转换为相似度分数。
 func (s *PgvectorStore) CosineSearch(ctx context.Context, kbID int64, embedding []float32, topK int) ([]SearchResult, error) {
+	// TODO(adapter/vector): topK 应限制范围并处理 embedding 为空。
+	// 空向量或过大的 LIMIT 会产生数据库错误或拖慢检索。
 	query := `SELECT id, article_id, content, chunk_index,
 		1 - (embedding <=> $1::halfvec) AS score
 		FROM knowledge_chunks
@@ -256,6 +262,8 @@ func float32ToPgVector(v []float32) string {
 	if len(v) == 0 {
 		return "[]"
 	}
+	// TODO(adapter/vector): 使用 fmt.Sprintf("%.6f") 会损失 embedding 精度。
+	// halfvec 已经会量化，字符串阶段再截断可能进一步影响召回质量。
 	var b strings.Builder
 	b.WriteByte('[')
 	for i, f := range v {

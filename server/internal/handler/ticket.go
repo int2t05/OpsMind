@@ -57,6 +57,7 @@ func (h *TicketHandler) CreateTicket(c *gin.Context) {
 func (h *TicketHandler) ListByUser(c *gin.Context) {
 	userID, _ := getCurrentUserID(c)
 
+	// TODO(handler/ticket): 复用 parsePagination，避免和其他列表端点的分页规则不一致。
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
 	if page < 1 {
@@ -134,6 +135,8 @@ func (h *TicketHandler) ListAll(c *gin.Context) {
 // GET /api/v1/admin/tickets/:id
 // GET /api/v1/portal/tickets/:id
 func (h *TicketHandler) GetDetail(c *gin.Context) {
+	// TODO(handler/ticket): 门户端和后台共用 GetDetail，但没有区分权限范围。
+	// 门户端应只能看自己的 ticket，后台可看全部，建议拆分 Service 方法或传入 currentUser。
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
 		response.Error(c, errcode.ErrParam, "无效的申告 ID")
@@ -211,6 +214,8 @@ func (h *TicketHandler) AddRecord(c *gin.Context) {
 // 该操作的本质是将申告处理经验转化为知识，操作入口是申告详情页，
 // 放在 TicketHandler 更符合用户操作路径。
 func (h *TicketHandler) CreateKnowledgeCandidate(c *gin.Context) {
+	// TODO(handler/ticket): 这里跨 Handler 直接调用 KnowledgeService 创建文章，缺少事务和审计记录。
+	// 建议在 Service 层提供“从申告生成知识候选”用例，集中处理状态和审计。
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
 		response.Error(c, errcode.ErrParam, "无效的申告 ID")

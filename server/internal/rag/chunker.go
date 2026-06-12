@@ -54,6 +54,8 @@ func NewChunker(chunkSize, chunkOverlap int) *Chunker {
 //
 // 空字符串返回空切片。
 func (c *Chunker) Split(text string) []string {
+	// TODO(rag/chunker): 分块前应做文本归一化，如统一换行、去除连续空白、保留 Markdown 标题层级。
+	// 这会提升 BM25 分词质量和 embedding 稳定性。
 	if len(text) == 0 {
 		return nil
 	}
@@ -139,6 +141,8 @@ func (c *Chunker) splitByRunes(text string) []string {
 // 为什么需要合并：递归分割可能产生很多小块（特别是按句号分割时），
 // 合并后可以控制在 chunkSize 附近，减少 embedding API 调用次数。
 func (c *Chunker) mergeSplits(splits []string) []string {
+	// TODO(rag/chunker): mergeSplits 没有实现 chunkOverlap，只有字符级硬切分才有重叠。
+	// 段落/句子级分块同样需要 overlap，否则边界信息仍可能丢失。
 	if len(splits) <= 1 {
 		return splits
 	}

@@ -69,18 +69,16 @@ func TestKnowledgeArticle_Fields(t *testing.T) {
 	}
 }
 
-// TestKnowledgeChunk_Fields 验证 KnowledgeChunk 模型字段与 TECH.md §4.2 knowledge_chunks 表定义一致。
-//
-// 注意：Embedding 字段已移除——RAG 检索由 AnythingLLM LanceDB 承担，
-// knowledge_chunks 表仅记录 AnythingLLM 同步状态。
+// TestKnowledgeChunk_Fields 验证 KnowledgeChunk 模型字段与 v2 schema 一致。
 func TestKnowledgeChunk_Fields(t *testing.T) {
 	now := time.Now()
 	chunk := model.KnowledgeChunk{
 		ArticleID:       1,
+		KBID:            1,
 		Content:         "OA系统登录问题",
+		ChunkIndex:      2,
 		EmbeddingModel:  "text-embedding-3-small",
 		VectorDimension: 3,
-		SyncStatus:      model.ChunkSyncPending,
 		CreatedAt:       now,
 	}
 	chunk.ID = 1
@@ -88,8 +86,11 @@ func TestKnowledgeChunk_Fields(t *testing.T) {
 	if chunk.ArticleID != 1 {
 		t.Errorf("ArticleID = %d, 期望 1", chunk.ArticleID)
 	}
-	if chunk.SyncStatus != model.ChunkSyncPending {
-		t.Errorf("SyncStatus = %q, 期望 %q", chunk.SyncStatus, model.ChunkSyncPending)
+	if chunk.KBID != 1 {
+		t.Errorf("KBID = %d, 期望 1", chunk.KBID)
+	}
+	if chunk.ChunkIndex != 2 {
+		t.Errorf("ChunkIndex = %d, 期望 2", chunk.ChunkIndex)
 	}
 	if chunk.VectorDimension != 3 {
 		t.Errorf("VectorDimension = %d, 期望 3", chunk.VectorDimension)

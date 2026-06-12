@@ -54,6 +54,8 @@ type Processor struct {
 //
 // poolSize 为 worker goroutine 数量，建议 2-4。
 func NewProcessor(parser *DocParser, chunker *Chunker, embedder *Embedder, store adapter.VectorStore, poolSize int) *Processor {
+	// TODO(rag/processor): 构造时校验 parser/chunker/embedder/store 非 nil。
+	// 现在 worker 到 processTask 才会 panic，问题会以后台 goroutine 崩溃形式出现。
 	if poolSize <= 0 {
 		poolSize = 2
 	}
@@ -82,6 +84,8 @@ func NewProcessor(parser *DocParser, chunker *Chunker, embedder *Embedder, store
 // 任务进入缓冲队列后立即返回，不等待处理完成。
 // 队列满时返回 error，调用方可据此重试或向客户端返回错误。
 func (p *Processor) Submit(task ProcessTask) error {
+	// TODO(rag/processor): Stop 后 Submit 会向已关闭 channel 发送并 panic。
+	// 需要引入 stopped 标志或用 recover 转换为 error。
 	select {
 	case p.taskCh <- task:
 		return nil
@@ -99,6 +103,8 @@ func (p *Processor) Submit(task ProcessTask) error {
 // 先 cancel context（中断正在进行的 I/O），关闭任务通道（不再接收新任务），
 // 然后等待所有 worker 完成当前任务后退出。
 func (p *Processor) Stop() {
+	// TODO(rag/processor): Stop 不是幂等的，重复调用 close(taskCh) 会 panic。
+	// Scheduler/HTTP 优雅关闭多处调用时需要保证安全。
 	p.cancel() // 先中断所有进行中的 I/O 操作
 	close(p.taskCh)
 	p.wg.Wait()
@@ -120,6 +126,8 @@ func (p *Processor) worker(id int) {
 func (p *Processor) processTask(task ProcessTask) {
 	ctx := p.ctx
 	articleID := task.ArticleID
+	// TODO(rag/processor): ProcessTask.Content 已经是解析后的文本，parser 字段未使用。
+	// 如果目标是异步解析 MinIO 文件，task 应携带 bucket/key/fileType 并在 worker 中调用 parser。
 
 	// 阶段 1: 分块
 	p.updateStatus(task, "chunking", "")
@@ -157,6 +165,8 @@ func (p *Processor) processTask(task ProcessTask) {
 	}
 
 	// 阶段 3: 写入 pgvector
+	// TODO(rag/processor): 这里重复 updateStatus("indexing")，前端进度可能收到两次相同阶段。
+	// 保留一个即可，另一个可改为更细的 batch 写入进度。
 	// 注意：这里不执行 DeleteByArticle——避免「先删后写失败导致数据丢失」。
 	// 旧向量由调用方（Service 层）在重新发布时负责清理。
 	p.updateStatus(task, "indexing", "")

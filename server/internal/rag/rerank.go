@@ -38,6 +38,8 @@ func Rerank(ctx context.Context, llm adapter.LLMClient, query string, candidates
 
 	var docList strings.Builder
 	for i, c := range candidates {
+		// TODO(rag/rerank): 候选内容直接拼进 prompt，没有长度裁剪。
+		// 长 chunk 或候选过多会超过模型上下文，应按 token 预算截断。
 		fmt.Fprintf(&docList, "[%d] %s\n", i+1, c.Content)
 	}
 
@@ -88,6 +90,8 @@ func Rerank(ctx context.Context, llm adapter.LLMClient, query string, candidates
 //
 // 支持格式："3,1,2"、"[3,1,2]"、"3 1 2" 等。
 func parseRankOrder(response string, maxIdx int) []int {
+	// TODO(rag/rerank): parseRankOrder 未去重，LLM 输出重复编号会让后续补齐逻辑处理更多异常。
+	// 可在解析阶段去重并保留首次出现顺序。
 	// 清理响应
 	s := strings.TrimSpace(response)
 	s = strings.Trim(s, "[]")

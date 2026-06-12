@@ -102,7 +102,7 @@ func TestAutoMigrate_KnowledgeChunksColumns(t *testing.T) {
 		t.Fatalf("AutoMigrate() 失败: %v", err)
 	}
 
-	expectedColumns := []string{"article_id", "content", "embedding_model", "vector_dimension", "sync_status"}
+	expectedColumns := []string{"article_id", "kb_id", "content", "chunk_index", "embedding_model", "vector_dimension"}
 	for _, col := range expectedColumns {
 		if !db.Migrator().HasColumn(&model.KnowledgeChunk{}, col) {
 			t.Errorf("knowledge_chunks 表缺少列 %s", col)

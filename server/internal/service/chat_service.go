@@ -85,6 +85,8 @@ func NewChatService(knowledgeRepo chatKnowledgeRepo, chatRepo chatSessionRepo, p
 //  3. LLMClient.ChatCompletion 生成答案
 //  4. 保存会话
 func (s *ChatService) CreateChatSession(req request.CreateChatRequest, userID int64) (*ChatSessionResponse, error) {
+	// TODO(service/chat): 接收 context.Context 参数，避免 context.Background 让请求取消无法传播到 RAG/LLM/DB。
+	// SSE 和非流式问答都应使用 c.Request.Context() 作为根上下文。
 	if strings.TrimSpace(req.Question) == "" {
 		return nil, errcode.AppError{Code: errcode.ErrParam, Message: "问题不能为空"}
 	}
@@ -98,6 +100,8 @@ func (s *ChatService) CreateChatSession(req request.CreateChatRequest, userID in
 	}
 
 	start := time.Now()
+	// TODO(service/chat): 60s 超时应配置化，并按 RAG 检索和 LLM 生成拆分预算。
+	// 当前一个 timeout 覆盖全部步骤，长生成可能挤占检索时间，短查询也无法快速失败。
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
@@ -106,6 +110,8 @@ func (s *ChatService) CreateChatSession(req request.CreateChatRequest, userID in
 	if s.pipeline != nil {
 		// RAG 选项从 ChatService.defaultTopK 读取（源自配置 AI_DEFAULT_TOP_K）。
 		// 各步骤开关当前默认开启，后续可按知识库粒度或请求级覆盖。
+		// TODO(service/chat): req.RAGOptions 被忽略，前端高级设置不会真正影响后端管道。
+		// 应将 request.RAGOptions 映射到 rag.RAGOptions，并对 TopK/RouteCount/RerankCount 做范围校验。
 		result, pipeErr := s.pipeline.Execute(ctx, req.Question, req.KBID, rag.RAGOptions{
 			TopK:         s.defaultTopK,
 			QueryRewrite: true,
@@ -128,6 +134,8 @@ func (s *ChatService) CreateChatSession(req request.CreateChatRequest, userID in
 		llmAnswer = "暂未找到足够匹配的知识，建议提交申告由运维人员人工处理。"
 		canSubmit = true
 	} else if s.llmClient != nil {
+		// TODO(service/chat): 最终答案生成和 Handler.streamWithLLM 会各调用一次 LLM。
+		// 应让 Service 暴露一个流式生成入口，避免先完整生成再重复流式生成导致答案不一致和成本翻倍。
 		// Step 2: 构造带上下文的 prompt
 		// 注意：system prompt 当前为全局默认值。后续可在知识库或 LLM 配置中
 		// 增加 prompt_template 字段，支持按知识库定制角色设定。
@@ -159,6 +167,8 @@ func (s *ChatService) CreateChatSession(req request.CreateChatRequest, userID in
 			Temperature: 0.3,
 		})
 		if llmErr != nil {
+			// TODO(service/chat): LLM 生成失败按 API 文档应返回 ErrAIUnavailable，而不是保存兜底答案为成功会话。
+			// 需要区分“低置信度兜底”和“核心路径失败”两类场景。
 			llmAnswer = "AI 服务不可用，请稍后重试或提交申告。"
 			canSubmit = true
 		} else {
@@ -188,6 +198,8 @@ func (s *ChatService) CreateChatSession(req request.CreateChatRequest, userID in
 			}
 		}
 	}
+	// TODO(service/chat): 使用 RRF/BM25 原始分数直接和 0.6 阈值比较不可靠。
+	// 应对不同检索来源做分数归一化或引入独立 confidence 估计，否则 can_submit_ticket 判断会漂移。
 	session := &model.ChatSession{
 		UserID:     userID,
 		KBID:       req.KBID,
@@ -197,6 +209,8 @@ func (s *ChatService) CreateChatSession(req request.CreateChatRequest, userID in
 		DurationMs: durationMS,
 	}
 	if s.chatRepo != nil {
+		// TODO(service/chat): sources 和 chat_messages 没有持久化。
+		// GetChatDetail 读取 session.Sources，但创建会话时未写入来源，历史详情会缺少引用证据。
 		if err := s.chatRepo.Create(session); err != nil {
 			return nil, errcode.AppError{Code: errcode.ErrUnknown, Message: "保存会话失败"}
 		}
@@ -218,6 +232,8 @@ func (s *ChatService) CreateChatSession(req request.CreateChatRequest, userID in
 
 // SubmitFeedback 提交问答反馈。
 func (s *ChatService) SubmitFeedback(sessionID int64, feedback int16) error {
+	// TODO(service/chat): 校验 feedback 只能是 0/1/2 的规则应放在 Service 层。
+	// Handler 已校验但其他调用方或测试替身仍可能绕过。
 	if s.chatRepo == nil {
 		return errcode.AppError{Code: errcode.ErrUnknown, Message: "服务未初始化"}
 	}
@@ -233,6 +249,8 @@ func (s *ChatService) SubmitFeedback(sessionID int64, feedback int16) error {
 
 // GetChatDetail 查询问答会话详情。
 func (s *ChatService) GetChatDetail(sessionID int64) (*response.ChatSessionResponse, error) {
+	// TODO(service/chat): GetChatDetail 未校验 session.UserID，门户端用户可查询他人的会话 ID。
+	// 应接收 currentUserID 或拆分 Admin/Portal 查询接口。
 	if s.chatRepo == nil {
 		return nil, errcode.AppError{Code: errcode.ErrUnknown, Message: "服务未初始化"}
 	}

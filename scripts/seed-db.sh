@@ -13,7 +13,7 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-SEED_SQL="$PROJECT_ROOT/server/migrations/seed.sql"
+SEED_SQL="$PROJECT_ROOT/server/migrations/001_init.sql"
 RESET_SQL="$SCRIPT_DIR/reset-db.sql"
 
 cd "$PROJECT_ROOT"

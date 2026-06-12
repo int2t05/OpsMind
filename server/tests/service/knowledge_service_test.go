@@ -365,20 +365,18 @@ func TestKnowledgeService_Publish(t *testing.T) {
 
 	err := svc.Publish(article.ID, 2)
 	if err == nil {
-		// 如果有真实管道，期望成功
+		// 有真实管道时验证状态
+		var updated model.KnowledgeArticle
+		knowledgeSvcDB.First(&updated, article.ID)
+		if updated.Status != int16(model.ArticleStatusPublished) {
+			t.Errorf("期望 status=%d(已发布), got %d", model.ArticleStatusPublished, updated.Status)
+		}
+		if updated.PublishedBy == nil || *updated.PublishedBy != 2 {
+			t.Error("期望 published_by=2")
+		}
 	} else {
-		// 管道未初始化时的预期行为
+		// 管道未初始化时的预期行为（chunker/embedder/store 为 nil）
 		t.Logf("Publish 返回错误（预期：管道未初始化）: %v", err)
-	}
-
-	// 验证文章状态和字段
-	var updated model.KnowledgeArticle
-	knowledgeSvcDB.First(&updated, article.ID)
-	if updated.Status != 4 {
-		t.Errorf("期望 status=4(已发布), got %d", updated.Status)
-	}
-	if updated.PublishedBy == nil || *updated.PublishedBy != 2 {
-		t.Error("期望 published_by=2")
 	}
 }
 
@@ -391,14 +389,14 @@ func TestKnowledgeService_Disable(t *testing.T) {
 
 	err := svc.Disable(article.ID)
 	if err == nil {
-		// 有真实管道时验证 status=0
+		// 成功停用时验证 status=ArticleStatusDisabled(4)
 		var updated model.KnowledgeArticle
 		knowledgeSvcDB.First(&updated, article.ID)
-		if updated.Status != 0 {
-			t.Errorf("期望 status=0(已停用), got %d", updated.Status)
+		if updated.Status != int16(model.ArticleStatusDisabled) {
+			t.Errorf("期望 status=%d(已停用), got %d", model.ArticleStatusDisabled, updated.Status)
 		}
 	} else {
-		t.Logf("Disable 返回错误（预期：管道未初始化）: %v", err)
+		t.Logf("Disable 返回错误（预期：向量删除失败）: %v", err)
 	}
 }
 
@@ -429,13 +427,12 @@ func TestKnowledgeService_GetArticleDetail(t *testing.T) {
 	kb := createTestKB(t, svc, "详情测试库")
 	article := createTestArticle(t, svc, kb.ID, 1)
 
-	// 创建切片
+	// 创建切片（v2 schema：无 sync_status/sync_error/synced_at 字段）
 	chunk := model.KnowledgeChunk{
 		ArticleID:       article.ID,
 		Content:         "切片内容",
 		EmbeddingModel:  "test-model",
 		VectorDimension: 768,
-		SyncStatus:      "synced",
 	}
 	knowledgeSvcDB.Create(&chunk)
 

@@ -17,6 +17,7 @@ import (
 	"opsmind/internal/model"
 	"opsmind/internal/repository"
 
+	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
 )
 
@@ -384,8 +385,15 @@ func TestTicketRepo_CreateRecord(t *testing.T) {
 	repo := repository.NewTicketRepo(db)
 	user := createTestUser(t, db, "test_record")
 
+	// 先创建申告（FK 约束：ticket_records.ticket_id → tickets.id）
+	ticket := &model.Ticket{
+		TicketNo: "TK-TEST-001", UserID: user.ID, Title: "测试", Description: "测试",
+		Urgency: 1, ContactPhone: "13800000001", Status: 1, Source: 1,
+	}
+	require.NoError(t, db.Create(ticket).Error)
+
 	record := &model.TicketRecord{
-		TicketID:   1,
+		TicketID:   ticket.ID,
 		OperatorID: user.ID,
 		Action:     "start",
 		Content:    "开始处理申告",
@@ -405,15 +413,23 @@ func TestTicketRepo_FindByTicketID(t *testing.T) {
 	cleanTicketTables(t, db)
 	repo := repository.NewTicketRepo(db)
 
+	// 先创建用户和申告（FK 约束）
+	user := createTestUser(t, db, "test_find_records")
+	ticket := &model.Ticket{
+		TicketNo: "TK-FIND-RECORDS", UserID: user.ID, Title: "记录查询测试",
+		Description: "测试", Urgency: 1, ContactPhone: "13800000001", Status: 1, Source: 1,
+	}
+	requireNoErr(t, db.Create(ticket).Error)
+
 	records := []model.TicketRecord{
-		{TicketID: 100, OperatorID: 1, Action: "create", Content: "创建"},
-		{TicketID: 100, OperatorID: 2, Action: "start", Content: "开始处理"},
+		{TicketID: ticket.ID, OperatorID: user.ID, Action: "create", Content: "创建"},
+		{TicketID: ticket.ID, OperatorID: user.ID, Action: "start", Content: "开始处理"},
 	}
 	for i := range records {
 		requireNoErr(t, db.Create(&records[i]).Error)
 	}
 
-	got, err := repo.FindByTicketID(100)
+	got, err := repo.FindByTicketID(ticket.ID)
 	if err != nil {
 		t.Fatalf("期望无错误, got %v", err)
 	}

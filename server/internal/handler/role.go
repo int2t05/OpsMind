@@ -60,6 +60,8 @@ func (h *RoleHandler) GetByID(c *gin.Context) {
 
 // List 角色列表（分页）。
 func (h *RoleHandler) List(c *gin.Context) {
+	// TODO(handler/role): 复用 parsePagination，并让角色列表支持 keyword 搜索。
+	// 角色增多后仅分页不利于快速定位。
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
 

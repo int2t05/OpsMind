@@ -41,6 +41,8 @@ func CheckPassword(hashed, password string) bool {
 // ValidatePassword 校验密码是否符合策略要求。
 // 策略：至少一个小写字母、一个大写字母、一个数字，长度 8-32。
 func ValidatePassword(password string) error {
+	// TODO(hash): 当前长度用 len(bytes) 计算，含中文或 emoji 时会按字节数限制。
+	// 如果允许非 ASCII 密码，应改用 utf8.RuneCountInString 并明确前端同样规则。
 	if len(password) < 8 {
 		return ErrPasswordTooShort
 	}

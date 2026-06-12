@@ -31,21 +31,20 @@ type ArticleListResponse struct {
 
 // ArticleResponse 文章列表项响应。
 type ArticleResponse struct {
-	ID              int64     `json:"id"`
-	KBID            int64     `json:"kb_id"`
-	KBName          string    `json:"kb_name"`
-	Question        string    `json:"question"`
-	Answer          string    `json:"answer"`
-	Category        string    `json:"category"`
-	Tags            []string  `json:"tags"`
-	Status          int16     `json:"status"`
-	StatusText      string    `json:"status_text"`
-	CreatedBy       int64     `json:"created_by"`
-	ReviewedBy      *int64    `json:"reviewed_by"`
-	ReviewComment   string    `json:"review_comment"`
-	SyncStatus      string    `json:"sync_status"`
-	CreatedAt       time.Time `json:"created_at"`
-	UpdatedAt       time.Time `json:"updated_at"`
+	ID            int64     `json:"id"`
+	KBID          int64     `json:"kb_id"`
+	KBName        string    `json:"kb_name"`
+	Question      string    `json:"question"`
+	Answer        string    `json:"answer"`
+	Category      string    `json:"category"`
+	Tags          []string  `json:"tags"`
+	Status        int16     `json:"status"`
+	StatusText    string    `json:"status_text"`
+	CreatedBy     int64     `json:"created_by"`
+	ReviewedBy    *int64    `json:"reviewed_by"`
+	ReviewComment string    `json:"review_comment"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
 }
 
 // ArticleDetailResponse 文章详情响应（含切片）。
@@ -56,11 +55,10 @@ type ArticleDetailResponse struct {
 
 // ChunkResponse 知识切片响应。
 type ChunkResponse struct {
-	ID              int64      `json:"id"`
-	Content         string     `json:"content"`
-	EmbeddingModel  string     `json:"embedding_model"`
-	VectorDimension int        `json:"vector_dimension"`
-	SyncStatus      string     `json:"sync_status"`
-	SyncError       string     `json:"sync_error"`
-	SyncedAt        *time.Time `json:"synced_at"`
+	ID              int64  `json:"id"`
+	KBID            int64  `json:"kb_id"`
+	Content         string `json:"content"`
+	ChunkIndex      int    `json:"chunk_index"`
+	EmbeddingModel  string `json:"embedding_model"`
+	VectorDimension int    `json:"vector_dimension"`
 }

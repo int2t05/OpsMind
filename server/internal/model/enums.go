@@ -53,13 +53,6 @@ const (
 	ArticleStatusRejected   int16 = 5 // 驳回
 )
 
-// 知识切片同步状态
-const (
-	ChunkSyncPending   = "pending"   // 待同步
-	ChunkSyncSynced    = "synced"    // 已同步
-	ChunkSyncFailed    = "failed"    // 同步失败
-	ChunkSyncDisabled  = "disabled"  // 已停用
-)
 
 // Embedding 模型类型
 const (

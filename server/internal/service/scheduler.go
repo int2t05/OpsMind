@@ -37,6 +37,8 @@ func NewScheduler(svc ticketAutoCloseService) *Scheduler {
 // 创建带取消功能的 context，启动 TicketAutoCloseJob goroutine。
 // 调用 Stop() 可优雅关闭。
 func (s *Scheduler) Start(ctx context.Context) {
+	// TODO(service/scheduler): Start 应防止重复调用。
+	// 当前重复 Start 会启动多个 auto-close goroutine，Stop 只能取消最后一次保存的 cancel。
 	ctx, s.cancel = context.WithCancel(ctx)
 	go s.runAutoCloseLoop(ctx)
 	slog.Info("后台调度器已启动")
@@ -58,6 +60,8 @@ func (s *Scheduler) Stop() {
 func (s *Scheduler) runAutoCloseLoop(ctx context.Context) {
 	ticker := time.NewTicker(1 * time.Hour)
 	defer ticker.Stop()
+	// TODO(service/scheduler): 启动后是否立即执行一次 AutoClose 需要明确。
+	// 当前必须等 1 小时才执行，重启频繁时可能长期不清理超期申告。
 
 	for {
 		select {

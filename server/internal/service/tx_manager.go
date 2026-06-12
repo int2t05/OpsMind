@@ -15,9 +15,13 @@ type GormTxManager struct {
 }
 
 func NewGormTxManager(db *gorm.DB) *GormTxManager {
+	// TODO(service/tx): 校验 db 非 nil，构造期提前暴露装配错误。
+	// 现在 nil db 会在第一次 Transaction 时 panic。
 	return &GormTxManager{db: db}
 }
 
 func (m *GormTxManager) Transaction(fn func(tx *gorm.DB) error) error {
+	// TODO(service/tx): Transaction 可以接收 context.Context 并使用 db.WithContext(ctx)。
+	// 这样事务内 SQL 也能响应请求取消和超时。
 	return m.db.Transaction(fn)
 }

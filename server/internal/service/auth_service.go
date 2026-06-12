@@ -40,6 +40,8 @@ func NewAuthService(userRepo *repository.UserRepo, db *gorm.DB) *AuthService {
 // 为什么密码错误和用户不存在返回相同错误码（10003）：
 // 避免用户名枚举攻击，不暴露"用户是否存在"信息。
 func (s *AuthService) Login(username, password string) (*response.LoginResponse, error) {
+	// TODO(service/auth): 增加登录失败限流/锁定策略。
+	// 目前只做 bcrypt 校验，暴力猜测会持续消耗 CPU，且没有按用户名/IP 维度的防护。
 	user, err := s.userRepo.GetByUsername(username)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -68,6 +70,8 @@ func (s *AuthService) RefreshToken(refreshToken string) (*response.LoginResponse
 	if err != nil {
 		return nil, AppError{Code: 10001, Message: "刷新令牌无效或已过期"}
 	}
+	// TODO(service/auth): 明确校验 claims.TokenType == "refresh"。
+	// 当前 access token 只要未过期也可能走刷新流程重新签发令牌对。
 
 	user, err := s.userRepo.GetByID(claims.UserID)
 	if err != nil {
@@ -120,6 +124,8 @@ func (s *AuthService) ChangePassword(userID int64, oldPwd, newPwd string) error 
 // 查询用户角色、权限、菜单树，组装完整的 LoginResponse。
 // 菜单树构建思路：先从全部菜单中分离一级菜单，再递归挂载子菜单。
 func (s *AuthService) buildLoginResponse(user *model.User) (*response.LoginResponse, error) {
+	// TODO(service/auth): 访问令牌和刷新令牌有效期应读取 config.JWT，而不是写死 2h/7d。
+	// 当前配置项存在但没有贯穿到 AuthService，环境变量调整不会生效。
 	// 查询用户角色
 	roles, err := s.userRepo.GetUserRoles(user.ID)
 	if err != nil {
@@ -229,6 +235,8 @@ func (s *AuthService) buildMenuTree(userID int64, roles []model.Role) ([]respons
 //
 // parentID=0 表示一级菜单，子菜单通过 parentID 关联。
 func buildTree(menus []model.Menu, parentID int64) []response.MenuItem {
+	// TODO(service/auth): buildTree 每层都会扫描完整 menus，菜单数量增大后是 O(n²)。
+	// 可先按 parent_id 建 map，再递归组装，顺便保证 sort_order 稳定。
 	var result []response.MenuItem
 	for _, m := range menus {
 		if m.ParentID == parentID {
@@ -253,6 +261,8 @@ func buildTree(menus []model.Menu, parentID int64) []response.MenuItem {
 // 为什么提供默认值：本地开发环境便利性。
 // 生产环境必须通过环境变量 OPSMIND_JWT_SECRET 覆盖。
 func jwtSecret() string {
+	// TODO(service/auth): jwtSecret 绕过 config.Load，和 main 中注入 JWTAuth 的 secret 来源不一致。
+	// 应把 secret 作为 AuthService 依赖注入，避免测试、开发、生产出现两套密钥来源。
 	if s := os.Getenv("OPSMIND_JWT_SECRET"); s != "" {
 		return s
 	}

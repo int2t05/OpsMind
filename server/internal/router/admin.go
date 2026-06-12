@@ -16,6 +16,8 @@ import (
 // 路由列表与 TECH.md §5.2 后台管理对齐。
 // 已实现 Handler 的路由绑定真实 Handler，未实现的仍使用占位。
 func registerAdminRoutes(rg *gin.RouterGroup, h *Handlers) {
+	// TODO(router/admin): 权限字符串散落在路由注册中，建议集中成常量或权限表。
+	// 这样前端菜单、种子数据、RBAC 中间件能共享同一来源，减少拼写漂移。
 	// 申告管理（T24 — 已实现）
 	if h != nil && h.Ticket != nil {
 		rg.GET("/tickets", middleware.RequirePermission("ticket:read"), h.Ticket.ListAll)
@@ -50,6 +52,8 @@ func registerAdminRoutes(rg *gin.RouterGroup, h *Handlers) {
 		rg.POST("/articles/:id/disable", middleware.RequirePermission("knowledge:review"), h.Knowledge.Disable)
 		rg.POST("/articles/:id/enable", middleware.RequirePermission("knowledge:review"), h.Knowledge.Enable)
 		rg.POST("/articles/:id/retry-sync", middleware.RequirePermission("knowledge:write"), h.Knowledge.RetrySync)
+			// TODO(router/admin): 文档上传路由当前缩进异常，后续容易误判其是否属于 Knowledge 分支。
+			// 只需格式化即可提升可读性，但本轮保持注释级改动。
 			// 文档上传
 			rg.POST("/knowledge-bases/:kb_id/documents/upload", middleware.RequirePermission("knowledge:write"), h.Knowledge.UploadDocuments)
 			rg.GET("/knowledge-bases/:kb_id/documents/:id/status", middleware.RequirePermission("knowledge:read"), h.Knowledge.GetDocumentStatus)
@@ -118,6 +122,8 @@ func registerAdminRoutes(rg *gin.RouterGroup, h *Handlers) {
 	}
 
 	// 数据看板（T32 — 已实现）
+	// TODO(router/admin): dashboard 使用 audit:read 权限不够直观。
+	// 建议引入 dashboard:read，避免拥有审计权限就天然拥有运营看板权限。
 	if h != nil && h.Dashboard != nil {
 		rg.GET("/dashboard/stats", middleware.RequirePermission("audit:read"), h.Dashboard.GetStats)
 		rg.GET("/dashboard/trends", middleware.RequirePermission("audit:read"), h.Dashboard.GetTrends)

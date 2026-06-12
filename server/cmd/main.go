@@ -28,6 +28,9 @@ func main() {
 	slog.Info("OpsMind 服务启动中...")
 
 	// 1. 加载配置
+	// TODO(cmd/main): 将 main 中的初始化流程拆成 wireApp()/runServer() 两层。
+	// 现在 main 同时负责配置、DB、Adapter、Service、Handler、Scheduler 和 HTTP 生命周期，
+	// 后续新增依赖时会继续膨胀，不利于集成测试单独复用应用装配逻辑。
 	cfg, err := config.Load("")
 	if err != nil {
 		slog.Error("加载配置失败", "error", err)
@@ -44,6 +47,8 @@ func main() {
 	}
 
 	// 2. 初始化数据库连接
+	// TODO(cmd/main): 数据库连接池参数目前写死在 database.Init 内部。
+	// 应将 MaxOpenConns/MaxIdleConns/ConnMaxLifetime 放入配置，避免生产环境只能改代码调参。
 	db, err := database.Init(cfg.Database)
 	if err != nil {
 		slog.Error("数据库连接失败", "error", err)
@@ -52,6 +57,8 @@ func main() {
 	slog.Info("数据库连接成功")
 
 	// 3. 自动迁移
+	// TODO(cmd/main): 生产环境应改为显式迁移命令或启动前迁移任务。
+	// AutoMigrate 适合开发环境，但在生产库上自动变更表结构缺少审批、回滚和审计。
 	if err := database.AutoMigrate(db); err != nil {
 		slog.Error("数据库迁移失败", "error", err)
 		os.Exit(1)
@@ -59,6 +66,8 @@ func main() {
 	slog.Info("数据库迁移完成")
 
 	// 4. 初始化 Adapter 层（LLMClient / EmbeddingClient / VectorStore）
+	// TODO(cmd/main): LLM/Embedding 超时时间应来自配置，并区分 query rewrite、rerank、最终生成等场景。
+	// 当前 60s/30s 写死会让短请求和长生成共享同一超时策略。
 	llmTimeout := 60 * time.Second
 	llmClient := adapter.NewOpenAIClient(cfg.LLM.BaseURL, cfg.LLM.APIKey, llmTimeout)
 
@@ -79,6 +88,8 @@ func main() {
 		"embedding_model", cfg.Embedding.Model)
 
 	// pgvector 向量存储
+	// TODO(cmd/main): VectorStore 初始化失败后仅 warn，但后续 KnowledgeService/ChatService 仍可启动。
+	// 应提供健康状态并让依赖向量核心路径的接口返回明确 20002，而不是在 nil store 处退化为未知错误。
 	pgDSN := fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=%s",
 		cfg.Database.User, cfg.Database.Password, cfg.Database.Host, cfg.Database.Port, cfg.Database.DBName, cfg.Database.SSLMode)
 	vectorStore, err := adapter.NewPgvectorStore(pgDSN)
@@ -110,11 +121,15 @@ func main() {
 	configService := service.NewConfigService(configRepo)
 
 	// LLM 配置管理
+	// TODO(cmd/main): 启动时应把 config.yaml/env 的 LLM 配置同步为默认 LLMConfig 或作为 fallback 注入 Manager。
+	// 当前 ChatService 可能从 LLMConfigManager 读取到 nil，然后使用 model="default"，与 cfg.LLM.Model 不一致。
 	llmConfigRepo := repository.NewLlmConfigRepo(db)
 	llmConfigSvc := service.NewLLMConfigService(llmConfigRepo)
 	slog.Info("LLM 配置服务已初始化")
 
 	// RAG 引擎组件
+	// TODO(cmd/main): Chunker、BM25Retriever、Pipeline、Processor 目前没有完整装配。
+	// ChatService 注入 nil pipeline 会让问答绕过 RAG，KnowledgeService 注入 nil chunker 会让发布路径不可用。
 	embedder := rag.NewEmbedder(embeddingClient, 20)
 	docParser := rag.NewDocParser()
 
@@ -162,6 +177,8 @@ func main() {
 	})
 
 	// 10. 创建 HTTP Server
+	// TODO(cmd/main): ReadTimeout/WriteTimeout/IdleTimeout 应配置化，并为 SSE 单独提供更长写超时策略。
+	// 全局 WriteTimeout=60s 对慢速 LLM 生成仍可能过短。
 	addr := fmt.Sprintf(":%d", cfg.Server.Port)
 	srv := &http.Server{
 		Addr:         addr,

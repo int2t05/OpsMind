@@ -30,6 +30,8 @@ func NewAuditRepo(db *gorm.DB) *AuditRepo {
 // 由各 Service 层在关键操作（创建/修改/删除）完成后调用。
 // 写入失败会返回 error，调用方应决定是否将写入失败视为业务错误。
 func (r *AuditRepo) Create(log *model.AuditLog) error {
+	// TODO(repository/audit): 审计写入失败是否阻断主流程需要统一策略。
+	// 关键操作（用户/角色/知识发布）通常应在同一事务中写审计，避免成功操作无审计。
 	return r.db.Create(log).Error
 }
 

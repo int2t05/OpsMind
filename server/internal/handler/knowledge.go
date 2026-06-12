@@ -34,6 +34,8 @@ func NewKnowledgeHandler(svc *service.KnowledgeService) *KnowledgeHandler {
 //
 // GET /api/v1/portal/knowledge-bases
 func (h *KnowledgeHandler) ListKBsForPortal(c *gin.Context) {
+	// TODO(handler/knowledge): 门户端知识库列表应返回精简 DTO，只包含 id/name/description。
+	// 当前复用后台 ListKBs，可能暴露 embedding_model/vector_dimension/created_by 等管理字段。
 	h.ListKBs(c)
 }
 
@@ -41,6 +43,8 @@ func (h *KnowledgeHandler) ListKBsForPortal(c *gin.Context) {
 //
 // POST /api/v1/admin/knowledge-bases
 func (h *KnowledgeHandler) CreateKB(c *gin.Context) {
+	// TODO(handler/knowledge): CreateKB 请求 DTO 缺少 vector_dimension/llm_config_id，与 API 文档不一致。
+	// Handler 层应先对齐请求结构，再交给 Service 写入完整知识库配置。
 	var req request.CreateKBRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, errcode.ErrParam, "参数校验失败: "+err.Error())
@@ -191,6 +195,8 @@ func (h *KnowledgeHandler) Review(c *gin.Context) {
 //
 // POST /api/v1/admin/articles/:id/publish
 func (h *KnowledgeHandler) Publish(c *gin.Context) {
+	// TODO(handler/knowledge): Publish 应将 c.Request.Context() 传给 Service。
+	// 发布涉及 embedding 和 pgvector 写入，必须能响应客户端取消和网关超时。
 	id, ok := parseID(c, "id")
 	if !ok {
 		return
@@ -308,6 +314,8 @@ func (h *KnowledgeHandler) UploadDocuments(c *gin.Context) {
 		return
 	}
 
+	// TODO(handler/knowledge): API 文档要求 multipart 字段名 files 且支持多文件，这里只读取单个 file。
+	// 应改为 MultipartForm.File["files"] 循环处理，并返回 documents 数组。
 	file, err := c.FormFile("file")
 	if err != nil {
 		response.Error(c, errcode.ErrParam, "文件上传失败: "+err.Error())
@@ -315,6 +323,8 @@ func (h *KnowledgeHandler) UploadDocuments(c *gin.Context) {
 	}
 
 	fileType := strings.TrimPrefix(strings.ToLower(filepath.Ext(file.Filename)), ".")
+	// TODO(handler/knowledge): 不能只信任扩展名，应结合 MIME sniffing 和解析器校验。
+	// 否则恶意文件改扩展名后会进入 PDF/DOCX 解析路径。
 
 	src, err := file.Open()
 	if err != nil {
@@ -344,6 +354,8 @@ func (h *KnowledgeHandler) UploadDocuments(c *gin.Context) {
 //
 // GET /api/v1/admin/knowledge-bases/:kb_id/documents/:id/status
 func (h *KnowledgeHandler) GetDocumentStatus(c *gin.Context) {
+	// TODO(handler/knowledge): 未校验路径中的 kb_id 与 article.KBID 是否一致。
+	// 错误 kb_id 仍可查询到其他知识库文章状态，破坏 URL 资源层级语义。
 	articleID, ok := parseID(c, "id")
 	if !ok {
 		return

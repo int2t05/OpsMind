@@ -129,6 +129,8 @@ func (r *UserRepo) UpdateStatus(id int64, status int) error {
 
 // ExistsByUsername 检查用户名是否已存在。
 func (r *UserRepo) ExistsByUsername(username string) (bool, error) {
+	// TODO(repository/user): ExistsByUsername/Phone 可优化为 SELECT 1 LIMIT 1。
+	// COUNT(*) 在大表上成本更高，且这里只需要存在性。
 	var count int64
 	err := r.db.Model(&model.User{}).Where("username = ?", username).Count(&count).Error
 	if err != nil {
@@ -159,6 +161,8 @@ func (r *UserRepo) CountUsersByRole(roleID int64) (int64, error) {
 
 // AssignRoles 分配用户角色（先删后插，保证幂等）。
 func (r *UserRepo) AssignRoles(userID int64, roleIDs []int64) error {
+	// TODO(repository/user): AssignRoles 未验证 roleIDs 存在，也没有去重。
+	// 重复 roleID 会依赖复合主键报错，不存在 roleID 的错误也不够友好。
 	return r.db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Where("user_id = ?", userID).Delete(&model.UserRole{}).Error; err != nil {
 			return err
@@ -226,6 +230,8 @@ func (r *UserRepo) UpdateRoleMenus(roleID int64, menuIDs []int64) error {
 // 权限从 Role.Permissions (jsonb) 字段解析，不再使用硬编码映射。
 // 新增角色或修改权限无需改代码，只需更新数据库 role 记录即可生效。
 func (r *UserRepo) GetUserPermissions(userID int64) ([]string, error) {
+	// TODO(repository/user): 权限解析失败时当前 continue 静默跳过。
+	// 角色权限 JSON 损坏属于数据完整性问题，应记录日志或返回错误，避免隐式降权难排查。
 	// 从数据库 Role.Permissions (jsonb) 字段读取实际权限
 	var roles []model.Role
 	if err := r.db.Model(&model.Role{}).

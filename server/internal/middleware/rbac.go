@@ -20,6 +20,8 @@ import (
 // 如需同时满足多个权限，可在业务层做更细粒度的校验。
 func RequirePermission(permissions ...string) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// TODO(middleware/rbac): permissions 为空时当前逻辑会恒定拒绝。
+		// 建议在启动路由注册时检测空权限配置，避免误把接口配置成不可访问。
 		// 从 context 获取 currentUser
 		val, exists := c.Get("currentUser")
 		if !exists {
@@ -48,6 +50,8 @@ func RequirePermission(permissions ...string) gin.HandlerFunc {
 
 // hasAnyPermission 检查用户权限列表中是否包含任意一个所需权限。
 func hasAnyPermission(userPerms []string, required []string) bool {
+	// TODO(middleware/rbac): 支持通配权限（如 "knowledge:*"）或权限层级。
+	// 当前必须逐一列出按钮权限，角色权限增多后维护成本会快速上升。
 	permSet := make(map[string]struct{}, len(userPerms))
 	for _, p := range userPerms {
 		permSet[p] = struct{}{}

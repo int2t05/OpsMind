@@ -34,6 +34,8 @@ func NewConfigService(repo *repository.ConfigRepo) *ConfigService {
 // 从 JSONB 反序列化后返回原始值（string、float64、map 等）。
 // key 不存在时返回 AppError code=10004。
 func (s *ConfigService) GetConfig(key string) (interface{}, error) {
+	// TODO(service/config): 增加允许的配置 key 白名单和类型定义。
+	// 当前任意 key 都可读写，调用方只能在运行时发现类型不符合预期。
 	cfg, err := s.repo.GetByKey(key)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -57,6 +59,8 @@ func (s *ConfigService) GetConfig(key string) (interface{}, error) {
 // 如果允许存储 null，GetConfig 会返回 JSON 的 null 而非 AppError，
 // 导致调用方无法区分「配置不存在」和「配置值为 null」。
 func (s *ConfigService) UpdateConfig(key string, value interface{}, updatedBy int64) error {
+	// TODO(service/config): 更新 ai.default_top_k/ai.confidence_threshold 后没有同步到 ChatService 运行时配置。
+	// 需要引入配置观察者或把 AI 配置也纳入 atomic manager。
 	if value == nil {
 		return AppError{Code: errcode.ErrParam, Message: "配置值不能为 nil"}
 	}

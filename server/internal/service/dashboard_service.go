@@ -29,6 +29,8 @@ func NewDashboardService(repo *repository.DashboardRepo) *DashboardService {
 
 // GetStats 获取看板统计数据。
 func (s *DashboardService) GetStats() (*response.StatsResponse, error) {
+	// TODO(service/dashboard): 这些统计查询串行执行，首屏看板延迟等于所有 SQL 延迟之和。
+	// 可在 Repo 层合并为一条聚合 SQL，或在 Service 层用 errgroup 并行执行。
 	var resp response.StatsResponse
 
 	count, err := s.repo.CountTodayTickets()
@@ -82,6 +84,8 @@ func (s *DashboardService) GetStats() (*response.StatsResponse, error) {
 
 // GetTrends 获取趋势数据。
 func (s *DashboardService) GetTrends(req request.TrendRequest) (*response.TrendResponse, error) {
+	// TODO(service/dashboard): 校验 endDate >= startDate 且范围上限（如 90 天）。
+	// 当前超大范围会生成很长日期序列并放大数据库聚合成本。
 	startDate, err := time.Parse("2006-01-02", req.StartDate)
 	if err != nil {
 		return nil, fmt.Errorf("无效的开始日期: %w", err)
@@ -106,6 +110,8 @@ func (s *DashboardService) GetTrends(req request.TrendRequest) (*response.TrendR
 	}
 
 	// 查询每日申告数
+	// TODO(service/dashboard): 双重循环填充趋势数据是 O(days * rows)。
+	// 可先把 ticketCounts/chatCounts 转为 map[date]count，再单次遍历 dataPoints。
 	ticketCounts, err := s.repo.GetTicketTrends(req.StartDate, req.EndDate)
 	if err != nil {
 		return nil, fmt.Errorf("查询每日申告数失败: %w", err)

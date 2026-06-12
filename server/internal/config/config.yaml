@@ -6,6 +6,7 @@
 server:
   port: 8080
   mode: debug  # debug / release
+  # TODO(config): 增加 read_timeout/write_timeout/idle_timeout 配置，避免 HTTP 超时只能通过代码调整。
 
 database:
   host: localhost        # Docker 内: postgres
@@ -14,6 +15,7 @@ database:
   password: ""           # 通过环境变量 OPSMIND_DATABASE_PASSWORD 设置
   dbname: opsmind
   sslmode: disable
+  # TODO(config): 增加 max_open_conns/max_idle_conns/conn_max_lifetime，生产环境需要按数据库规格调优。
 
 jwt:
   secret: ""             # 通过环境变量 OPSMIND_JWT_SECRET 设置
@@ -41,3 +43,4 @@ embedding:
 ai:
   default_top_k: 5
   confidence_threshold: 0.6  # 低于此阈值引导用户提交申告
+  # TODO(config): 增加 query_rewrite/multi_route/hybrid/rerank 默认开关，避免 ChatService 中硬编码 RAG 策略。

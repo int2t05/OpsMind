@@ -30,6 +30,8 @@ func NewAuthHandler(authService *service.AuthService) *AuthHandler {
 // POST /api/v1/auth/login
 // 参数校验失败返回 400，业务错误返回对应错误码，成功返回 LoginResponse。
 func (h *AuthHandler) Login(c *gin.Context) {
+	// TODO(handler/auth): 登录接口应记录失败审计/安全日志，但不能泄露用户名是否存在。
+	// 这有助于发现暴力破解和异常登录来源。
 	var req request.LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, errcode.ErrParam, "参数校验失败: "+err.Error())
@@ -101,6 +103,8 @@ func (h *AuthHandler) ChangePassword(c *gin.Context) {
 // POST /api/v1/auth/logout
 // MVP 阶段无状态 JWT，客户端清除 token 即可，服务端直接返回成功。
 func (h *AuthHandler) Logout(c *gin.Context) {
+	// TODO(handler/auth): 如果后续引入 jti/token_version，Logout 应让当前 refresh token 失效。
+	// 仅依赖客户端删除 token 无法覆盖 token 已泄露的场景。
 	response.Success(c, nil)
 }
 

@@ -47,6 +47,8 @@ func NewTicketService(repo *repository.TicketRepo, txManager TxManager) *TicketS
 //   - ticket_no 格式：TK-YYYYMMDD-XXXX（XXXX 为随机 4 位后缀）
 //   - 新建申告 status=1（待处理）、source=1（门户提交）
 func (s *TicketService) CreateTicket(req request.CreateTicketRequest, userID int64) error {
+	// TODO(service/ticket): 使用 model.TicketUrgency* 等常量替代裸数字 1/2/3。
+	// 状态、紧急程度、来源散落裸值会让后续改枚举时难以全局追踪。
 	// 参数校验
 	if strings.TrimSpace(req.Title) == "" {
 		return AppError{Code: errcode.ErrParam, Message: "标题不能为空"}
@@ -64,6 +66,8 @@ func (s *TicketService) CreateTicket(req request.CreateTicketRequest, userID int
 		// 生成唯一 ticket_no：日期 + 纳秒时间戳后6位
 		// 相比 rand.Intn(10000)（仅 10000 种组合），纳秒时间戳提供百万级组合，
 		// 结合日期前缀，碰撞概率极低。后续可升级为雪花算法或 DB 序列。
+		// TODO(service/ticket): ticket_no 仍可能在高并发或多实例同纳秒场景碰撞。
+		// 建议使用数据库序列/唯一索引重试/雪花 ID，确保唯一性失败时可自动重试。
 		now := time.Now()
 		datePart := now.Format("20060102")
 		suffix := fmt.Sprintf("%06d", now.UnixNano()%1000000)
@@ -78,6 +82,8 @@ func (s *TicketService) CreateTicket(req request.CreateTicketRequest, userID int
 	// 序列化 ChatContext
 	var chatCtxJSON datatypes.JSON
 	if req.ChatContext != "" {
+		// TODO(service/ticket): 校验 ChatContext 是合法 JSON。
+		// 直接写入 datatypes.JSON 字符串，非法 JSON 会在数据库层报错且错误信息不友好。
 		chatCtxJSON = datatypes.JSON(req.ChatContext)
 	}
 
@@ -111,6 +117,8 @@ func (s *TicketService) CreateTicket(req request.CreateTicketRequest, userID int
 //   - 补充后状态变为"处理中"(2)
 //   - 创建处理记录（action=supplement）
 func (s *TicketService) SupplementTicket(id int64, userID int64, req request.SupplementTicketRequest) error {
+	// TODO(service/ticket): 补充记录创建和状态更新应放入同一事务。
+	// 当前 CreateRecord 成功后 UpdateStatus 失败，会留下补充记录但工单仍停留在需补充状态。
 	ticket, err := s.repo.FindByID(id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -162,6 +170,8 @@ func (s *TicketService) SupplementTicket(id int64, userID int64, req request.Sup
 // 为什么用 switch-case 而非状态转换矩阵：
 // MVP 阶段 action 数量有限（4 个），switch-case 更直观且易于调试。
 func (s *TicketService) UpdateStatus(id int64, operatorID int64, req request.UpdateTicketStatusRequest) error {
+	// TODO(service/ticket): 状态机应使用 model.TicketAction* 和 model.TicketStatus* 常量。
+	// 当前字符串和数字混用，和 enums.go 的常量定义没有形成编译期约束。
 	ticket, err := s.repo.FindByID(id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -197,6 +207,8 @@ func (s *TicketService) UpdateStatus(id int64, operatorID int64, req request.Upd
 		}
 		newStatus = 3
 		recordAction = "request_info"
+		// TODO(service/ticket): request_info 后应同步创建站内消息或调用 MessageService.NotifySupplement。
+		// 当前注释/文档说会通知，但 TicketService 构造函数未注入 MessageService，实际用户可能收不到补充提醒。
 
 	case "resolve":
 		// 仅处理中(2)可解决
@@ -208,6 +220,8 @@ func (s *TicketService) UpdateStatus(id int64, operatorID int64, req request.Upd
 
 	case "close":
 		// 任意状态可关闭
+		// TODO(service/ticket): close 是否允许关闭已解决/已关闭需要业务确认。
+		// 当前重复关闭会再次创建 close 记录，可能污染处理时间线。
 		newStatus = 5
 		recordAction = "close"
 
@@ -219,6 +233,8 @@ func (s *TicketService) UpdateStatus(id int64, operatorID int64, req request.Upd
 		// 避免状态已变但无 timeline 记录的数据不一致。
 		return s.txManager.Transaction(func(tx *gorm.DB) error {
 			txRepo := repository.NewTicketRepo(tx)
+			// TODO(service/ticket): UpdateStatus 的 WHERE 仅按 id 更新，没有带旧 status 条件。
+			// 并发操作时可能两个操作者基于同一旧状态都成功写入记录，应改为 CAS 式状态转换。
 			if err := txRepo.UpdateStatus(id, int(newStatus)); err != nil {
 				return err
 			}
@@ -241,6 +257,8 @@ func (s *TicketService) UpdateStatus(id int64, operatorID int64, req request.Upd
 //
 // 用于记录处理过程中的备注、沟通记录等。
 func (s *TicketService) AddRecord(id int64, operatorID int64, req request.CreateTicketRecordRequest) error {
+	// TODO(service/ticket): req.Detail 应校验为合法 JSON，并限制 action 白名单。
+	// 处理记录是审计性质数据，非法 detail 或任意 action 会降低后续统计可信度。
 	// 验证申告存在
 	_, err := s.repo.FindByID(id)
 	if err != nil {
@@ -309,6 +327,8 @@ func (s *TicketService) ListAll(status, urgency, page, pageSize int) (*response.
 
 // GetDetail 获取申告详情（含提交人信息和处理记录时间线）。
 func (s *TicketService) GetDetail(id int64) (*response.TicketDetailResponse, error) {
+	// TODO(service/ticket): 门户端查询详情时需要校验 ticket.UserID == currentUserID。
+	// 当前 Handler 复用 GetDetail，Service 不知道调用者身份，存在水平越权风险。
 	ticket, err := s.repo.FindByID(id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -410,6 +430,8 @@ func unmarshalTicketTags(data datatypes.JSON) []string {
 // 业务规则：status IN (1,2,3) AND created_at < olderThan 的申告自动关闭。
 // 在事务中执行：批量关闭 + 为每个 ticket 创建 action=auto_close 的 TicketRecord。
 func (s *TicketService) AutoClose(olderThan time.Time) (int64, error) {
+	// TODO(service/ticket): AutoCloseTickets 的批量 UPDATE 和创建 TicketRecord 不在同一事务里。
+	// 如果记录创建失败，工单已经关闭但缺少自动关闭时间线。
 	ids, err := s.repo.AutoCloseTickets(olderThan)
 	if err != nil {
 		return 0, err

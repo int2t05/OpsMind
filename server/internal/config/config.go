@@ -109,6 +109,9 @@ func Load(configPath string) (*AppConfig, error) {
 	v := viper.New()
 
 	// 设置默认值
+	// TODO(config): 增加 Validate() 阶段统一校验配置合法性。
+	// 例如 server.mode 只能是 debug/release、端口范围、TopK 范围、confidence_threshold 范围，
+	// 以及 release 模式下 JWT/数据库/对象存储关键配置必须显式提供。
 	setDefaults(v)
 
 	// 读取配置文件
@@ -137,6 +140,8 @@ func Load(configPath string) (*AppConfig, error) {
 		return nil, err
 	}
 
+	// TODO(config): 记录实际生效配置时应对 password/api_key/secret 做脱敏。
+	// 后续如果添加配置诊断日志，避免把敏感值打到 stdout 或容器日志。
 	return &cfg, nil
 }
 
@@ -145,6 +150,8 @@ func Load(configPath string) (*AppConfig, error) {
 // 环境变量命名规则：OPSMIND_ + 字段路径（下划线分隔），
 // 例如 database.host → OPSMIND_DATABASE_HOST。
 func bindEnvs(v *viper.Viper) {
+	// TODO(config): 这里的 BindEnv 调用应检查返回 error。
+	// Viper 当前通常返回 nil，但忽略错误会掩盖未来 key 绑定失败或测试替身异常。
 	// Server
 	v.BindEnv("server.port", "OPSMIND_SERVER_PORT")
 	v.BindEnv("server.mode", "OPSMIND_SERVER_MODE")

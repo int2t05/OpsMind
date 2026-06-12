@@ -28,6 +28,8 @@ type Embedder struct {
 // client 为 OpenAI-compatible Embedding 客户端。
 // batchSize 控制每批最大文本数，建议 20。
 func NewEmbedder(client adapter.EmbeddingClient, batchSize int) *Embedder {
+	// TODO(rag/embedder): client 为 nil 时应返回错误或禁用 Embedder。
+	// 当前 Embed 调用 nil client 会 panic，启动期无法发现装配问题。
 	if batchSize <= 0 {
 		batchSize = 20
 	}
@@ -46,6 +48,8 @@ func NewEmbedder(client adapter.EmbeddingClient, batchSize int) *Embedder {
 //
 // 空输入返回空向量列表且 dimension=0。
 func (e *Embedder) Embed(ctx context.Context, texts []string) ([][]float32, int, error) {
+	// TODO(rag/embedder): 部分批次失败时跳过会破坏向量与文本的索引对应关系。
+	// 调用方通常要求 len(vectors)==len(texts)，应返回带批次位置的错误，而不是静默少返回。
 	if len(texts) == 0 {
 		return nil, 0, nil
 	}

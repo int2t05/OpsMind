@@ -47,6 +47,8 @@ func (s *UserService) List(page, pageSize int, keyword string) (*response.UserLi
 	if err != nil {
 		return nil, err
 	}
+	// TODO(service/user): 这里对每个用户调用 toDetailResponse 会逐个查询角色，用户列表存在 N+1 查询。
+	// 可在 Repo 层批量查询 user_roles/roles 后一次性组装，提高后台用户列表性能。
 
 	details := make([]response.UserDetailResponse, 0, len(users))
 	for i := range users {
@@ -68,6 +70,8 @@ func (s *UserService) List(page, pageSize int, keyword string) (*response.UserLi
 // 流程：校验用户名唯一 → 校验密码策略 → bcrypt 哈希 → 事务(创建用户 + 分配角色)。
 // 为什么包裹在事务中：若用户创建成功但角色分配失败，事务回滚保证数据一致性。
 func (s *UserService) Create(req request.CreateUserRequest) error {
+	// TODO(service/user): 增加 username/phone/email 的格式和空白裁剪校验。
+	// 当前只校验用户名唯一和密码强度，可能写入空格用户名或非法手机号。
 	// 校验用户名唯一
 	exists, err := s.repo.ExistsByUsername(req.Username)
 	if err != nil {
@@ -99,6 +103,8 @@ func (s *UserService) Create(req request.CreateUserRequest) error {
 	}
 
 	// 包裹在事务中：Create + AssignRoles 原子执行
+	// TODO(service/user): AssignRoles 内部自己再开事务，当前外层 tx + 内层 r.db.Transaction 容易形成嵌套事务。
+	// 应提供 AssignRolesTx 或让 Repository 接收当前 tx，保证事务边界清晰。
 	return s.db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(user).Error; err != nil {
 			return err
@@ -151,6 +157,8 @@ func (s *UserService) Update(id int64, req request.UpdateUserRequest) error {
 //
 // 冻结前校验当前状态：已冻结的用户不能重复冻结（返回 10006）。
 func (s *UserService) Freeze(id int64) error {
+	// TODO(service/user): 禁止冻结最后一个系统管理员。
+	// 否则误操作可能导致后台无人能恢复用户和权限。
 	user, err := s.repo.GetByID(id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {

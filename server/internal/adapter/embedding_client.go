@@ -104,6 +104,8 @@ type openAIEmbeddingsResponse struct {
 // 使用共享的 doHTTPRequest 避免与 llm_client 重复代码。
 // 对 429/503 执行指数退避重试（与 LLM 客户端一致）。
 func (c *OpenAIEmbeddingClient) CreateEmbeddings(ctx context.Context, req EmbeddingRequest) (*EmbeddingResponse, error) {
+	// TODO(adapter/embedding): 校验 Input 非空、Model 非空或有默认模型。
+	// 空 model 目前由上层用“默认模型”语义传入，但客户端本身并不知道默认模型是什么。
 	body := openAIEmbeddingsRequest{
 		Model: req.Model,
 		Input: req.Input,
@@ -159,6 +161,8 @@ func (c *OpenAIEmbeddingClient) CreateEmbeddings(ctx context.Context, req Embedd
 		}
 		embeddings[d.Index] = d.Embedding
 	}
+	// TODO(adapter/embedding): 检查每个 input 都返回了 embedding。
+	// 当前缺失 index 会留下 nil 向量，后续 BatchInsert 可能以空向量写入或维度不一致。
 
 	dimension := 0
 	if len(embeddings) > 0 && len(embeddings[0]) > 0 {

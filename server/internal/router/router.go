@@ -46,6 +46,8 @@ func Setup(cfg *config.AppConfig, h *Handlers) *gin.Engine {
 
 	r := gin.New()
 
+	// TODO(router): 增加 /readyz 就绪探针，检查 DB、VectorStore、MinIO、默认 LLM 配置是否可用。
+	// /health 只能证明进程存活，不能证明核心依赖可服务。
 	// 注册全局中间件
 	// Recovery 注册在最外层（第一个）以捕获后续所有中间件的 panic。
 	r.Use(gin.Recovery())
@@ -84,6 +86,8 @@ func Setup(cfg *config.AppConfig, h *Handlers) *gin.Engine {
 
 // registerPublicRoutes 注册公开路由（无需认证）。
 func registerPublicRoutes(rg *gin.RouterGroup, h *Handlers) {
+	// TODO(router): placeholder 路由适合开发早期，生产环境应在启动时发现 nil Handler 并 fail fast。
+	// 否则未装配模块会以运行时 501 暴露给用户。
 	if h != nil && h.Auth != nil {
 		rg.POST("/login", h.Auth.Login)
 		rg.POST("/refresh", h.Auth.Refresh)

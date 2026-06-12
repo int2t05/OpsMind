@@ -40,6 +40,8 @@ func Success(c *gin.Context, data interface{}) {
 
 // Error 返回错误响应，根据错误码自动映射 HTTP 状态码
 func Error(c *gin.Context, code int, message string) {
+	// TODO(response): 错误响应应带 request_id，方便前端报错和服务端日志关联。
+	// 可从 middleware.RequestID 写入的 Gin context/header 中读取。
 	c.JSON(mapHTTPStatus(code), Response{
 		Code:    code,
 		Message: message,
@@ -49,6 +51,8 @@ func Error(c *gin.Context, code int, message string) {
 
 // SuccessWithPage 返回分页成功响应
 func SuccessWithPage(c *gin.Context, data interface{}, total int64, page, pageSize int) {
+	// TODO(response): 分页响应当前把 total/page/page_size 放在顶层，而部分前端类型期望 data.items/data.total。
+	// 应统一一种分页契约，减少视图里 (res as any).data || res 的兼容代码。
 	c.JSON(http.StatusOK, PageResponse{
 		Code:     errcode.Success,
 		Message:  "success",

@@ -46,6 +46,8 @@ func LoggerWithWriter(writer io.Writer) gin.HandlerFunc {
 			"latency":     latency.String(),
 			"client_ip":   c.ClientIP(),
 		}
+		// TODO(middleware/logger): 将 X-Request-ID、userID、错误码、响应大小写入日志。
+		// 现在日志无法把一次失败请求和业务错误、审计日志、前端报错串起来。
 
 		// 输出 JSON 格式日志
 		jsonBytes, err := json.Marshal(logEntry)

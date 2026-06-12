@@ -32,6 +32,8 @@ func NewRoleService(repo *repository.RoleRepo, userRepo *repository.UserRepo, db
 //
 // 校验角色名唯一性，重复返回 10005。
 func (s *RoleService) Create(name, description string, permissions []string) error {
+	// TODO(service/role): 对 permissions 做白名单校验。
+	// 当前任意字符串都能写入角色权限，拼写错误会导致菜单/接口权限悄悄失效。
 	// 校验角色名唯一（通过 Repository 层，保证三层架构一致）
 	exists, err := s.repo.ExistsByName(name, 0)
 	if err != nil {
@@ -108,6 +110,8 @@ func (s *RoleService) Update(id int64, name, description string, permissions []s
 
 // Delete 删除角色。
 func (s *RoleService) Delete(id int64) error {
+	// TODO(service/role): 禁止删除系统内置角色或最后一个系统管理员角色。
+	// 这些角色是权限体系的根，删除后可能导致系统无法管理。
 	_, err := s.repo.GetByID(id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -154,6 +158,8 @@ func (s *RoleService) GetRoleMenus(roleID int64) ([]model.Menu, error) {
 // 为什么全量替换而非增量更新：前端提交的是完整菜单 ID 列表，
 // 全量替换避免了前端需要追踪增删的复杂性。
 func (s *RoleService) UpdateRoleMenus(roleID int64, menuIDs []int64) error {
+	// TODO(service/role): 校验 menuIDs 是否全部存在，且按钮权限不能挂到错误父级。
+	// 现在直接写关联表，非法 ID 只能依赖数据库约束或静默产生无效授权。
 	// 先确认角色存在
 	if _, err := s.repo.GetByID(roleID); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {

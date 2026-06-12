@@ -39,6 +39,8 @@ func NewMessageService(repo *repository.MessageRepo) *MessageService {
 // 为什么同步调用而非异步：消息写入是轻量操作（单条 INSERT），
 // 同步执行可保证事务一致性——如果消息创建失败，申告操作也告失败。
 func (s *MessageService) NotifySupplement(ticketID int64, userID int64) error {
+	// TODO(service/message): 消息文案应包含 ticket_no/title 或跳转目标摘要。
+	// 只有 RelatedID 时前端可跳转，但通知列表缺少足够上下文。
 	msg := &model.Message{
 		UserID:      userID,
 		Title:       "申告需补充信息",
@@ -79,6 +81,8 @@ func (s *MessageService) MarkAsRead(id int64, userID int64) error {
 
 // CountUnread 查询指定用户的未读消息数。
 func (s *MessageService) CountUnread(userID int64) (int64, error) {
+	// TODO(service/message): 未读数适合缓存或通过 WebSocket/SSE 推送。
+	// 当前每次布局刷新都查库，用户量上来后会形成高频小查询。
 	if userID <= 0 {
 		return 0, AppError{Code: errcode.ErrParam, Message: "无效的用户 ID"}
 	}

@@ -34,6 +34,8 @@ func (r *ChatRepo) Create(session *model.ChatSession) error {
 
 // FindByID 按 ID 查询问答会话。
 func (r *ChatRepo) FindByID(id int64) (*model.ChatSession, error) {
+	// TODO(repository/chat): FindByID 应支持 userID 条件，用于门户端防止水平越权。
+	// 只按 session id 查询会把授权判断推到更上层且容易遗漏。
 	var session model.ChatSession
 	err := r.db.Where("id = ?", id).First(&session).Error
 	if err != nil {
@@ -84,6 +86,8 @@ func (r *ChatRepo) ListByUser(userID int64, page, pageSize int) ([]model.ChatSes
 // 批量插入减少网络往返。GORM Create 支持切片参数。
 // 空切片调用不会报错（GORM 跳过空切片插入）。
 func (r *ChatRepo) CreateBatch(messages []model.ChatMessage) error {
+	// TODO(repository/chat): CreateBatch 当前没有和 ChatSession 创建放在同一事务。
+	// 如果后续恢复消息落库，应保证会话和两条消息原子写入。
 	if len(messages) == 0 {
 		return nil
 	}

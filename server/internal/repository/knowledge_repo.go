@@ -31,6 +31,8 @@ func NewKnowledgeRepo(db *gorm.DB) *KnowledgeRepo {
 // 创建后 kb.ID 会被 GORM 自动填充。
 // rag_workspace_slug 唯一约束由数据库保证，重复时返回 PostgreSQL 错误。
 func (r *KnowledgeRepo) CreateKB(kb *model.KnowledgeBase) error {
+	// TODO(repository/knowledge): 创建知识库应依赖数据库唯一索引兜底，并将重复错误转换为 ErrConflict。
+	// 当前 Service 没有名称唯一性预校验，重复名称会返回底层数据库错误。
 	return r.db.Create(kb).Error
 }
 
@@ -58,6 +60,8 @@ func (r *KnowledgeRepo) UpdateKB(kb *model.KnowledgeBase) error {
 //
 // 为什么返回空切片而非 nil：调用方可以直接 range 遍历，无需额外 nil 判断。
 func (r *KnowledgeRepo) ListKBs() ([]model.KnowledgeBase, error) {
+	// TODO(repository/knowledge): ListKBs 应返回 article_count，避免 Service/前端再额外查询统计。
+	// API 文档已经定义 article_count 字段。
 	var kbs []model.KnowledgeBase
 	err := r.db.Order("id ASC").Find(&kbs).Error
 	if err != nil {
@@ -110,6 +114,8 @@ func (r *KnowledgeRepo) UpdateArticle(article *model.KnowledgeArticle) error {
 //
 // 为什么按 id DESC 排序：最新创建的文章排在前面，符合管理后台使用习惯。
 func (r *KnowledgeRepo) ListArticles(kbID int64, status int, page, pageSize int) ([]model.KnowledgeArticle, int64, error) {
+	// TODO(repository/knowledge): Count 后复用同一个 query 继续 Offset/Limit 容易携带 Count 的状态。
+	// 虽然 GORM 多数场景可用，后续可 clone session 或使用通用 Paginate 明确分离。
 	var articles []model.KnowledgeArticle
 	var total int64
 
@@ -135,6 +141,8 @@ func (r *KnowledgeRepo) ListArticles(kbID int64, status int, page, pageSize int)
 // 为什么单独封装而非复用 UpdateArticle：仅更新 status 字段，
 // 避免 Save 时意外覆盖其他字段（如 reviewed_by、review_comment 等）。
 func (r *KnowledgeRepo) UpdateArticleStatus(id int64, status int) error {
+	// TODO(repository/knowledge): UpdateArticleStatus 未检查 RowsAffected。
+	// 不存在的 articleID 会被当成更新成功，Service 无法返回 404。
 	return r.db.Model(&model.KnowledgeArticle{}).Where("id = ?", id).Update("status", status).Error
 }
 
@@ -157,4 +165,3 @@ func (r *KnowledgeRepo) FindChunksByArticleID(articleID int64) ([]model.Knowledg
 }
 
 // =============================================================================
-

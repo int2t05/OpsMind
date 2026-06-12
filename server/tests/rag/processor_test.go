@@ -79,9 +79,8 @@ func TestProcessor_SingleDocument(t *testing.T) {
 
 	parser := rag.NewDocParser()
 	chunker := rag.NewChunker(1000, 200)
-	emb := rag.NewEmbedder(&mockEmbeddingClient{dimension: 4}, 20)
+	emb := rag.NewEmbedder(&mockEmbeddingClient{dimension: 1024}, 20)
 
-	// 使用 4 维向量测试（无需真实 Embedding 服务）
 	proc := rag.NewProcessor(parser, chunker, emb, store, 2)
 
 	// 准备测试数据
@@ -127,7 +126,7 @@ func TestProcessor_MultipleDocuments(t *testing.T) {
 
 	parser := rag.NewDocParser()
 	chunker := rag.NewChunker(500, 100)
-	emb := rag.NewEmbedder(&mockEmbeddingClient{dimension: 4}, 20)
+	emb := rag.NewEmbedder(&mockEmbeddingClient{dimension: 1024}, 20)
 	proc := rag.NewProcessor(parser, chunker, emb, store, 2)
 
 	baseID := int64(99960)
@@ -171,7 +170,7 @@ func TestProcessor_StopGraceful(t *testing.T) {
 
 	parser := rag.NewDocParser()
 	chunker := rag.NewChunker(1000, 200)
-	emb := rag.NewEmbedder(&mockEmbeddingClient{dimension: 4}, 20)
+	emb := rag.NewEmbedder(&mockEmbeddingClient{dimension: 1024}, 20)
 	proc := rag.NewProcessor(parser, chunker, emb, store, 1) // 单 worker
 
 	articleID := int64(99980)

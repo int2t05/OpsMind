@@ -45,6 +45,8 @@ func (h *ConfigHandler) Get(c *gin.Context) {
 //
 // PUT /api/v1/admin/configs/:key
 func (h *ConfigHandler) Update(c *gin.Context) {
+	// TODO(handler/config): binding:"required" 会让 false、0 等合法配置值被判定为缺失。
+	// 应改为解析 map[string]json.RawMessage 并检查 value key 是否存在。
 	key := c.Param("key")
 	if key == "" {
 		response.Error(c, errcode.ErrParam, "配置 key 不能为空")

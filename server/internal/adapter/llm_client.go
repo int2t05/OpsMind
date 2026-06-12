@@ -99,6 +99,8 @@ type OpenAIClient struct {
 
 // NewOpenAIClient 创建 OpenAIClient 实例。
 func NewOpenAIClient(baseURL, apiKey string, timeout time.Duration) *OpenAIClient {
+	// TODO(adapter/llm): 校验 baseURL 非空且是合法 URL。
+	// 当前空字符串会在请求阶段才变成难读的 unsupported protocol scheme 错误。
 	return &OpenAIClient{
 		baseURL: strings.TrimRight(baseURL, "/"),
 		apiKey:  apiKey,
@@ -139,6 +141,8 @@ type openAICompletionResponse struct {
 
 // ChatCompletion 发送同步对话请求。
 func (c *OpenAIClient) ChatCompletion(ctx context.Context, req ChatRequest) (*ChatResponse, error) {
+	// TODO(adapter/llm): req.Model 为空时应使用客户端默认模型或直接返回参数错误。
+	// OpenAI-compatible 服务通常要求 model 必填，空值错误应在本地提前暴露。
 	body := openAICompletionRequest{
 		Model:       req.Model,
 		Messages:    req.Messages,
@@ -214,6 +218,8 @@ func (c *OpenAIClient) ChatCompletionStream(ctx context.Context, req ChatRequest
 	if err != nil {
 		return nil, fmt.Errorf("流式请求 %s 失败: %w", c.baseURL, err)
 	}
+	// TODO(adapter/llm): 流式请求没有复用 doRequest 的 429/503 重试策略。
+	// 对临时限流或模型加载中的本地服务，首次失败会直接中断用户流式问答。
 	if resp.StatusCode != http.StatusOK {
 		respBody, _ := io.ReadAll(resp.Body)
 		resp.Body.Close()
@@ -239,6 +245,8 @@ func (c *OpenAIClient) readSSEStream(ctx context.Context, resp *http.Response, c
 	defer resp.Body.Close()
 
 	scanner := bufio.NewScanner(resp.Body)
+	// TODO(adapter/llm): bufio.Scanner 默认 token 上限 64K，较大的 SSE data 行会触发 ErrTooLong。
+	// 应调用 scanner.Buffer 或改用 bufio.Reader 按行读取。
 	for scanner.Scan() {
 		line := scanner.Text()
 		// 跳过空行和注释
@@ -390,6 +398,8 @@ func isRetryable(err error) bool {
 //
 // 封装 setHeaders + HTTP 发送 + 状态码检查，消除 llm_client 与 embedding_client 的重复代码。
 func doHTTPRequest(ctx context.Context, baseURL, apiKey, path string, jsonBody []byte, client *http.Client) ([]byte, error) {
+	// TODO(adapter/http): 与 OpenAIClient.tryRequest 的状态码处理不一致。
+	// 这里把 429/503 包成普通 error，导致 EmbeddingClient 的 isRetryable 永远识别不到。
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, baseURL+path, bytes.NewReader(jsonBody))
 	if err != nil {
 		return nil, fmt.Errorf("创建请求失败: %w", err)

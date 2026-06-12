@@ -27,6 +27,8 @@ func NewAuditService(auditRepo *repository.AuditRepo, userRepo *repository.UserR
 
 // List 分页查询审计日志，附加操作人姓名。
 func (s *AuditService) List(operatorID int64, action string, page, pageSize int) ([]response.AuditLogItem, int64, error) {
+	// TODO(service/audit): action/target_type 应支持枚举筛选和模糊搜索。
+	// 当前只能精确 action，排查“某个用户做过什么”之外的场景不够方便。
 	logs, total, err := s.auditRepo.List(operatorID, action, page, pageSize)
 	if err != nil {
 		return nil, 0, err
@@ -59,6 +61,8 @@ func (s *AuditService) List(operatorID int64, action string, page, pageSize int)
 
 // batchGetOperatorNames 批量查询操作人姓名。
 func (s *AuditService) batchGetOperatorNames(logs []model.AuditLog) map[int64]string {
+	// TODO(service/audit): operatorID=0 表示系统操作，应返回“系统”而不是空字符串。
+	// 这样自动关闭等日志在前端更可读。
 	if len(logs) == 0 {
 		return make(map[int64]string)
 	}
@@ -84,4 +88,3 @@ func (s *AuditService) batchGetOperatorNames(logs []model.AuditLog) map[int64]st
 	}
 	return result
 }
-

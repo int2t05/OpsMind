@@ -30,6 +30,7 @@ func (r *MessageRepo) Create(msg *model.Message) error {
 //
 // 按 created_at DESC 排序（最新在前），返回总数和列表。
 func (r *MessageRepo) ListByUser(userID int64, page, pageSize int) ([]model.Message, int64, error) {
+	// TODO(repository/message): 增加 is_read/type 过滤，消息中心需要快速查看未读或某类通知。
 	var messages []model.Message
 	var total int64
 

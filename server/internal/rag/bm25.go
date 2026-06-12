@@ -60,6 +60,8 @@ type GseSegmenter struct {
 func NewGseSegmenter() *GseSegmenter {
 	s := &GseSegmenter{}
 	// 加载内置词典
+	// TODO(rag/bm25): LoadDict 错误不应完全忽略。
+	// 至少记录 warn，否则分词质量退化到字符级时检索效果下降但无可观测信号。
 	_ = s.seg.LoadDict() // gse 内置词典加载失败不影响使用（回退到字符级）
 	return s
 }
@@ -182,6 +184,8 @@ func NewBM25Retriever(seg Segmenter, ttl time.Duration) *BM25Retriever {
 //
 // 此方法会替换该知识库的全部旧索引数据。
 func (r *BM25Retriever) BuildIndex(kbID int64, docs []BM25Document) {
+	// TODO(rag/bm25): BuildIndex 会同步分词全量 docs，调用方如果在请求路径调用会造成长尾延迟。
+	// 可提供异步预热和构建中状态，避免首个用户请求承担索引成本。
 	idx := r.buildIndex(docs)
 
 	r.mu.Lock()
@@ -235,6 +239,8 @@ func (r *BM25Retriever) buildIndex(docs []BM25Document) *BM25Index {
 //
 // 如果知识库索引不存在或已过期，返回空结果（不报错）。
 func (r *BM25Retriever) Retrieve(ctx context.Context, query string, kbID int64, topK int) ([]RetrievalResult, error) {
+	// TODO(rag/bm25): topK<=0 时应返回默认值或参数错误。
+	// 当前 topK=0 会截取空结果，导致管道误判无召回。
 	// 检查 context 是否已取消（支持超时和取消）
 	select {
 	case <-ctx.Done():
@@ -260,6 +266,8 @@ func (r *BM25Retriever) Retrieve(ctx context.Context, query string, kbID int64, 
 
 	// 对查询分词
 	queryTokens := r.segmenter.Segment(query)
+	// TODO(rag/bm25): 对 token 做停用词、空白、标点和过短 token 过滤。
+	// 中文分词会产生一些低信息量 token，直接入 BM25 会降低排序质量。
 
 	// 计算每个文档的 BM25 分数
 	scores := r.scoreQuery(entry.index, queryTokens)

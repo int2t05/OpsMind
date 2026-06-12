@@ -33,6 +33,8 @@ func GenerateRefreshToken(userID int64, username string, roles []string, permiss
 
 // ParseToken 解析并验证令牌
 func ParseToken(tokenString string, secret string) (*Claims, error) {
+	// TODO(jwt): 限制 JWT alg 必须为 HS256。
+	// jwt.ParseWithClaims 会校验签名，但最好显式拒绝非预期算法，避免未来改配置时扩大攻击面。
 	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
 		return []byte(secret), nil
 	})
@@ -49,6 +51,8 @@ func ParseToken(tokenString string, secret string) (*Claims, error) {
 
 // generateToken 内部令牌生成函数
 func generateToken(userID int64, username string, roles []string, permissions []string, tokenType string, secret string, expire time.Duration) (string, error) {
+	// TODO(jwt): 增加 issuer/audience/jti/token_version。
+	// 这些声明可支持多环境隔离、单点登出、权限变更后强制旧 token 失效。
 	claims := &Claims{
 		UserID:      userID,
 		Username:    username,

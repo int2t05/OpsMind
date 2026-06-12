@@ -34,6 +34,8 @@ type CurrentUser struct {
 // 函数签名更清晰，调用方通过参数传入 secret，便于测试和配置。
 func JWTAuth(secret string) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// TODO(middleware/auth): secret 为空时应在中间件构造阶段拒绝启动或返回明确配置错误。
+		// 当前空密钥会让 token 校验行为依赖调用方是否提前检查，安全边界不够集中。
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
 			abortWithError(c, errcode.ErrAuth, "缺失 Authorization 头")
@@ -52,6 +54,8 @@ func JWTAuth(secret string) gin.HandlerFunc {
 			abortWithError(c, errcode.ErrAuth, "令牌无效或已过期")
 			return
 		}
+		// TODO(middleware/auth): JWT 只校验签名和过期时间，没有检查用户是否被冻结或角色权限是否已被撤销。
+		// 对高风险后台接口，可增加 token_version 或短期权限缓存，让权限变更能即时失效。
 
 		// 拒绝 refresh token 用于 API 认证，保证双令牌安全模型
 		if claims.TokenType != "access" {

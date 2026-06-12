@@ -35,6 +35,8 @@ const (
 //
 // k 为 RRF 平滑参数，通常设为 60。
 func HybridFuse(vectorResults, bm25Results []RetrievalResult, k int, topK int) []RetrievalResult {
+	// TODO(rag/hybrid): 单路结果直接返回时没有按 topK 截断。
+	// 如果上游传入多路聚合结果，可能返回超过目标候选数。
 	if len(vectorResults) == 0 && len(bm25Results) == 0 {
 		return nil
 	}

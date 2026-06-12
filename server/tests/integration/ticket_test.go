@@ -135,6 +135,7 @@ func setupTicketIntegration(t *testing.T) *ticketIntEnv {
 	portal := r.Group("/api/v1/portal")
 	portal.Use(func(c *gin.Context) {
 		c.Set("currentUser", map[string]interface{}{"user_id": float64(submitter.ID)})
+		c.Set("userID", submitter.ID)
 		c.Next()
 	})
 	{
@@ -152,6 +153,7 @@ func setupTicketIntegration(t *testing.T) *ticketIntEnv {
 			"username": "itg_ticket_op",
 			"roles":    []interface{}{"admin"},
 		})
+		c.Set("userID", operator.ID)
 		c.Next()
 	})
 	{

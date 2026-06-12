@@ -121,6 +121,7 @@ func setupKnowledgeIntegration(t *testing.T) *knowledgeIntEnv {
 			"username": "admin",
 			"roles":    []interface{}{"admin"},
 		})
+		c.Set("userID", int64(1))
 		c.Next()
 	})
 
@@ -341,21 +342,16 @@ func TestKnowledgeIntegration_ListAndDetail(t *testing.T) {
 
 	assert.Equal(t, 200, w.Code, "列表查询应返回 200")
 	var listResp struct {
-		Code int `json:"code"`
-		Data struct {
-			Items []struct {
-				ID   int64  `json:"id"`
-				Name string `json:"name"`
-			} `json:"items"`
-		} `json:"data"`
+		Code int                       `json:"code"`
+		Data []model.KnowledgeBase     `json:"data"`
 	}
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &listResp))
 	assert.Equal(t, 0, listResp.Code)
-	assert.GreaterOrEqual(t, len(listResp.Data.Items), 1, "至少应有 1 个知识库")
-	t.Logf("✅ 知识库列表: %d 个", len(listResp.Data.Items))
+	assert.GreaterOrEqual(t, len(listResp.Data), 1, "至少应有 1 个知识库")
+	t.Logf("✅ 知识库列表: %d 个", len(listResp.Data))
 
 	// 创建文章并查询文章列表
-	kbID := listResp.Data.Items[0].ID
+	kbID := listResp.Data[0].ID
 	postJSON(t, env, fmt.Sprintf("/api/v1/admin/knowledge-bases/%d/articles", kbID),
 		request.CreateArticleRequest{
 			KBID:     kbID,

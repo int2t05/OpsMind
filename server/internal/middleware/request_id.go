@@ -21,6 +21,8 @@ func RequestID() gin.HandlerFunc {
 		if rid == "" {
 			rid = uuid.New().String()
 		}
+		// TODO(middleware/request_id): 校验客户端传入的 X-Request-ID 长度和字符集。
+		// 直接透传任意值可能污染日志字段，甚至影响下游日志检索。
 
 		c.Set(RequestIDKey, rid)
 		c.Header(RequestIDKey, rid)

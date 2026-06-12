@@ -67,6 +67,8 @@ func (r *TicketRepo) Update(ticket *model.Ticket) error {
 // 为什么单独封装：状态转换是高频操作，仅更新 status 字段避免
 // Save 意外覆盖其他字段（如 supplement_count）。
 func (r *TicketRepo) UpdateStatus(id int64, status int) error {
+	// TODO(repository/ticket): UpdateStatus 应返回 RowsAffected 或在 WHERE 中带 expectedStatus。
+	// 当前无法区分“不存在”“并发状态已变化”“成功更新”三种结果。
 	return r.db.Model(&model.Ticket{}).Where("id = ?", id).Update("status", status).Error
 }
 
@@ -107,6 +109,8 @@ func (r *TicketRepo) ListByUser(userID int64, page, pageSize int) ([]model.Ticke
 //   - status: -1 表示不过滤，其他值按精确匹配
 //   - urgency: 0 表示不过滤，其他值按精确匹配
 func (r *TicketRepo) ListAll(status int, urgency int, page, pageSize int) ([]model.Ticket, int64, error) {
+	// TODO(repository/ticket): ListAll 对提交人使用二次查询填充，但失败时静默忽略。
+	// 如果用户表查询失败，应返回错误，避免前端看到空 submitterName 误判为匿名。
 	var tickets []model.Ticket
 	var total int64
 
@@ -155,6 +159,8 @@ func (r *TicketRepo) ListAll(status int, urgency int, page, pageSize int) ([]mod
 // 纯数据操作：查询待关闭的 ticket → 批量 UPDATE status=5。
 // 事务编排和 TicketRecord 创建已上移到 TicketService.AutoClose。
 func (r *TicketRepo) AutoCloseTickets(olderThan time.Time) ([]int64, error) {
+	// TODO(repository/ticket): SELECT ids + UPDATE ids 之间不是原子操作。
+	// 可使用 UPDATE ... RETURNING id 在单条 SQL 中拿到关闭的工单列表。
 	var tickets []model.Ticket
 	if err := r.db.Model(&model.Ticket{}).
 		Where("status IN ? AND created_at < ?",

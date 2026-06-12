@@ -24,6 +24,8 @@ func CORS(allowOrigins []string) gin.HandlerFunc {
 		allowOrigins = []string{"http://localhost:5173"}
 	}
 
+	// TODO(middleware/cors): release 模式下应禁止 "*" 与 localhost 默认值。
+	// CORS 属于部署安全配置，建议在 config.Validate 中按环境强校验。
 	return cors.New(cors.Config{
 		AllowOrigins:     allowOrigins,
 		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},

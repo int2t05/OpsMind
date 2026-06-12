@@ -44,17 +44,17 @@ func (KnowledgeArticle) TableName() string { return "knowledge_articles" }
 
 // KnowledgeChunk 知识切片表。
 // 记录知识条目发布时的切片内容和 pgvector 向量。
-// embedding 向量以 halfvec 类型存储在 pgvector 中（通过 VectorStore 接口管理）。
+// embedding 向量以 halfvec 类型存储在 pgvector column 中（由 VectorStore 适配器通过 SQL 管理，不走 GORM）。
 type KnowledgeChunk struct {
-	ID              int64      `gorm:"primaryKey;autoIncrement" json:"id"`
-	ArticleID       int64      `gorm:"not null;column:article_id;index:idx_chunks_article_id" json:"article_id"`
-	Content         string     `gorm:"type:text;not null" json:"content"`
-	EmbeddingModel  string     `gorm:"type:varchar(128);not null;column:embedding_model" json:"embedding_model"`
-	VectorDimension int        `gorm:"not null;column:vector_dimension" json:"vector_dimension"`
-	SyncStatus      string     `gorm:"type:varchar(16);not null;default:'pending';column:sync_status" json:"sync_status"`
-	SyncError       string     `gorm:"type:text;column:sync_error" json:"sync_error"`
-	SyncedAt        *time.Time `gorm:"column:synced_at" json:"synced_at"`
-	CreatedAt       time.Time  `gorm:"not null" json:"created_at"`
+	ID              int64     `gorm:"primaryKey;autoIncrement" json:"id"`
+	ArticleID       int64     `gorm:"not null;column:article_id;index:idx_chunks_article_id" json:"article_id"`
+	KBID            int64     `gorm:"not null;default:0;column:kb_id;index:idx_chunks_kb_id" json:"kb_id"`
+	Content         string    `gorm:"type:text;not null" json:"content"`
+	ChunkIndex      int       `gorm:"not null;default:0;column:chunk_index" json:"chunk_index"`
+	EmbeddingModel  string    `gorm:"type:varchar(128);not null;column:embedding_model" json:"embedding_model"`
+	VectorDimension int       `gorm:"not null;column:vector_dimension" json:"vector_dimension"`
+	CreatedAt       time.Time `gorm:"not null" json:"created_at"`
+	// embedding halfvec(1024) — 由 VectorStore 适配器通过 SQL 直接管理，不走 GORM
 }
 
 func (KnowledgeChunk) TableName() string { return "knowledge_chunks" }

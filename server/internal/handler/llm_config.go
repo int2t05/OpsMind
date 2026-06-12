@@ -69,6 +69,8 @@ func (h *LLMConfigHandler) ListConfigs(c *gin.Context) {
 //
 // POST /api/v1/admin/llm-configs
 func (h *LLMConfigHandler) CreateConfig(c *gin.Context) {
+	// TODO(handler/llm_config): Handler 不应在这里补业务默认值 8192/1024。
+	// 默认值应集中在配置/Service 层，避免不同入口创建配置时默认值不一致。
 	var req request.CreateLLMConfigRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, errcode.ErrParam, "参数校验失败: "+err.Error())
@@ -94,6 +96,8 @@ func (h *LLMConfigHandler) CreateConfig(c *gin.Context) {
 //
 // GET /api/v1/admin/llm-configs/:id
 func (h *LLMConfigHandler) GetConfig(c *gin.Context) {
+	// TODO(handler/llm_config): GetConfig 直接返回 model.LlmConfig，会暴露完整 api_key。
+	// 应返回和列表相同的脱敏 DTO，编辑时通过“不传保留原密钥”机制处理。
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
 		response.Error(c, errcode.ErrParam, "无效的配置 ID")
@@ -112,6 +116,8 @@ func (h *LLMConfigHandler) GetConfig(c *gin.Context) {
 //
 // PUT /api/v1/admin/llm-configs/:id
 func (h *LLMConfigHandler) UpdateConfig(c *gin.Context) {
+	// TODO(handler/llm_config): UpdateConfig 是全量替换，但 API 文档说明 api_key 不传时保留。
+	// 需要使用指针字段 DTO 区分零值和未传字段。
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
 		response.Error(c, errcode.ErrParam, "无效的配置 ID")
@@ -172,6 +178,8 @@ func (h *LLMConfigHandler) DeleteConfig(c *gin.Context) {
 //
 // POST /api/v1/admin/llm-configs/:id/test
 func (h *LLMConfigHandler) TestConnection(c *gin.Context) {
+	// TODO(handler/llm_config): 测试连接应基于被测 cfg 创建临时 OpenAIClient。
+	// 当前使用注入的 h.llmClient，实际测试的是启动时默认 BaseURL/APIKey，而不是 :id 对应配置。
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
 		response.Error(c, errcode.ErrParam, "无效的配置 ID")
@@ -207,6 +215,8 @@ func (h *LLMConfigHandler) TestConnection(c *gin.Context) {
 		resp, err := h.llmClient.ChatCompletion(ctx, testReq)
 		latency := time.Since(start).Milliseconds()
 		if err != nil {
+			// TODO(handler/llm_config): API 文档约定测试失败仍返回 code=0, data.success=false。
+			// 当前返回 ErrAIUnavailable，会让前端把业务测试失败当成接口失败处理。
 			response.Error(c, errcode.ErrAIUnavailable, "连接测试失败: "+err.Error())
 			return
 		}

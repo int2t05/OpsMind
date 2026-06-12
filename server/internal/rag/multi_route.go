@@ -25,6 +25,8 @@ import (
 // count 控制生成的子查询数量（2-4 个）。
 // LLM 调用失败时降级返回 [query] 单路检索。
 func MultiRoute(ctx context.Context, llm adapter.LLMClient, query string, count int) ([]string, error) {
+	// TODO(rag/multi_route): count 应限制到 2-4，与 API 文档一致。
+	// 过大的 count 会放大检索次数和 RRF 候选池，影响延迟。
 	if count <= 0 {
 		count = 3
 	}

@@ -36,6 +36,8 @@ type Retriever interface {
 //
 // 所有字段均为可选，零值表示使用默认配置（全部开启，TopK=5）。
 type RAGOptions struct {
+	// TODO(rag/types): bool 零值无法表达“未传则默认 true”和“用户显式 false”的区别。
+	// 请求层需要用 *bool 或先 DefaultRAGOptions 再覆盖，否则默认选项容易被零值关闭。
 	TopK          int  `json:"top_k"`          // 最终返回的检索结果数，默认 5
 	QueryRewrite  bool `json:"query_rewrite"`  // 是否启用查询改写
 	MultiRoute    bool `json:"multi_route"`    // 是否启用多路检索（生成子查询）
@@ -47,6 +49,8 @@ type RAGOptions struct {
 
 // DefaultRAGOptions 返回默认的 RAG 检索选项。
 func DefaultRAGOptions() RAGOptions {
+	// TODO(rag/types): 增加 Normalize/Validate 方法统一处理 TopK、RouteCount、RerankCount 的范围。
+	// 现在各调用方可能各自补默认值，行为容易不一致。
 	return RAGOptions{
 		TopK:         5,
 		QueryRewrite: true,

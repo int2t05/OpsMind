@@ -76,5 +76,7 @@ func (r *RoleRepo) Update(role *model.Role) error {
 
 // Delete 删除角色。
 func (r *RoleRepo) Delete(id int64) error {
+	// TODO(repository/role): Delete 应检查 RowsAffected。
+	// Service 虽先查存在，但并发删除时仍可能返回成功。
 	return r.db.Delete(&model.Role{}, id).Error
 }

@@ -16,6 +16,8 @@ import (
 //
 // 因此 AutoMigrate 完成后，通过原始 SQL 重建这三个索引为 DESC。
 func AutoMigrate(db *gorm.DB) error {
+	// TODO(database/migrate): AutoMigrate 不会启用 pgvector 扩展，也不会创建 halfvec/HNSW 专用索引。
+	// 应将 pgvector schema 迁移固定到 SQL migration，确保开发、测试、生产结构完全一致。
 	if err := db.AutoMigrate(
 		&model.User{},
 		&model.Role{},
@@ -43,6 +45,8 @@ func AutoMigrate(db *gorm.DB) error {
 		"CREATE INDEX IF NOT EXISTS idx_chat_created_at ON chat_sessions(created_at DESC)",
 		"CREATE INDEX IF NOT EXISTS idx_audit_created_at ON audit_logs(created_at DESC)",
 	}
+	// TODO(database/migrate): 这些索引 SQL 与 migrations/001_init.sql 之间存在重复定义风险。
+	// 后续应选择单一迁移来源，避免 AutoMigrate 与 SQL migration 对同一索引策略产生漂移。
 	for _, sql := range descIndexes {
 		if err := db.Exec(sql).Error; err != nil {
 			return err
