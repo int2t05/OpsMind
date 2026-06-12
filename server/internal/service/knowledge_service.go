@@ -4,13 +4,14 @@
 package service
 
 import (
-	"errors"
 	"context"
-	"log/slog"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"strings"
+	"time"
 
 	"opsmind/internal/adapter"
 	"opsmind/internal/dto/request"
@@ -86,12 +87,18 @@ func NewKnowledgeService(repo knowledgeRepo, chunker knowledgeChunker, embedder 
 
 // CreateKB 创建知识库（仅写 PostgreSQL）。
 func (s *KnowledgeService) CreateKB(req request.CreateKBRequest, userID int64) error {
+	// 生成唯一 workspace slug，避免空字符串触发唯一索引冲突
+	slug := strings.TrimSpace(req.Name)
+	if slug == "" {
+		slug = fmt.Sprintf("kb-%d", time.Now().UnixNano())
+	}
 	kb := &model.KnowledgeBase{
-		Name:            req.Name,
-		Description:     req.Description,
-		EmbeddingModel:  req.EmbeddingModel,
-		VectorDimension: req.VectorDimension,
-		CreatedBy:       userID,
+		Name:             req.Name,
+		Description:      req.Description,
+		RAGWorkspaceSlug: slug,
+		EmbeddingModel:   req.EmbeddingModel,
+		VectorDimension:  req.VectorDimension,
+		CreatedBy:        userID,
 	}
 	return s.repo.CreateKB(kb)
 }
@@ -151,8 +158,8 @@ func (s *KnowledgeService) CreateArticle(req request.CreateArticleRequest, userI
 	tagsJSON := marshalTags(req.Tags)
 	article := &model.KnowledgeArticle{
 		KBID:      req.KBID,
-		Question:  req.Question,
-		Answer:    req.Answer,
+		Title:     req.Title,
+		Content:   req.Content,
 		Category:  req.Category,
 		Tags:      tagsJSON,
 		Status:    1, // 草稿
@@ -177,8 +184,8 @@ func (s *KnowledgeService) UpdateArticle(id int64, req request.UpdateArticleRequ
 		// 应统一状态枚举，避免前后端对文章生命周期理解不一致。
 		return errcode.AppError{Code: errcode.ErrParam, Message: "仅草稿和驳回状态可编辑"}
 	}
-	article.Question = req.Question
-	article.Answer = req.Answer
+	article.Title = req.Title
+	article.Content = req.Content
 	article.Category = req.Category
 	article.Tags = marshalTags(req.Tags)
 	return s.repo.UpdateArticle(article)
@@ -264,7 +271,7 @@ func (s *KnowledgeService) Publish(id int64, publisherID int64) error {
 	// Step 1: 分块
 	// TODO(service/knowledge): 应将标题和正文一起进入分块，例如 title + "\n\n" + content。
 	// 只对 Answer 分块会丢失标题语义，影响短问答类知识的召回。
-	content := article.Answer
+	content := article.Content
 	chunks := s.chunker.Split(content)
 	if len(chunks) == 0 {
 		return errcode.AppError{Code: errcode.ErrUnknown, Message: "分块结果为空"}
@@ -377,8 +384,8 @@ func (s *KnowledgeService) ListArticles(kbID int64, status int, page, pageSize i
 			ID:            a.ID,
 			KBID:          a.KBID,
 			KBName:        a.KnowledgeBase.Name,
-			Question:      a.Question,
-			Answer:        a.Answer,
+			Title:         a.Title,
+			Content:       a.Content,
 			Category:      a.Category,
 			Tags:          unmarshalTags(a.Tags),
 			Status:        a.Status,
@@ -431,8 +438,8 @@ func (s *KnowledgeService) GetArticleDetail(id int64) (*response.ArticleDetailRe
 			ID:            article.ID,
 			KBID:          article.KBID,
 			KBName:        article.KnowledgeBase.Name,
-			Question:      article.Question,
-			Answer:        article.Answer,
+			Title:         article.Title,
+			Content:       article.Content,
 			Category:      article.Category,
 			Tags:          unmarshalTags(article.Tags),
 			Status:        article.Status,
@@ -487,8 +494,8 @@ func (s *KnowledgeService) UploadDocuments(kbID int64, userID int64, filename st
 
 	article := &model.KnowledgeArticle{
 		KBID:      kbID,
-		Question:  filename,
-		Answer:    text,
+		Title:     filename,
+		Content:   text,
 		Category:  "文档上传",
 		Status:    1, // 草稿
 		CreatedBy: userID,
@@ -543,7 +550,7 @@ func (s *KnowledgeService) RetryDocument(articleID int64) error {
 	task := rag.ProcessTask{
 		ArticleID: articleID,
 		KBID:      article.KBID,
-		Content:   article.Answer,
+		Content:   article.Content,
 	}
 	if err := s.processor.Submit(task); err != nil {
 		return errcode.AppError{Code: errcode.ErrUnknown, Message: "提交处理任务失败: " + err.Error()}

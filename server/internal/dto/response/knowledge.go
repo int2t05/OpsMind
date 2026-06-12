@@ -31,19 +31,21 @@ type ArticleListResponse struct {
 	Total    int64             `json:"total"`
 }
 
-// ArticleResponse 文章列表项响应。
+// ArticleResponse 文章列表项响应（v2 title/content）。
 type ArticleResponse struct {
-	// TODO(dto/knowledge): ArticleResponse 仍暴露 question/answer。
-	// v2 列表应返回 title/content/source_type/process_status/word_count/chunk_count。
 	ID            int64     `json:"id"`
 	KBID          int64     `json:"kb_id"`
 	KBName        string    `json:"kb_name"`
-	Question      string    `json:"question"`
-	Answer        string    `json:"answer"`
+	Title         string    `json:"title"`
+	Content       string    `json:"content"`
 	Category      string    `json:"category"`
 	Tags          []string  `json:"tags"`
 	Status        int16     `json:"status"`
 	StatusText    string    `json:"status_text"`
+	SourceType    int16     `json:"source_type"`
+	WordCount     int       `json:"word_count"`
+	ChunkCount    int       `json:"chunk_count"`
+	ProcessStatus string    `json:"process_status"`
 	CreatedBy     int64     `json:"created_by"`
 	ReviewedBy    *int64    `json:"reviewed_by"`
 	ReviewComment string    `json:"review_comment"`

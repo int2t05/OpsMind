@@ -31,11 +31,10 @@ type CreateArticleRequest struct {
 
 // UpdateArticleRequest 更新知识文章请求。
 type UpdateArticleRequest struct {
-	// TODO(dto/knowledge): 更新文章同样需要迁移到 title/content，并支持 tags/category 的局部更新语义。
-	Question string   `json:"question" binding:"required"` // 问题
-	Answer   string   `json:"answer" binding:"required"`   // 答案
+	Title    string   `json:"title" binding:"required"`    // 标题
+	Content  string   `json:"content" binding:"required"`  // 内容
 	Category string   `json:"category"`                    // 分类
-	Tags     []string `json:"tags"`                       // 标签列表
+	Tags     []string `json:"tags"`                        // 标签列表
 }
 
 // ReviewRequest 审核知识文章请求。

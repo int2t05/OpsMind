@@ -157,7 +157,8 @@ export async function assertError(
   const statuses = Array.isArray(expectedHttpStatus) ? expectedHttpStatus : [expectedHttpStatus];
   expect(statuses, `HTTP ${response.status()} not in [${statuses}]`).toContain(response.status());
   const body: ApiResponse = await response.json();
-  expect(body.code, `期望 code=${expectedCode}`).toBe(expectedCode);
+  const codes = Array.isArray(expectedCode) ? expectedCode : [expectedCode];
+  expect(codes, `期望 code in [${codes}], got ${body.code}`).toContain(body.code);
   expect(body.message).toBeTruthy();
   return body;
 }
