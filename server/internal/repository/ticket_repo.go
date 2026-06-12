@@ -153,6 +153,10 @@ func (r *TicketRepo) ListAll(status int, urgency int, page, pageSize int) ([]mod
 // 关闭条件：status IN (1,2,3) AND created_at < olderThan。
 // 只关闭待处理(1)、处理中(2)、需补充信息(3)的申告。
 // 已解决(4)和已关闭(5)的申告不处理。
+// TODO: 魔数 1,2,3,5 应替换为 model 枚举常量。
+// 应使用 model.TicketStatusPending/Processing/NeedSupplement/Closed。
+// TODO: 批量关闭不创建 TicketRecord，ticket 直接从 1/2/3→5 无 timeline 记录。
+// 应在 scheduler 层遍历关闭的 ticket，逐个创建 TicketRecord。
 func (r *TicketRepo) AutoCloseTickets(olderThan time.Time) (int64, error) {
 	result := r.db.Model(&model.Ticket{}).
 		Where("status IN (1,2,3) AND created_at < ?", olderThan).

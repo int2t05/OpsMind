@@ -35,6 +35,11 @@
 </template>
 
 <script setup lang="ts">
+// TODO(portal/Messages): Pagination 组件仅 emit update:current-page/update:page-size，
+//                       但模板使用 @change="handlePageChange" 监听不存在的事件 — 分页功能实际失效。
+//                       应改为 @update:current-page="handlePageChange" 或使用 v-model:current-page。
+// TODO(portal/Messages): handleClick 中 markAsRead 无错误处理 — 标记失败时用户无感知。
+// TODO(portal/Messages): 使用 (res as any) 绕过类型检查 — 待 API 层泛型补全后移除。
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { listMessages, markAsRead, type MessageItem } from '@/api/message'

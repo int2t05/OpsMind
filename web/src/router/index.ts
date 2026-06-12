@@ -7,6 +7,13 @@
  * - 后台路由（/admin/*）— 需要登录 + 对应角色权限
  *
  * 路由守卫检查 token 有效性、首次登录强制跳转修改密码页、角色权限校验。
+ *
+ * TODO(router): 路由守卫未读取 meta.roles 进行角色权限校验 — 任何已登录用户可访问所有路由。
+ *               需在 beforeEach 中根据 auth store 的 user roles 与 to.meta.roles 做交集判断。
+ * TODO(router): 路由守卫仅检查 token 是否存在，未校验 JWT 是否过期 — 过期 token 会导致页面加载闪白后
+ *               才被 API 拦截器踢回登录页。应在守卫层主动解码 token 并校验 exp。
+ * TODO(router): 缺少 scrollBehavior 配置 — 页面间导航不会自动恢复/重置滚动位置。
+ * TODO(router): /admin 路由组缺少 meta.roles 定义 — 应限定为 admin/operator 等后台角色。
  */
 
 import { createRouter, createWebHistory } from 'vue-router'

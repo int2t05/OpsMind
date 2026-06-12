@@ -163,6 +163,11 @@
 </template>
 
 <script setup lang="ts">
+// TODO(admin/LLMConfig): 组件超过 610 行 — 应拆分为配置列表子组件、编辑弹窗子组件、连接测试组件。
+// TODO(admin/LLMConfig): reactive() 和 ref() 混用管理表单状态 — form 用 reactive，deleteTarget/testResult 用 ref，
+//                       增加了认知负担。建议统一使用 ref + 整体对象替换。
+// TODO(admin/LLMConfig): toast 定时器未在 onUnmounted 清理 — 存在内存泄漏。
+// TODO(admin/LLMConfig): Base URL 无 URL 格式校验；API Key 编辑模式下清空但无提示说明留空则保留原值。
 import { ref, reactive, onMounted } from 'vue'
 import {
   getLLMConfigs, createLLMConfig, updateLLMConfig, deleteLLMConfig, testLLMConnection,

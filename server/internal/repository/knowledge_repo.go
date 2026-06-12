@@ -115,6 +115,7 @@ func (r *KnowledgeRepo) ListArticles(kbID int64, status int, page, pageSize int)
 	var total int64
 
 	query := r.db.Model(&model.KnowledgeArticle{}).Where("kb_id = ?", kbID)
+	// TODO: 缺少 .Preload("KnowledgeBase") — 导致 ListArticles 的 KBName 字段触发 N+1 查询。
 	if status >= 0 {
 		query = query.Where("status = ?", status)
 	}
@@ -202,6 +203,9 @@ func (r *KnowledgeRepo) UpdateChunkStatusByArticleID(articleID int64, status str
 
 // =============================================================================
 // EmbeddingConfig
+// TODO: 以下 5 个方法 (CreateEmbeddingConfig / UpdateEmbeddingConfig / ListEmbeddingConfigs /
+// DeleteEmbeddingConfig / GetDefaultEmbeddingConfig) 在 Service 层无调用方，仅测试引用，
+// 属于死代码。若短期内无使用计划应删除。
 // =============================================================================
 
 // CreateEmbeddingConfig 创建 Embedding 配置。

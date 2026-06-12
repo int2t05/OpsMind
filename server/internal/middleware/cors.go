@@ -16,6 +16,8 @@ import (
 )
 
 // CORS 返回 CORS 跨域中间件
+// TODO: AllowOrigins 硬编码为 localhost:5173 — 非本地环境需手动修改代码。
+// 应从配置读取（如 config.AppConfig.CORS.AllowOrigins），支持环境变量注入。
 func CORS() gin.HandlerFunc {
 	return cors.New(cors.Config{
 		AllowOrigins:     []string{"http://localhost:5173"},

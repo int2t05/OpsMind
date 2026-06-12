@@ -187,6 +187,10 @@ func (s *TicketService) UpdateStatus(id int64, operatorID int64, req request.Upd
 			return AppError{Code: errcode.ErrParam, Message: "仅处理中状态可请求补充信息"}
 		}
 		// 补充次数上限检查
+		// TODO: 竞态条件 — ticket.SupplementCount 是读取后几毫秒的旧值。
+		// 并发请求可能同时通过 >= 3 检查，双双自增到 4、5 并转入状态 3。
+		// 应改为 SQL 原子检查: UPDATE ... SET supplement_count = supplement_count + 1
+		// WHERE id = ? AND supplement_count < 3，然后检查 RowsAffected。
 		if ticket.SupplementCount >= 3 {
 			return AppError{Code: errcode.ErrParam, Message: "补充信息次数已达上限（3次）"}
 		}
@@ -215,6 +219,10 @@ func (s *TicketService) UpdateStatus(id int64, operatorID int64, req request.Upd
 	}
 
 	// 更新状态
+	// TODO: UpdateStatus + CreateRecord 不在同一事务中。
+	// 若状态更新成功但 record 创建失败（约束冲突/磁盘满），
+	// 状态已变化但无对应的 timeline 记录，数据不一致。
+	// 应包裹在 s.repo.Transaction(func(tx *gorm.DB) error { ... }) 中。
 	if err := s.repo.UpdateStatus(id, int(newStatus)); err != nil {
 		return err
 	}
@@ -370,6 +378,8 @@ func toTicketItem(t *model.Ticket) response.TicketItem {
 }
 
 // marshalTicketTags 将字符串切片序列化为 JSON。
+// TODO: 手动字符串拼接构建 JSON 不安全 — 若 tag 值含双引号或逗号则产生畸形 JSON。
+// 应使用 json.Marshal（参考 knowledge_service.go 的 marshalTags 正确实现）。
 func marshalTicketTags(items []string) datatypes.JSON {
 	if len(items) == 0 {
 		return datatypes.JSON(`[]`)
@@ -383,6 +393,7 @@ func marshalTicketTags(items []string) datatypes.JSON {
 }
 
 // unmarshalTicketTags 将 JSON 反序列化为字符串切片。
+// TODO: 手动字符串分割解析 JSON 不安全 — 同 marshalTicketTags。应使用 json.Unmarshal。
 func unmarshalTicketTags(data datatypes.JSON) []string {
 	if len(data) == 0 {
 		return nil

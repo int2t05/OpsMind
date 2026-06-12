@@ -75,6 +75,7 @@ func (h *ChatHandler) SubmitFeedback(c *gin.Context) {
 	}
 
 	// 解析反馈值（int16: 0=未评价, 1=已解决, 2=未解决）
+	// TODO: 缺少反馈值范围校验 — 任意 int16 都能通过，应限制为 0/1/2。
 	var body struct {
 		Feedback int16 `json:"feedback"`
 	}
@@ -214,6 +215,7 @@ func (h *ChatHandler) streamWithLLM(c *gin.Context, flusher http.Flusher, fallba
 }
 
 // streamSimulated 降级方案：将完整答案按 rune 分块模拟流式输出。
+// TODO: 同上 — 使用字符串拼接而非 json.Marshal 构建 SSE 事件，控制字符可能导致 JSON 畸形。
 func (h *ChatHandler) streamSimulated(c *gin.Context, flusher http.Flusher, answer string) {
 	runes := []rune(answer)
 	chunkSize := 5
@@ -234,6 +236,8 @@ func (h *ChatHandler) streamSimulated(c *gin.Context, flusher http.Flusher, answ
 }
 
 // escapeSSE 对 SSE 数据中的特殊字符进行转义。
+// TODO: 字符串拼接构建 JSON 不安全 — escapeSSE 不处理 \t、Unicode 控制字符等。
+// 应使用 json.Marshal 为每个 token 事件生成 payload，彻底消除手动转义需求。
 func escapeSSE(s string) string {
 	s = strings.ReplaceAll(s, `\`, `\\`)
 	s = strings.ReplaceAll(s, `"`, `\"`)

@@ -112,8 +112,8 @@ func (p *Pipeline) Execute(ctx context.Context, query string, kbID int64, opts R
 			return nil
 		})
 	}
-
-	// ─── Step 3: 混合检索 ───
+	// TODO: 多路检索时 rewrittenQuery 可能与 routes[0] 不一致。
+	// 后续 Rerank 步骤使用 rewrittenQuery 而非实际检索路由，可能导致 Query-Document 相关性评分偏差。
 	// Retriever 接口内部处理 embedding 生成，Pipeline 不直接调用 Embedder。
 	var allChunks []RetrievalResult
 	if opts.Hybrid && p.bm25Retriever != nil {

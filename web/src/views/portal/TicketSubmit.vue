@@ -114,6 +114,9 @@
 </template>
 
 <script setup lang="ts">
+// TODO(portal/TicketSubmit): 缺少表单字段校验 — 手机号无正则格式校验、邮箱无格式校验。
+// TODO(portal/TicketSubmit): 提交失败时使用通用消息"提交失败，请稍后重试"，丢失后端返回的具体错误信息。
+// TODO(portal/TicketSubmit): 组件超过 340 行 — 可提取表单字段组件和验证逻辑。
 import { ref, reactive } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { createTicket } from '@/api/ticket'

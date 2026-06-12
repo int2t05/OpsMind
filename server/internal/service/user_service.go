@@ -98,6 +98,9 @@ func (s *UserService) Create(req request.CreateUserRequest) error {
 		FirstLogin:   true,
 	}
 
+	// TODO: Create + AssignRoles 不在同一事务中。
+	// 若用户创建成功但角色分配失败，用户已持久化但无角色，数据不一致。
+	// 应包裹在事务中: db.Transaction(func(tx *gorm.DB) error { ... })。
 	if err := s.repo.Create(user); err != nil {
 		return err
 	}
@@ -128,6 +131,7 @@ func (s *UserService) Update(id int64, req request.UpdateUserRequest) error {
 	user.Phone = req.Phone
 	user.Email = req.Email
 
+	// TODO: Update + AssignRoles 不在同一事务中，与 Create 同。
 	if err := s.repo.Update(user); err != nil {
 		return err
 	}

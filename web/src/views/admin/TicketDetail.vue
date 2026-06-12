@@ -70,6 +70,10 @@
 </template>
 
 <script setup lang="ts">
+// TODO(admin/TicketDetail): urgencyText/statusClass/scopeText 等辅助函数在多个视图中重复 —
+//                         应提取到 utils/ticket.ts 共享。
+// TODO(admin/TicketDetail): toast 使用 window.setTimeout 但 onUnmounted 未清理定时器 — 组件卸载时存在内存泄漏风险。
+// TODO(admin/TicketDetail): 使用 (res as any) 强制类型转换 — 等 API 泛型补全后移除。
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { getTicketDetail, updateTicketStatus } from '@/api/admin'

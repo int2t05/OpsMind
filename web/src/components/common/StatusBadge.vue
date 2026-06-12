@@ -5,6 +5,9 @@
 </template>
 
 <script setup lang="ts">
+// TODO(components/StatusBadge): knowledge 状态映射 `{ 0:'草稿', 1:'待审核', 2:'已发布', 3:'已停用' }`
+//                             与实际后端状态码 0-5（停用/草稿/待审核/已通过/已发布/已驳回）不一致，
+//                             此类型分支也未被任何知识库视图使用。需同步更新映射或删除该分支。
 import { computed } from 'vue'
 import { NTag } from 'naive-ui'
 

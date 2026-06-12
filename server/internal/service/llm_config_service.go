@@ -121,6 +121,7 @@ func (s *LLMConfigService) CreateConfig(name string, providerType int16, baseURL
 		return AppError{Code: errcode.ErrParam, Message: "名称不能为空"}
 	}
 
+	// TODO: ClearDefault + Create 不在同一事务中 — 若 Create 失败，默认配置已被清空。
 	if isDefault {
 		if err := s.repo.ClearDefault(); err != nil {
 			return AppError{Code: errcode.ErrUnknown, Message: "清空默认配置失败"}
@@ -156,6 +157,7 @@ func (s *LLMConfigService) CreateConfig(name string, providerType int16, baseURL
 //
 // 更新为默认时先清空其他默认，更新后立即热替换。
 func (s *LLMConfigService) UpdateConfig(cfg *model.LlmConfig) error {
+	// TODO: ClearDefault + Update 不在同一事务中 — 同上。
 	if cfg.IsDefault {
 		if err := s.repo.ClearDefault(); err != nil {
 			return AppError{Code: errcode.ErrUnknown, Message: "清空默认配置失败"}

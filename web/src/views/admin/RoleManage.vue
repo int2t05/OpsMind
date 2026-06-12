@@ -25,6 +25,8 @@
 </template>
 
 <script setup lang="ts">
+// TODO(admin/RoleManage): catch 块静默忽略所有错误 — API 调用失败时用户无任何提示。
+// TODO(admin/RoleManage): 使用 (res as any) 强制类型转换 — 等 API 层泛型补全后移除。
 import { ref, onMounted } from 'vue'
 import { getRoleList } from '@/api/role'
 import type { RoleItem } from '@/api/role'

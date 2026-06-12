@@ -48,6 +48,8 @@ type TicketRecordItem struct {
 }
 
 // ticketStatusText 返回状态中文描述。
+// TODO: TicketStatusText 放在 DTO 包而非 model 或 service — DTO 包惯例只放数据结构，
+// 业务映射函数建议移至 model/enums.go 或 service 包。
 func TicketStatusText(status int16) string {
 	switch status {
 	case 1:

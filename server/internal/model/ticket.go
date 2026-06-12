@@ -33,8 +33,8 @@ func (Ticket) TableName() string { return "tickets" }
 // TicketRecord 申告处理记录表
 type TicketRecord struct {
 	ID         int64          `gorm:"primaryKey;autoIncrement" json:"id"`
-	TicketID   int64          `gorm:"not null;column:ticket_id" json:"ticket_id"`
-	OperatorID int64          `gorm:"not null;column:operator_id" json:"operator_id"`
+	TicketID   int64          `gorm:"not null;column:ticket_id" json:"ticket_id"` // TODO: 缺少索引 — FindByTicketID 用于时间线查询，无索引在大量记录时退化为全表扫描
+	OperatorID int64          `gorm:"not null;column:operator_id" json:"operator_id"` // TODO: 缺少 FK 约束标签
 	Action     string         `gorm:"type:varchar(32);not null" json:"action"`
 	Content    string         `gorm:"type:text" json:"content"`
 	Detail     datatypes.JSON `gorm:"type:jsonb" json:"detail"`

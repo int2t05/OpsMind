@@ -2,6 +2,8 @@
 //
 // 该文件仅用于声明项目核心依赖，确保 go mod tidy 不会移除它们。
 // 实际使用这些依赖的代码在 internal/ 包中，此处通过匿名导入引入。
+// TODO: 非标准模式 — Go 惯例使用 tools.go + //go:build tools 构建约束。
+// 当前方式将所有依赖打入生产二进制，应改为 tools.go 模式。
 package main
 
 import (

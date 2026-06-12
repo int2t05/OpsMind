@@ -64,6 +64,7 @@ func (p *DocParser) parseTxt(reader io.Reader) (string, error) {
 }
 
 // parsePDF 解析 PDF 文件，逐页提取文本。
+// TODO: io.ReadAll 无大小限制 — 同 parseTxt，恶意大 PDF 可导致 OOM。
 func (p *DocParser) parsePDF(reader io.Reader) (string, error) {
 	// ledongthuc/pdf 需要 ReadAt 接口和文件大小
 	// 对于流式 reader，先读入内存
@@ -97,6 +98,7 @@ func (p *DocParser) parsePDF(reader io.Reader) (string, error) {
 //
 // DOCX 文件是一个 ZIP 压缩包，其中 word/document.xml 包含正文内容。
 // 提取所有 <w:t> 元素中的文本，跳过其他元素（如格式、图片信息）。
+// TODO: io.ReadAll 无大小限制 — 同上。
 func (p *DocParser) parseDocx(reader io.Reader) (string, error) {
 	b, err := io.ReadAll(reader)
 	if err != nil {

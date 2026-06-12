@@ -48,6 +48,10 @@
 </template>
 
 <script setup lang="ts">
+// TODO(portal/TicketQuery): Pagination 组件 @change 事件不存在 — 应改为 @update:current-page 或 v-model:current-page。
+// TODO(portal/TicketQuery): urgencyText 函数与 admin/TicketDetail、admin/TicketList、portal/TicketDetail 重复 —
+//                          应提取到 utils/ticket.ts 作为共享工具函数。
+// TODO(portal/TicketQuery): formatDate 函数在几乎所有页面中重复定义 — 应抽取为共享工具函数或全局 filter。
 import { ref, onMounted } from 'vue'
 import { listMyTickets, type TicketItem } from '@/api/ticket'
 import StatusBadge from '@/components/common/StatusBadge.vue'

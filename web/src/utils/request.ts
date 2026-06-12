@@ -4,6 +4,15 @@
  * 创建统一的 HTTP 客户端，配置：
  * - 请求拦截器：注入 Authorization: Bearer <token>
  * - 响应拦截器：处理 401（跳转登录）、403（提示无权限）、统一提取 data
+ *
+ * TODO(request): 401 处理存在无限重定向风险 — 若用户已在 /login 页面收到 401，会再次
+ *               router.push('/login') 形成循环。应增加 router.currentRoute.value.path !== '/login' 判断。
+ * TODO(request): 403 仅 console.error，没有用户可见的提示（应弹出 toast/notification）。
+ * TODO(request): 缺少全局 loading 计数器 — 无法在 API 请求期间自动展示全局加载指示器。
+ * TODO(request): login 接口返回了 refresh_token 但未被拦截器使用 — 可增加 token 过期自动刷新逻辑，
+ *               避免用户因 token 过期而频繁重新登录。
+ * TODO(request): InterceptedAxiosInstance 所有方法默认泛型 T = any — 调用方不传泛型时返回 any，
+ *               应改为 T = unknown 强制调用方显式声明返回类型。
  */
 
 import axios, { type AxiosRequestConfig } from 'axios'

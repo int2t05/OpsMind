@@ -10,6 +10,8 @@ import (
 )
 
 func main() {
+	// TODO: 硬编码数据库密码 opsmind123 — 不安全且与生产配置不一致。
+	// 应从环境变量/命令行参数读取，复用 config.LoadConfig()。
 	cfg := config.DatabaseConfig{
 		Host:     "localhost",
 		Port:     5432,

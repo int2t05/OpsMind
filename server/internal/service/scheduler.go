@@ -76,6 +76,9 @@ func (s *Scheduler) runAutoCloseLoop(ctx context.Context) {
 // 关闭条件：status IN (1,2,3) AND created_at < olderThan。
 // 返回关闭的申告数量。
 // 为什么暴露为公开方法：便于测试时直接调用，无需等待 ticker。
+// TODO: AutoCloseTickets 执行裸 UPDATE，不创建 TicketRecord。
+// 状态直接从 1/2/3→5，timeline 出现空白。应遍历关闭的 ticket 逐个创建 TicketRecord。
+// TODO: 无审计日志 — 自动关闭是系统操作，需要记录审计。
 func (s *Scheduler) RunAutoClose(olderThan time.Time) (int64, error) {
 	return s.ticketRepo.AutoCloseTickets(olderThan)
 }

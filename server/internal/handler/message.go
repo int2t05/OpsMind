@@ -55,6 +55,8 @@ func (h *MessageHandler) ListMessages(c *gin.Context) {
 // MarkAsRead 标记消息为已读。
 //
 // PUT /api/v1/portal/messages/:id/read
+// TODO: 不校验消息归属 — 用户 A 可标记用户 B 的消息已读（水平越权）。
+// 应传入 currentUserID 并在 Service/Repo 层校验消息的 user_id 归属。
 func (h *MessageHandler) MarkAsRead(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)

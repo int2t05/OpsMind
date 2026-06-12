@@ -42,6 +42,8 @@
 </template>
 
 <script setup lang="ts">
+// TODO(layout/PortalLayout): catch 块静默失败 — getUnreadCount 调用失败时用户界面无任何提示。
+// TODO(layout/PortalLayout): 使用 (res as any) 强制类型转换 — 待 API 层泛型补全后移除。
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { NLayout, NLayoutHeader, NLayoutContent, NButton, NIcon, NBadge } from 'naive-ui'

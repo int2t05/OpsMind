@@ -46,6 +46,8 @@ func Setup(cfg *config.AppConfig, h *Handlers) *gin.Engine {
 	r := gin.New()
 
 	// 注册全局中间件
+	// TODO: Recovery 应注册在最外层（第一个）以捕获所有中间件的 panic。
+	// 当前顺序 RequestID→CORS→Logger→Recovery 在风格上有违惯例。
 	r.Use(middleware.RequestID())
 	r.Use(middleware.CORS())
 	r.Use(middleware.Logger())
@@ -62,6 +64,8 @@ func Setup(cfg *config.AppConfig, h *Handlers) *gin.Engine {
 
 	// JWT 认证路由（需要登录但不需要 RBAC）— 修改密码和登出
 	// 为什么不在 public 组：ChangePassword handler 依赖 JWT 中间件注入的 userID
+	// TODO: 与 public 组使用相同前缀 /api/v1/auth — 开发者可能误以为所有 /auth 路由无中间件。
+	// 应将受保护路由移至不同前缀（如 /api/v1/auth/me/）或使用注释明确区分。
 	authRequired := r.Group("/api/v1/auth")
 	authRequired.Use(middleware.JWTAuth(cfg.JWT.Secret))
 	registerAuthRequiredRoutes(authRequired, h)

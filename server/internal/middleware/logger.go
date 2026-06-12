@@ -15,6 +15,7 @@ import (
 )
 
 // Logger 返回请求日志中间件（输出到 stdout）
+// TODO: Logger() 是 LoggerWithWriter(nil) 的薄封装 — 可内联默认逻辑或移除 LoggerWithWriter。
 func Logger() gin.HandlerFunc {
 	return LoggerWithWriter(nil)
 }
@@ -46,6 +47,7 @@ func LoggerWithWriter(writer io.Writer) gin.HandlerFunc {
 		}
 
 		// 输出 JSON 格式日志
+		// TODO: json.Marshal 错误被静默丢弃 — 若 logEntry 含不可序列化值将静默丢失日志。
 		jsonBytes, _ := json.Marshal(logEntry)
 		fmt.Fprintln(writer, string(jsonBytes))
 	}

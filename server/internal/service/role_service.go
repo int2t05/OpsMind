@@ -32,6 +32,10 @@ func NewRoleService(repo *repository.RoleRepo, userRepo *repository.UserRepo, db
 // 校验角色名唯一性，重复返回 10005。
 func (s *RoleService) Create(name, description string, permissions []string) error {
 	// 校验角色名唯一
+	// TODO: 绕过 Repository 直接使用 s.db — 破坏三层架构。
+	// 其他 Service (UserService) 通过 repo.ExistsByUsername() 检查唯一性，
+	// RoleService 应改为 s.repo.ExistsByName(name)。
+	// TODO: .Count(&count) 错误被静默丢弃 — 查询失败时 count=0，绕过唯一性检查。
 	var count int64
 	s.db.Model(&model.Role{}).Where("name = ?", name).Count(&count)
 	if count > 0 {
@@ -83,6 +87,7 @@ func (s *RoleService) Update(id int64, name, description string, permissions []s
 	}
 
 	// 校验角色名唯一（排除自身）
+	// TODO: 同上 — 绕过 Repo + 静默吞噬 Count 错误。
 	var count int64
 	s.db.Model(&model.Role{}).Where("name = ? AND id != ?", name, id).Count(&count)
 	if count > 0 {
@@ -111,6 +116,8 @@ func (s *RoleService) Delete(id int64) error {
 		return err
 	}
 
+	// TODO: Delete 未检查关联用户 — 删除有用户绑定的角色会留下孤儿 user_roles 记录。
+	// 应先 count 关联用户数，>0 则拒绝删除。
 	return s.repo.Delete(id)
 }
 

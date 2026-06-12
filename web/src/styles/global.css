@@ -1,4 +1,6 @@
 /* ===== OpsMind 全局样式 — Linear Design 设计系统 ===== */
+/* TODO(styles): .n-menu / .n-config-provider / .n-button__content 中使用 !important —
+               在 Naive UI 版本升级时可能失效。应考虑用更高特异性选择器替代。 */
 /* 与 docs/prompts/DESIGN-linear.app.md 完全对齐 */
 /* 支持 dark/light 双主题，通过 [data-theme] 属性切换 */
 

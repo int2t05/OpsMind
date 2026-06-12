@@ -247,6 +247,9 @@ func (r *BM25Retriever) Retrieve(ctx context.Context, query string, kbID int64, 
 
 	// TTL 检查：过期时自动重建索引（使用存储的文档副本）
 	if r.ttl > 0 && time.Since(entry.builtAt) > r.ttl {
+		// TODO: 锁降级模式脆弱 — RLock→Unlock→Lock→Unlock→RLock 序列已出过 bug（注释记录）。
+		// 如果发生 panic，函数可能在持有读锁的情况下退出，导致死锁。
+		// 应将 TTL 检查与重建提取为独立辅助方法 tryRefreshIndex，减少嵌套复杂性。
 		// 升级为写锁并重建（RLock 已在入口处释放，直接获取写锁即可；原 r.mu.RUnlock() 为重复释放 bug）
 		r.mu.Lock()
 		// 双重检查（其他 goroutine 可能已重建）

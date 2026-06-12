@@ -202,6 +202,8 @@ func (s *AuthService) buildMenuTree(userID int64, roles []model.Role) ([]respons
 		// 其他用户：聚合所有角色的菜单（去重）
 		menuMap := make(map[int64]model.Menu)
 		for _, role := range roles {
+			// TODO: 在循环中调用 GetRoleMenus — 用户有 N 个角色则产生 N 次 DB 查询。
+			// 应增加 BatchGetRoleMenus(roleIDs) 方法，一次查询获取所有角色的菜单。
 			roleMenus, roleErr := s.userRepo.GetRoleMenus(role.ID)
 			if roleErr != nil {
 				return nil, roleErr

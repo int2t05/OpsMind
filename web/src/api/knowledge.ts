@@ -1,3 +1,10 @@
+/**
+ * TODO(api/knowledge): 所有函数均未传入泛型类型参数，返回值全部为 any。
+ *                    这是项目中 API 表面积最大的模块（17+ 端点），需要优先补全类型。
+ *                    应为每个端点定义响应类型并使用 ApiResponse<T> 包装。
+ * TODO(api/knowledge): listKnowledgeBases 和 listKnowledgeBasesForPortal 有独立的接口定义，
+ *                     但两者结构高度相似 — 可抽取共享的 KnowledgeBaseItem 类型。
+ */
 import request from '../utils/request'
 
 // =============================================================================

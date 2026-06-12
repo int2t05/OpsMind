@@ -145,6 +145,8 @@ func (s *DashboardService) GetTrends(req request.TrendRequest) (*response.TrendR
 	}
 
 	var ticketCounts []dailyCount
+	// TODO: .Scan() 错误被丢弃 — SQL 失败时静默返回空数据。
+	// 应改为 if err := s.db.Raw(...).Scan(&ticketCounts).Error; err != nil { return nil, err }
 	s.db.Raw(
 		`SELECT TO_CHAR(created_at::date, 'YYYY-MM-DD') AS date, COUNT(*) AS count
 		 FROM tickets
@@ -167,6 +169,7 @@ func (s *DashboardService) GetTrends(req request.TrendRequest) (*response.TrendR
 
 	// 查询每日问答数
 	var chatCounts []dailyCount
+	// TODO: .Scan() 错误被丢弃 — 同上。
 	s.db.Raw(
 		`SELECT TO_CHAR(created_at::date, 'YYYY-MM-DD') AS date, COUNT(*) AS count
 		 FROM chat_sessions

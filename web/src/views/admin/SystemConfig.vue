@@ -68,6 +68,9 @@
 </template>
 
 <script setup lang="ts">
+// TODO(admin/SystemConfig): 与 ModelConfig 页面管理完全相同的配置项（ai.default_top_k / ai.confidence_threshold），
+//                         修改一个不会同步到另一个 — 应合并为统一的 AI 配置入口或共享配置读写逻辑。
+// TODO(admin/SystemConfig): toast 定时器未在 onUnmounted 清理 — 存在内存泄漏。
 import { ref, onMounted } from 'vue'
 import request from '@/utils/request'
 

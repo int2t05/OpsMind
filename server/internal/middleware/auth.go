@@ -32,6 +32,10 @@ type CurrentUser struct {
 //
 // 为什么返回 gin.HandlerFunc 而非直接使用闭包：
 // 函数签名更清晰，调用方通过参数传入 secret，便于测试和配置。
+//
+// TODO: 缺少 token_type 校验 — Access Token 和 Refresh Token 结构相同（见 pkg/jwt/jwt.go），
+// Refresh Token 可当 Access Token 使用，丧失双令牌安全模型。
+// 应在 Claims 中增加 TokenType 字段，中间件拒绝 token_type != "access" 的令牌。
 func JWTAuth(secret string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")

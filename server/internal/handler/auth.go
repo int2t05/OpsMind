@@ -82,7 +82,15 @@ func (h *AuthHandler) ChangePassword(c *gin.Context) {
 		return
 	}
 
-	err := h.authService.ChangePassword(userID.(int64), req.OldPassword, req.NewPassword)
+	// TODO: 不安全的类型断言 — userID.(int64) 缺少 comma-ok 检查。
+	// 若中间件重构导致 context 值类型变更，此处会 panic。
+	// 应改为: uid, ok := userID.(int64); if !ok { response.Error(c, errcode.ErrUnknown, "用户信息异常"); return }
+	uid, ok := userID.(int64)
+	if !ok {
+		response.Error(c, errcode.ErrUnknown, "用户信息异常")
+		return
+	}
+	err := h.authService.ChangePassword(uid, req.OldPassword, req.NewPassword)
 	if err != nil {
 		handleServiceError(c, err)
 		return

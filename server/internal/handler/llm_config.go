@@ -41,6 +41,8 @@ type llmConfigService interface {
 // NewLLMConfigHandler 创建 LLMConfigHandler 实例。
 //
 // svc 可以是 *service.LLMConfigService 或测试 mock。
+// TODO: 接受 interface{} 绕过编译期类型检查 — 传入错误类型时 svc 为 nil，调用时 panic。
+// 应改为直接接受 llmConfigService 接口类型。
 func NewLLMConfigHandler(svc interface{}) *LLMConfigHandler {
 	h := &LLMConfigHandler{}
 	if s, ok := svc.(llmConfigService); ok {
@@ -50,6 +52,8 @@ func NewLLMConfigHandler(svc interface{}) *LLMConfigHandler {
 }
 
 // SetLLMClient 注入 LLM 客户端（用于 TestConnection 真实验证）。
+// TODO: Setter 注入模式脆弱 — 可能在首次调用后才设置，导致 nil pointer。
+// 应改为构造函数注入（参考 ChatHandler.NewChatHandler）。
 func (h *LLMConfigHandler) SetLLMClient(client adapter.LLMClient) {
 	h.llmClient = client
 }
@@ -64,6 +68,7 @@ func (h *LLMConfigHandler) SetLLMClient(client adapter.LLMClient) {
 func (h *LLMConfigHandler) ListConfigs(c *gin.Context) {
 	configs, err := h.svc.ListConfigs()
 	if err != nil {
+		// TODO: err.Error() 泄露内部错误 — 应使用 handleServiceError(c, err)。
 		response.Error(c, errcode.ErrUnknown, "查询 LLM 配置失败: "+err.Error())
 		return
 	}
@@ -217,6 +222,8 @@ func (h *LLMConfigHandler) TestConnection(c *gin.Context) {
 	response.Success(c, gin.H{
 		"success": true,
 		"model":   cfg.LLMModel,
+		// TODO: TokensUsed 被当作 "latency" 返回 — 语义错误，Token 数 ≠ 延迟。
+		// 应测量实际耗时: start := time.Now(); ...; latency := time.Since(start).Milliseconds()。
 		"latency": resp.TokensUsed, // 近似延迟指标
 	})
 }

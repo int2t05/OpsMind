@@ -249,6 +249,8 @@ func (s *PgvectorStore) GetChunksByArticle(ctx context.Context, articleID int64)
 // 对 NaN 和 ±Inf 使用 0.0 替代——pgvector 不接受非有限浮点数，
 // 而 NaN/Inf 在 normalized embedding 中不应出现（出现意味着上游 bug），
 // 0.0 替代是最小伤害的降级策略（不影响向量维度）。
+// TODO: 静默替换 NaN/Inf 为 0.0 会隐藏上游 bug — 向量入库后产生有问题的相似度分数。
+// 应至少 slog.Warn 记录 NaN 出现，或提供「拒绝写入」的严格模式。
 func float32ToPgVector(v []float32) string {
 	if len(v) == 0 {
 		return "[]"

@@ -138,6 +138,11 @@
 </template>
 
 <script setup lang="ts">
+// TODO(portal/Chat): v-for 使用 :key="i"（数组索引）作为 key — 流式更新消息列表时，
+//                   Vue patch 算法无法正确追踪元素变更，可能导致 DOM 闪烁。
+//                   应使用消息的唯一 ID 作为 key（需在消息模型中添加唯一标识）。
+// TODO(portal/Chat): 组件超过 560 行 — 应拆分为消息渲染子组件、高级设置面板子组件等。
+// TODO(portal/Chat): catch 块静默吞错误 — 应提示用户问答失败。
 import { ref, onMounted, nextTick } from 'vue'
 import { useChatStore } from '@/stores/chat'
 import { listKnowledgeBasesForPortal } from '@/api/knowledge'

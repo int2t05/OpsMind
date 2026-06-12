@@ -2,6 +2,13 @@
  * 智能问答 API 封装（门户端）
  *
  * 提供问答会话创建（普通 + SSE 流式）和反馈提交接口。
+ *
+ * TODO(api/chat): streamChatSession 使用原生 fetch 而非 axios request 封装 — 导致：
+ *                 1) 手动拼接 Authorization header（与拦截器逻辑重复）
+ *                 2) 无 401/403 统一处理
+ *                 3) 无超时控制（fetch 不支持 timeout）
+ *                 应评估是否可改用 axios（需确认 SSE 流式兼容性）。
+ * TODO(api/chat): catch 子句中 err 类型为 any — 应改为 unknown + 类型守卫 (err instanceof Error)。
  */
 import request from '../utils/request'
 import { getToken } from '../utils/auth'

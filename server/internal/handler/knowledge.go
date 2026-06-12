@@ -85,10 +85,13 @@ func (h *KnowledgeHandler) UpdateKB(c *gin.Context) {
 func (h *KnowledgeHandler) ListKBs(c *gin.Context) {
 	kbs, err := h.svc.ListKBs()
 	if err != nil {
+		// TODO: err.Error() 泄露内部错误 — 应使用 handleServiceError(c, err)。
 		response.Error(c, errcode.ErrUnknown, err.Error())
 		return
 	}
 
+	// TODO: gin.H{"items": kbs} 包裹格式不一致 — 其他列表端点直接返回数组。
+	// 应改为 response.Success(c, kbs) 与 ListMenus/ListUsers 对齐。
 	response.Success(c, gin.H{"items": kbs})
 }
 
@@ -332,6 +335,7 @@ func (h *KnowledgeHandler) UploadDocuments(c *gin.Context) {
 
 	src, err := file.Open()
 	if err != nil {
+		// TODO: err.Error() 泄露内部错误 — 应使用 handleServiceError(c, err)。
 		response.Error(c, errcode.ErrUnknown, "读取文件失败: "+err.Error())
 		return
 	}

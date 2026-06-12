@@ -4,6 +4,8 @@
 package request
 
 // CreateLLMConfigRequest 创建 LLM 配置请求。
+// TODO: 与 UpdateLLMConfigRequest 字段完全相同 — 重复定义。
+// 若 Create/Update 语义无差别可合并为 LLMConfigRequest；若后续可能分化则保留但加注释说明。
 type CreateLLMConfigRequest struct {
 	Name             string `json:"name" binding:"required"`
 	ProviderType     int16  `json:"provider_type" binding:"required"`

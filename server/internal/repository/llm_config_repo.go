@@ -10,6 +10,7 @@ import (
 )
 
 // ErrNotFound 通用"未找到"哨兵错误。
+// TODO: 导出后无调用方 — 仅 var _ = ErrNotFound 确保编译，属于死代码。若无跨包使用计划应删除。
 var ErrNotFound = gorm.ErrRecordNotFound
 
 // LlmConfigRepo LLM 配置数据访问。

@@ -50,7 +50,7 @@ type ChatRequest struct {
 	Messages    []ChatMessage `json:"messages"`
 	MaxTokens   int           `json:"max_tokens,omitempty"`
 	Temperature float64       `json:"temperature,omitempty"`
-	Stream      bool          `json:"stream,omitempty"` // 仅 ChatCompletionStream 使用
+	Stream      bool          `json:"stream,omitempty"` // TODO: 死代码 — ChatCompletion 硬编码 false，ChatCompletionStream 硬编码 true（在内部结构体中），此字段从未被读取。
 }
 
 // ChatMessage 对话消息。
@@ -291,6 +291,7 @@ func sendChunk(ctx context.Context, ch chan<- StreamChunk, chunk StreamChunk) bo
 // =============================================================================
 
 // doRequest 发送 HTTP 请求并返回响应体。
+// TODO: 无重试逻辑 — HTTP 429/503 等瞬时故障不重试，生产环境需要指数退避 + 最大重试次数。
 func (c *OpenAIClient) doRequest(ctx context.Context, path string, body interface{}) ([]byte, error) {
 	jsonBody, err := json.Marshal(body)
 	if err != nil {

@@ -64,6 +64,7 @@
 </template>
 
 <script setup lang="ts">
+// TODO(admin/Dashboard): 使用 (res as any) 强制类型转换 — 等 API 泛型补全后移除。
 import { ref, onMounted, computed } from 'vue'
 import {
   NCard, NGrid, NGi, NStatistic, NButton, NDatePicker, NSpace,

@@ -147,6 +147,11 @@
 </template>
 
 <script setup lang="ts">
+// TODO(admin/KnowledgeEdit): 组件超过 400 行 — 应拆分为文档上传区域、元信息表单、处理状态展示等子组件。
+// TODO(admin/KnowledgeEdit): 使用相对路径 import（../../api/knowledge）与其他文件不一致。
+// TODO(admin/KnowledgeEdit): fileIconClass() 生成的 CSS class 无对应样式规则 — 属于死逻辑。
+// TODO(admin/KnowledgeEdit): fetchArticle/fetchKBs 失败时仅 console.error，无用户可见提示，无 loading 状态。
+// TODO(admin/KnowledgeEdit): processClass/processText/statusClass/statusText 与 KnowledgeList 重复 — 应提取到 utils/knowledge.ts。
 import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import {

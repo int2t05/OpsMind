@@ -52,6 +52,8 @@ func MultiRoute(ctx context.Context, llm adapter.LLMClient, query string, count 
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
 		// 去除编号前缀：匹配 "1." "1、" "1) " "- " 等格式
+		// TODO: 脆弱的字符串清理 — 依赖 LLM 输出固定编号格式，容易因 LLM 输出变化（如 "Route 1:"、"："）而失败。
+		// 应使用正则提取或让 LLM 输出 JSON 格式的子查询数组。
 		line = strings.TrimLeft(line, "0123456789")
 		line = strings.TrimLeft(line, ".、) -")
 		line = strings.TrimSpace(line)

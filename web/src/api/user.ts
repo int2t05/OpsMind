@@ -1,3 +1,9 @@
+/**
+ * TODO(api/user): 所有函数均未传入泛型类型参数，返回值全部为 any。
+ *                需定义 ApiResponse<T> 共享类型并为每个函数添加泛型声明，
+ *                例如：request.get<ApiResponse<UserListData>>(...)。
+ *                同时应将导入路径统一为 @/utils/request（混用相对路径）。
+ */
 import request from '../utils/request'
 
 interface UserListParams {

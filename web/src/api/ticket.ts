@@ -3,6 +3,11 @@
  *
  * 提供申告创建、列表查询、详情查询、补充信息等门户端接口。
  * 后台管理端申告接口（列表管理、状态操作）在 admin API 中独立封装。
+ *
+ * TODO(api/ticket): TicketRecord.detail 使用 Record<string, any> — any 应替换为具体类型。
+ * TODO(api/ticket): listMyTickets/getTicketDetail 响应类型缺少 ApiResponse<T> 包装，
+ *                   TicketListResponse/TicketDetail 无法正确匹配后端 { code, message, data } 结构。
+ * TODO(api/ticket): createTicket/supplementTicket 无泛型参数，返回 any — 应补充类型。
  */
 import request from '../utils/request'
 

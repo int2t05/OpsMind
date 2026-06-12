@@ -65,6 +65,8 @@ type KnowledgeService struct {
 //
 // 接受 interface{} 参数，通过类型断言适配——遵循 Go "accept interfaces, return structs"。
 // repo/chunker/embedder/store/docParser/processor 可以为 nil（测试或部分功能不需要时）。
+// TODO: 构造函数接受 interface{} 绕过编译期类型检查。
+// 传入错误类型时静默 nil，调用时 panic。应直接使用具体接口类型（knowledgeRepo 等）。
 func NewKnowledgeService(repo interface{}, chunker interface{}, embedder interface{}, store adapter.VectorStore, docParser interface{}, processor *rag.Processor) *KnowledgeService {
 	svc := &KnowledgeService{
 		store:     store,
@@ -317,6 +319,10 @@ func (s *KnowledgeService) Disable(id int64) error {
 		}
 	}
 
+	// TODO: article.Status = 0 与 model.ArticleStatusDisabled (4) 不一致。
+	// 枚举常量 ArticleStatusDisabled=4 从未被使用；statusText(0) 恰好返回 "已停用"，
+	// 但若其他代码检查 article.Status == model.ArticleStatusDisabled 则会漏掉实际值为 0 的记录。
+	// 应改为 article.Status = model.ArticleStatusDisabled，并统一所有状态枚举的使用。
 	article.Status = 0
 	return s.repo.UpdateArticle(article)
 }
@@ -330,6 +336,7 @@ func (s *KnowledgeService) Enable(id int64) error {
 		}
 		return err
 	}
+	// TODO: 应与 Disable 同步改为 model.ArticleStatusDisabled
 	if article.Status != 0 {
 		return errcode.AppError{Code: errcode.ErrParam, Message: "仅已停用状态的文章可恢复"}
 	}
@@ -495,6 +502,7 @@ func (s *KnowledgeService) RetryDocument(articleID int64) error {
 		return errcode.AppError{Code: errcode.ErrUnknown, Message: "文档处理器未初始化"}
 	}
 
+	// TODO: UpdateArticleStatus 错误被静默丢弃。至少应记录日志。
 	_ = s.repo.UpdateArticleStatus(articleID, 1)
 	task := rag.ProcessTask{
 		ArticleID: articleID,

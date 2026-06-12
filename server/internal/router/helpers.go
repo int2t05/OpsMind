@@ -25,6 +25,9 @@ func placeholder() gin.HandlerFunc {
 // 为什么集中 nil-guard 逻辑：
 // 3 个路由文件中 if h != nil && h.Xxx != nil { ... } else { placeholder() }
 // 模式重复 14 次，register 辅助函数压缩为 1 行，让路由结构一目了然。
+//
+// TODO: 此函数和 registerGroup 目前无任何调用方 — portal.go 和 admin.go 仍使用手写 nil-check。
+// 应统一采用此辅助函数（消除 14 处重复），或删除 helpers.go 彻底放弃统一。
 func register(rg gin.IRouter, handler interface{}, method, path string, realHandler gin.HandlerFunc) {
 	if handler != nil {
 		rg.Handle(method, path, realHandler)

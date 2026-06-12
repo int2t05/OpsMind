@@ -25,6 +25,10 @@
 </template>
 
 <script setup lang="ts">
+// TODO(admin/TicketList): catch 块静默忽略错误（/* API error */）— API 调用失败时用户无提示。
+// TODO(admin/TicketList): urgencyClass/urgencyText/statusClass/formatDate 在 admin/TicketDetail、
+//                       portal/TicketQuery、portal/TicketDetail 中重复 — 应抽取到 utils/ticket.ts。
+// TODO(admin/TicketList): 使用 (res as any) 强制类型转换 — 等 API 泛型补全后移除。
 import { ref, onMounted } from 'vue'
 import { listAllTickets } from '@/api/admin'
 import type { TicketItem } from '@/api/ticket'

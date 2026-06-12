@@ -72,6 +72,10 @@
 </template>
 
 <script setup lang="ts">
+// TODO(admin/UserList): fetchRoles 的 catch 块仅忽略错误 — 角色列表加载失败时用户无感知。
+// TODO(admin/UserList): 创建/编辑用户表单缺少手机号、邮箱格式校验，密码无强度指示器。
+// TODO(admin/UserList): toast 定时器未在 onUnmounted 清理 — 存在内存泄漏。
+// TODO(admin/UserList): 使用 res?.items || res?.data?.items || res || [] 链式解包，待 API 泛型补全。
 import { ref, onMounted } from 'vue'
 import { getUserList, createUser, updateUser, freezeUser, restoreUser } from '@/api/user'
 import { getRoleList } from '@/api/role'

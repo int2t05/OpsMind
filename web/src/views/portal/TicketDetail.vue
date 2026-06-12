@@ -93,6 +93,9 @@
 </template>
 
 <script setup lang="ts">
+// TODO(portal/TicketDetail): API 调用失败时静默置 null，无用户可见错误提示。
+// TODO(portal/TicketDetail): urgencyText 函数在 4 个文件中重复定义 — 应提取到 utils/ticket.ts。
+// TODO(portal/TicketDetail): 使用 (res as any) / (res?.data || res) 解包 — 等 API 泛型补全后统一。
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { getTicketDetail, supplementTicket, type TicketDetail } from '@/api/ticket'

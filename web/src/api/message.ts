@@ -2,6 +2,10 @@
  * 站内消息 API 封装（门户端）
  *
  * 提供消息列表查询、标记已读、未读计数等接口。
+ *
+ * TODO(api/message): listMessages 和 getUnreadCount 的响应类型缺少 ApiResponse<T> 包装 —
+ *                   当前直接使用 MessageListResponse/UnreadCountResponse，无法匹配后端实际
+ *                   { code, message, data: {...} } 的响应结构。
  */
 import request from '../utils/request'
 

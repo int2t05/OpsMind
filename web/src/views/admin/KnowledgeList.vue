@@ -98,6 +98,10 @@
 </template>
 
 <script setup lang="ts">
+// TODO(admin/KnowledgeList): 使用相对路径 import（../../api/knowledge）与其他文件 @/api/knowledge 不一致。
+// TODO(admin/KnowledgeList): statusClass/statusText/processClass/processText 与 KnowledgeEdit 重复 — 应提取到 utils/knowledge.ts。
+// TODO(admin/KnowledgeList): API 错误仅 console.error，无用户可见提示。
+// TODO(admin/KnowledgeList): 使用 (res.data as any) 强制类型转换 — 等 API 泛型补全后移除。
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import Pagination from '../../components/common/Pagination.vue'

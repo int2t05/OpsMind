@@ -67,6 +67,9 @@ func NewMinIOClient(client *minio.Client, buckets ...string) *MinIOClient {
 		if err := mc.ensureBucket(context.Background(), bucket); err != nil {
 			// bucket 创建失败仅记录，不阻断启动流程
 			// 后续对应操作会因 bucket 不存在而返回明确错误
+			// TODO: ensureBucket 错误被静默丢弃 — 至少应 slog.Warn 记录。
+			// TODO: 使用 context.Background() 而非可取消的 context — bucket 创建无法被中断。
+			// TODO: 构造函数无超时参数 — 无法限制 MinIO 连接超时。
 			_ = err
 		}
 	}

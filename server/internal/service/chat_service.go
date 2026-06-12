@@ -58,6 +58,8 @@ type ChatService struct {
 //
 // pipeline/llmClient/configMgr 可以为 nil（测试或降级场景）。
 // knowledgeRepo/chatRepo 接受接口类型，repository 具体类型隐式满足。
+// TODO: 构造函数接受 interface{} 绕过编译期类型检查 — 传入错误类型时静默 nil。
+// 应直接使用具体接口类型（chatKnowledgeRepo 等），repository 具体类型隐式满足接口。
 func NewChatService(knowledgeRepo interface{}, chatRepo interface{}, pipeline interface{}, llmClient adapter.LLMClient, configMgr *LLMConfigManager) *ChatService {
 	svc := &ChatService{
 		llmClient: llmClient,

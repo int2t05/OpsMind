@@ -8,6 +8,11 @@
  * 流式模式下，先添加一条空的 assistant 消息占位，
  * 然后通过 onToken 回调逐步追加内容，实现打字机效果。
  * 流式完成后通过 onDone 回调更新完整的元数据（sources、session_id 等）。
+ *
+ * TODO(store/chat): messages 数组中 sources 类型为 any[] — 应使用 api/chat.ts 中已定义的 SourceItem[]。
+ * TODO(store/chat): pipeline_metrics 通过 (session as any) 强制类型转换获取 — 应在 ChatSessionResponse
+ *                  中增加可选的 pipeline_metrics?: PipelineMetrics 字段，消除 any 断言。
+ * TODO(store/chat): submitFeedback 的 catch 块静默吞错误 — 应展示用户可见的错误提示。
  */
 import { defineStore } from 'pinia'
 import { ref } from 'vue'

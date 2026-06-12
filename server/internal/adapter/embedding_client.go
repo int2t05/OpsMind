@@ -100,6 +100,9 @@ type openAIEmbeddingsResponse struct {
 }
 
 // CreateEmbeddings 调用 /v1/embeddings 生成向量。
+// TODO: 与 llm_client.go 的 doRequest 高度重复 — setHeaders、HTTP 发送、状态码检查、错误处理
+// 完全一致。应提取公共 HTTP 辅助函数（如 doRequest）供两者复用。
+// TODO: 无重试逻辑 — 同 llm_client.go。
 func (c *OpenAIEmbeddingClient) CreateEmbeddings(ctx context.Context, req EmbeddingRequest) (*EmbeddingResponse, error) {
 	body := openAIEmbeddingsRequest{
 		Model: req.Model,

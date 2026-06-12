@@ -81,6 +81,9 @@
 </template>
 
 <script setup lang="ts">
+// TODO(admin/ModelConfig): 与 SystemConfig 页面管理完全相同的配置项 — 应合并为统一的 AI 配置入口。
+// TODO(admin/ModelConfig): 组件超过 310 行 — 可提取滑块配置子组件。
+// TODO(admin/ModelConfig): toast 定时器未在 onUnmounted 清理 — 存在内存泄漏。
 import { ref, onMounted } from 'vue'
 import request from '@/utils/request'
 
