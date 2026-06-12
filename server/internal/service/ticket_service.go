@@ -8,8 +8,8 @@
 package service
 
 import (
+	"encoding/json"
 	"fmt"
-	"math/rand"
 	"strings"
 	"time"
 
@@ -60,14 +60,13 @@ func (s *TicketService) CreateTicket(req request.CreateTicketRequest, userID int
 		return AppError{Code: errcode.ErrParam, Message: "紧急程度必须为 1-3"}
 	}
 
-	// 生成唯一 ticket_no
-	now := time.Now()
-	datePart := now.Format("20060102")
-	// MVP: 使用时间戳毫秒后4位 + 随机数确保唯一
-	// TODO: rand.Intn(10000) 在高并发下碰撞风险较高（仅 10000 种组合）。
-	// 应改用雪花算法或数据库自增序列 + 日期前缀保证唯一性。
-	suffix := fmt.Sprintf("%04d", rand.Intn(10000))
-	ticketNo := fmt.Sprintf("TK-%s-%s", datePart, suffix)
+		// 生成唯一 ticket_no：日期 + 纳秒时间戳后6位
+		// 相比 rand.Intn(10000)（仅 10000 种组合），纳秒时间戳提供百万级组合，
+		// 结合日期前缀，碰撞概率极低。后续可升级为雪花算法或 DB 序列。
+		now := time.Now()
+		datePart := now.Format("20060102")
+		suffix := fmt.Sprintf("%06d", now.UnixNano()%1000000)
+		ticketNo := fmt.Sprintf("TK-%s-%s", datePart, suffix)
 
 	// 序列化 AffectedSystems
 	var systemsJSON datatypes.JSON
@@ -374,44 +373,29 @@ func toTicketItem(t *model.Ticket) response.TicketItem {
 }
 
 // marshalTicketTags 将字符串切片序列化为 JSON。
-// TODO: 手动字符串拼接构建 JSON 不安全 — 若 tag 值含双引号或逗号则产生畸形 JSON。
-// 应使用 json.Marshal（参考 knowledge_service.go 的 marshalTags 正确实现）。
+//
+// 使用 json.Marshal 保证正确转义 — 修复前手动拼接在含双引号/逗号时产生畸形 JSON。
 func marshalTicketTags(items []string) datatypes.JSON {
 	if len(items) == 0 {
-		return datatypes.JSON(`[]`)
+		return datatypes.JSON("[]")
 	}
-	// 使用简单的 JSON 拼接，避免引入 encoding/json 的复杂性
-	quoted := make([]string, len(items))
-	for i, item := range items {
-		quoted[i] = fmt.Sprintf(`"%s"`, item)
+	data, err := json.Marshal(items)
+	if err != nil {
+		return datatypes.JSON("[]")
 	}
-	return datatypes.JSON(fmt.Sprintf(`[%s]`, strings.Join(quoted, ",")))
+	return datatypes.JSON(data)
 }
 
 // unmarshalTicketTags 将 JSON 反序列化为字符串切片。
-// TODO: 手动字符串分割解析 JSON 不安全 — 同 marshalTicketTags。应使用 json.Unmarshal。
+//
+// 使用 json.Unmarshal 替代手动字符串分割，正确处理转义字符。
 func unmarshalTicketTags(data datatypes.JSON) []string {
 	if len(data) == 0 {
 		return nil
 	}
-	s := string(data)
-	s = strings.TrimSpace(s)
-	if !strings.HasPrefix(s, "[") {
+	var result []string
+	if err := json.Unmarshal(data, &result); err != nil {
 		return nil
-	}
-	// 简单 JSON 数组解析
-	s = strings.Trim(s, "[]")
-	if s == "" {
-		return nil
-	}
-	parts := strings.Split(s, ",")
-	result := make([]string, 0, len(parts))
-	for _, p := range parts {
-		p = strings.TrimSpace(p)
-		p = strings.Trim(p, `"`)
-		if p != "" {
-			result = append(result, p)
-		}
 	}
 	return result
 }
