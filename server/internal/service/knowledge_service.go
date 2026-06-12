@@ -86,12 +86,12 @@ func NewKnowledgeService(repo knowledgeRepo, chunker knowledgeChunker, embedder 
 
 // CreateKB 创建知识库（仅写 PostgreSQL）。
 func (s *KnowledgeService) CreateKB(req request.CreateKBRequest, userID int64) error {
-	// TODO(service/knowledge): CreateKB 未写入 EmbeddingModel、VectorDimension、LLMConfigID。
-	// 与 docs/API/knowledge.md 的 v2 知识库模型不一致，后续发布向量时会拿到空模型配置。
 	kb := &model.KnowledgeBase{
-		Name:        req.Name,
-		Description: req.Description,
-		CreatedBy:   userID,
+		Name:            req.Name,
+		Description:     req.Description,
+		EmbeddingModel:  req.EmbeddingModel,
+		VectorDimension: req.VectorDimension,
+		CreatedBy:       userID,
 	}
 	return s.repo.CreateKB(kb)
 }

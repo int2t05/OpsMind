@@ -34,9 +34,22 @@ func NewKnowledgeHandler(svc *service.KnowledgeService) *KnowledgeHandler {
 //
 // GET /api/v1/portal/knowledge-bases
 func (h *KnowledgeHandler) ListKBsForPortal(c *gin.Context) {
-	// TODO(handler/knowledge): 门户端知识库列表应返回精简 DTO，只包含 id/name/description。
-	// 当前复用后台 ListKBs，可能暴露 embedding_model/vector_dimension/created_by 等管理字段。
-	h.ListKBs(c)
+	kbs, err := h.svc.ListKBs()
+	if err != nil {
+		handleServiceError(c, err)
+		return
+	}
+	// 门户端仅返回 id/name/description，不暴露 embedding_model/vector_dimension 等管理字段
+	type portalKB struct {
+		ID          int64  `json:"id"`
+		Name        string `json:"name"`
+		Description string `json:"description"`
+	}
+	result := make([]portalKB, len(kbs))
+	for i, kb := range kbs {
+		result[i] = portalKB{ID: kb.ID, Name: kb.Name, Description: kb.Description}
+	}
+	response.Success(c, result)
 }
 
 // CreateKB 创建知识库。

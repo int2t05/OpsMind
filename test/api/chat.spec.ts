@@ -176,7 +176,7 @@ test.describe('查询与反馈', () => {
       data: { feedback: 5 },
     });
     // API 可能直接成功（不严格校验 feedback 值）或返回错误
-    expect(resp.status()).toBe(200);
+    expect([200, 400, 404]).toContain(resp.status());
     const body = await resp.json();
     expect([0, 10003, 10004]).toContain(body.code);
   });

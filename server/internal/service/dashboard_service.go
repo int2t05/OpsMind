@@ -11,6 +11,7 @@ import (
 	"opsmind/internal/dto/request"
 	"opsmind/internal/dto/response"
 	"opsmind/internal/repository"
+	"opsmind/pkg/errcode"
 )
 
 // DashboardService 数据看板服务。
@@ -88,11 +89,14 @@ func (s *DashboardService) GetTrends(req request.TrendRequest) (*response.TrendR
 	// 当前超大范围会生成很长日期序列并放大数据库聚合成本。
 	startDate, err := time.Parse("2006-01-02", req.StartDate)
 	if err != nil {
-		return nil, fmt.Errorf("无效的开始日期: %w", err)
+		return nil, errcode.AppError{Code: errcode.ErrParam, Message: "开始日期格式错误，格式应为 YYYY-MM-DD"}
 	}
 	endDate, err := time.Parse("2006-01-02", req.EndDate)
 	if err != nil {
-		return nil, fmt.Errorf("无效的结束日期: %w", err)
+		return nil, errcode.AppError{Code: errcode.ErrParam, Message: "结束日期格式错误，格式应为 YYYY-MM-DD"}
+	}
+	if endDate.Before(startDate) {
+		return nil, errcode.AppError{Code: errcode.ErrParam, Message: "结束日期不能早于开始日期"}
 	}
 
 	// 生成日期序列

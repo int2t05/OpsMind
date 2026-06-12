@@ -65,9 +65,8 @@ func Setup(cfg *config.AppConfig, h *Handlers) *gin.Engine {
 	registerPublicRoutes(public, h)
 
 	// JWT 认证路由（需要登录但不需要 RBAC）— 修改密码和登出
-	// 使用独立前缀 /api/v1/auth/me 与公开路由 /api/v1/auth 明确区分，
-	// 避免开发者误以为所有 /auth 路由无中间件。
-	authRequired := r.Group("/api/v1/auth/me")
+	// 直接在 /api/v1/auth 下注册，与公开路由共享前缀但附加 JWTAuth 中间件。
+	authRequired := r.Group("/api/v1/auth")
 	authRequired.Use(middleware.JWTAuth(cfg.JWT.Secret))
 	registerAuthRequiredRoutes(authRequired, h)
 
