@@ -45,12 +45,14 @@ type LLMClient interface {
 // =============================================================================
 
 // ChatRequest 对话请求。
+//
+// Stream 字段由 ChatCompletion（硬编码 false）和 ChatCompletionStream（硬编码 true）
+// 在内部分别控制，不暴露给调用方——调用方通过方法选择（同步/流式）隐式决定是否流式。
 type ChatRequest struct {
 	Model       string        `json:"model"`
 	Messages    []ChatMessage `json:"messages"`
 	MaxTokens   int           `json:"max_tokens,omitempty"`
 	Temperature float64       `json:"temperature,omitempty"`
-	Stream      bool          `json:"stream,omitempty"` // TODO: 死代码 — ChatCompletion 硬编码 false，ChatCompletionStream 硬编码 true（在内部结构体中），此字段从未被读取。
 }
 
 // ChatMessage 对话消息。
@@ -77,6 +79,13 @@ type StreamChunk struct {
 // OpenAI-compatible 实现
 // =============================================================================
 
+const (
+	// defaultMaxRetries HTTP 请求最大重试次数
+	defaultMaxRetries = 3
+	// retryBaseDelay 重试基础延迟
+	retryBaseDelay = 500 * time.Millisecond
+)
+
 // OpenAIClient 实现 LLMClient，对接 OpenAI-compatible API。
 //
 // 为什么使用标准 net/http 而非第三方 SDK：
@@ -85,6 +94,7 @@ type OpenAIClient struct {
 	baseURL    string
 	apiKey     string
 	httpClient *http.Client
+	maxRetries int // 可重试的 HTTP 状态码（429/503）最大重试次数
 }
 
 // NewOpenAIClient 创建 OpenAIClient 实例。
@@ -95,6 +105,7 @@ func NewOpenAIClient(baseURL, apiKey string, timeout time.Duration) *OpenAIClien
 		httpClient: &http.Client{
 			Timeout: timeout,
 		},
+		maxRetries: defaultMaxRetries,
 	}
 }
 
@@ -291,13 +302,46 @@ func sendChunk(ctx context.Context, ch chan<- StreamChunk, chunk StreamChunk) bo
 // =============================================================================
 
 // doRequest 发送 HTTP 请求并返回响应体。
-// TODO: 无重试逻辑 — HTTP 429/503 等瞬时故障不重试，生产环境需要指数退避 + 最大重试次数。
+//
+// 对 429（限流）和 503（服务不可用）执行指数退避重试，最多 maxRetries 次。
 func (c *OpenAIClient) doRequest(ctx context.Context, path string, body interface{}) ([]byte, error) {
 	jsonBody, err := json.Marshal(body)
 	if err != nil {
 		return nil, fmt.Errorf("序列化请求失败: %w", err)
 	}
 
+	var lastErr error
+	for attempt := 0; attempt <= c.maxRetries; attempt++ {
+		if attempt > 0 {
+			// 指数退避: 500ms * 2^(attempt-1)，最大 8 秒
+			delay := retryBaseDelay * time.Duration(1<<(attempt-1))
+			if delay > 8*time.Second {
+				delay = 8 * time.Second
+			}
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-time.After(delay):
+			}
+		}
+
+		respBody, err := c.tryRequest(ctx, path, jsonBody)
+		if err == nil {
+			return respBody, nil
+		}
+		lastErr = err
+
+		// 仅 429/503 可重试，其他状态码直接返回
+		if !isRetryable(err) {
+			return nil, err
+		}
+	}
+
+	return nil, fmt.Errorf("重试 %d 次后仍失败: %w", c.maxRetries, lastErr)
+}
+
+// tryRequest 执行单次 HTTP 请求（不含重试逻辑）。
+func (c *OpenAIClient) tryRequest(ctx context.Context, path string, jsonBody []byte) ([]byte, error) {
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+path, bytes.NewReader(jsonBody))
 	if err != nil {
 		return nil, fmt.Errorf("创建请求失败: %w", err)
@@ -315,8 +359,59 @@ func (c *OpenAIClient) doRequest(ctx context.Context, path string, body interfac
 		return nil, fmt.Errorf("读取响应失败: %w", err)
 	}
 
+	if resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode == http.StatusServiceUnavailable {
+		return nil, &retryableError{statusCode: resp.StatusCode, body: string(respBody)}
+	}
+
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("LLM API 返回 HTTP %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	return respBody, nil
+}
+
+// retryableError 可重试的 HTTP 错误（429/503）。
+type retryableError struct {
+	statusCode int
+	body       string
+}
+
+func (e *retryableError) Error() string {
+	return fmt.Sprintf("HTTP %d: %s", e.statusCode, e.body)
+}
+
+// isRetryable 判断错误是否可重试。
+func isRetryable(err error) bool {
+	_, ok := err.(*retryableError)
+	return ok
+}
+
+// doHTTPRequest 包级共享 HTTP 请求辅助函数，供 Embedding 客户端复用。
+//
+// 封装 setHeaders + HTTP 发送 + 状态码检查，消除 llm_client 与 embedding_client 的重复代码。
+func doHTTPRequest(ctx context.Context, baseURL, apiKey, path string, jsonBody []byte, client *http.Client) ([]byte, error) {
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, baseURL+path, bytes.NewReader(jsonBody))
+	if err != nil {
+		return nil, fmt.Errorf("创建请求失败: %w", err)
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+	if apiKey != "" {
+		httpReq.Header.Set("Authorization", "Bearer "+apiKey)
+	}
+
+	resp, err := client.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("请求 %s 失败: %w", baseURL, err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("读取响应失败: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API 返回 HTTP %d: %s", resp.StatusCode, string(respBody))
 	}
 
 	return respBody, nil

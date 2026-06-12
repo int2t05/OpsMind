@@ -10,11 +10,9 @@
 package adapter
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -66,6 +64,7 @@ type OpenAIEmbeddingClient struct {
 	baseURL    string
 	apiKey     string
 	httpClient *http.Client
+	maxRetries int
 }
 
 // NewOpenAIEmbeddingClient 创建 OpenAIEmbeddingClient 实例。
@@ -76,6 +75,7 @@ func NewOpenAIEmbeddingClient(baseURL, apiKey string, timeout time.Duration) *Op
 		httpClient: &http.Client{
 			Timeout: timeout,
 		},
+		maxRetries: defaultMaxRetries,
 	}
 }
 
@@ -100,9 +100,9 @@ type openAIEmbeddingsResponse struct {
 }
 
 // CreateEmbeddings 调用 /v1/embeddings 生成向量。
-// TODO: 与 llm_client.go 的 doRequest 高度重复 — setHeaders、HTTP 发送、状态码检查、错误处理
-// 完全一致。应提取公共 HTTP 辅助函数（如 doRequest）供两者复用。
-// TODO: 无重试逻辑 — 同 llm_client.go。
+//
+// 使用共享的 doHTTPRequest 避免与 llm_client 重复代码。
+// 对 429/503 执行指数退避重试（与 LLM 客户端一致）。
 func (c *OpenAIEmbeddingClient) CreateEmbeddings(ctx context.Context, req EmbeddingRequest) (*EmbeddingResponse, error) {
 	body := openAIEmbeddingsRequest{
 		Model: req.Model,
@@ -114,29 +114,34 @@ func (c *OpenAIEmbeddingClient) CreateEmbeddings(ctx context.Context, req Embedd
 		return nil, fmt.Errorf("序列化 embedding 请求失败: %w", err)
 	}
 
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost,
-		c.baseURL+"/v1/embeddings", bytes.NewReader(jsonBody))
-	if err != nil {
-		return nil, fmt.Errorf("创建 embedding 请求失败: %w", err)
-	}
-	httpReq.Header.Set("Content-Type", "application/json")
-	if c.apiKey != "" {
-		httpReq.Header.Set("Authorization", "Bearer "+c.apiKey)
+	// 带重试的 HTTP 请求（复用 llm_client 的共享 doHTTPRequest）
+	var respBody []byte
+	for attempt := 0; attempt <= c.maxRetries; attempt++ {
+		if attempt > 0 {
+			delay := retryBaseDelay * time.Duration(1<<(attempt-1))
+			if delay > 8*time.Second {
+				delay = 8 * time.Second
+			}
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-time.After(delay):
+			}
+		}
+
+		respBody, err = doHTTPRequest(ctx, c.baseURL, c.apiKey, "/v1/embeddings", jsonBody, c.httpClient)
+		if err == nil {
+			break
+		}
+
+		// 仅 429/503 重试
+		if !isRetryable(err) {
+			return nil, fmt.Errorf("请求 embedding 服务失败: %w", err)
+		}
 	}
 
-	resp, err := c.httpClient.Do(httpReq)
 	if err != nil {
-		return nil, fmt.Errorf("请求 embedding 服务 %s 失败: %w", c.baseURL, err)
-	}
-	defer resp.Body.Close()
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("读取 embedding 响应失败: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("Embedding API 返回 HTTP %d: %s", resp.StatusCode, string(respBody))
+		return nil, fmt.Errorf("重试 %d 次后 embedding 仍失败: %w", c.maxRetries, err)
 	}
 
 	var apiResp openAIEmbeddingsResponse

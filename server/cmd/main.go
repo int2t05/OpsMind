@@ -134,8 +134,7 @@ func main() {
 	dashboardHandler := handler.NewDashboardHandler(dashboardService)
 	auditHandler := handler.NewAuditHandler(auditService)
 	configHandler := handler.NewConfigHandler(configService)
-	llmConfigHandler := handler.NewLLMConfigHandler(llmConfigSvc)
-	llmConfigHandler.SetLLMClient(llmClient)
+	llmConfigHandler := handler.NewLLMConfigHandler(llmConfigSvc, llmClient)
 
 	// 8. 初始化后台调度器
 	scheduler := service.NewScheduler(ticketRepo)

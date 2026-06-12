@@ -40,22 +40,13 @@ type llmConfigService interface {
 
 // NewLLMConfigHandler 创建 LLMConfigHandler 实例。
 //
-// svc 可以是 *service.LLMConfigService 或测试 mock。
-// TODO: 接受 interface{} 绕过编译期类型检查 — 传入错误类型时 svc 为 nil，调用时 panic。
-// 应改为直接接受 llmConfigService 接口类型。
-func NewLLMConfigHandler(svc interface{}) *LLMConfigHandler {
-	h := &LLMConfigHandler{}
-	if s, ok := svc.(llmConfigService); ok {
-		h.svc = s
+// svc 和 llmClient 通过构造函数注入，避免 Setter 注入的时序风险。
+// llmClient 可选（传 nil），用于 TestConnection 真实验证。
+func NewLLMConfigHandler(svc llmConfigService, llmClient adapter.LLMClient) *LLMConfigHandler {
+	return &LLMConfigHandler{
+		svc:       svc,
+		llmClient: llmClient,
 	}
-	return h
-}
-
-// SetLLMClient 注入 LLM 客户端（用于 TestConnection 真实验证）。
-// TODO: Setter 注入模式脆弱 — 可能在首次调用后才设置，导致 nil pointer。
-// 应改为构造函数注入（参考 ChatHandler.NewChatHandler）。
-func (h *LLMConfigHandler) SetLLMClient(client adapter.LLMClient) {
-	h.llmClient = client
 }
 
 // =============================================================================
@@ -213,17 +204,18 @@ func (h *LLMConfigHandler) TestConnection(c *gin.Context) {
 		Temperature: 0,
 	}
 
-	resp, err := h.llmClient.ChatCompletion(ctx, testReq)
-	if err != nil {
-		response.Error(c, errcode.ErrAIUnavailable, "连接测试失败: "+err.Error())
-		return
-	}
+		start := time.Now()
+		resp, err := h.llmClient.ChatCompletion(ctx, testReq)
+		latency := time.Since(start).Milliseconds()
+		if err != nil {
+			response.Error(c, errcode.ErrAIUnavailable, "连接测试失败: "+err.Error())
+			return
+		}
 
-	response.Success(c, gin.H{
-		"success": true,
-		"model":   cfg.LLMModel,
-		// TODO: TokensUsed 被当作 "latency" 返回 — 语义错误，Token 数 ≠ 延迟。
-		// 应测量实际耗时: start := time.Now(); ...; latency := time.Since(start).Milliseconds()。
-		"latency": resp.TokensUsed, // 近似延迟指标
-	})
+		response.Success(c, gin.H{
+			"success":     true,
+			"model":       cfg.LLMModel,
+			"latency_ms":  latency,
+			"tokens_used": resp.TokensUsed,
+		})
 }

@@ -56,9 +56,8 @@ func (m *mockLLMConfigSvc) GetManager() *service.LLMConfigManager    { return ni
 func setupLLMTestRouter(svc *mockLLMConfigSvc) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	h := handler.NewLLMConfigHandler(svc)
-	// 注入 mock LLMClient（TestConnection 需要）
-	h.SetLLMClient(&mockTestLLMClient{response: &adapter.ChatResponse{Content: "ok", FinishReason: "stop"}})
+	mockClient := &mockTestLLMClient{response: &adapter.ChatResponse{Content: "ok", FinishReason: "stop"}}
+	h := handler.NewLLMConfigHandler(svc, mockClient)
 	r.GET("/api/v1/admin/llm-configs", h.ListConfigs)
 	r.POST("/api/v1/admin/llm-configs", h.CreateConfig)
 	r.GET("/api/v1/admin/llm-configs/:id", h.GetConfig)
