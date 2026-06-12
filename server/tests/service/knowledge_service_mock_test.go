@@ -52,6 +52,15 @@ func (m *mockKnowledgeRepo) UpdateArticleStatus(id int64, status int) error {
 	return fmt.Errorf("not found")
 }
 
+func (m *mockKnowledgeRepo) UpdateArticleProcessStatus(id int64, processStatus, processError string) error {
+	if a, ok := m.articles[id]; ok {
+		a.ProcessStatus = processStatus
+		a.ProcessError = processError
+		return nil
+	}
+	return fmt.Errorf("not found")
+}
+
 func (m *mockKnowledgeRepo) CreateKB(kb *model.KnowledgeBase) error {
 	kb.ID = int64(len(m.kbs) + 1)
 	m.kbs[kb.ID] = kb

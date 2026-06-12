@@ -18,11 +18,11 @@ import (
 
 // mockOpenAIServer 创建模拟 OpenAI-compatible API 的 HTTP 测试服务器。
 //
-// chatHandler: 处理 /v1/chat/completions 请求（同步）
+// chatHandler: 处理 /chat/completions 请求（同步）
 func mockOpenAIServer(chatHandler http.HandlerFunc) *httptest.Server {
 	mux := http.NewServeMux()
 	if chatHandler != nil {
-		mux.HandleFunc("/v1/chat/completions", chatHandler)
+		mux.HandleFunc("/chat/completions", chatHandler)
 	}
 	return httptest.NewServer(mux)
 }

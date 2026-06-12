@@ -2,11 +2,6 @@
 //
 // embedding_client.go 定义 EmbeddingClient 接口和 OpenAI-compatible HTTP 实现。
 // 所有 Embedding 调用必须通过此适配层，禁止直接 HTTP 调用。
-//
-// 为什么 Embedding 和 LLM 使用同一 Base URL 但独立接口：
-// LLM 和 Embedding 通常指向同一服务（如 llama.cpp server），但
-// 调用模式不同（流式 vs 批量）且返回值类型不同（文本 vs []float32），
-// 独立接口保持职责清晰。
 package adapter
 
 import (
@@ -23,14 +18,7 @@ import (
 // =============================================================================
 
 // EmbeddingClient 定义 Embedding 生成接口（OpenAI-compatible 协议）。
-//
-// 支持任意 OpenAI-compatible /v1/embeddings 端点：
-//   - llama.cpp server    → http://llama-cpp:8080/v1
-//   - OpenAI              → https://api.openai.com/v1
-//   - 其他兼容服务
 type EmbeddingClient interface {
-	// CreateEmbeddings 生成文本向量。
-	// 支持批量输入，一次调用传入多个文本，减少 API 往返。
 	CreateEmbeddings(ctx context.Context, req EmbeddingRequest) (*EmbeddingResponse, error)
 }
 
@@ -46,78 +34,101 @@ type EmbeddingRequest struct {
 
 // EmbeddingResponse embedding 响应。
 type EmbeddingResponse struct {
-	Embeddings [][]float32 `json:"embeddings"` // 每个 input 对应一个向量
-	Dimension  int         `json:"dimension"`  // 向量维度
+	Embeddings [][]float32 `json:"embeddings"`
+	Dimension  int         `json:"dimension"`
 	TokensUsed int         `json:"tokens_used"`
 }
 
 // =============================================================================
-// OpenAI-compatible 实现
+// 实现
 // =============================================================================
 
-// OpenAIEmbeddingClient 实现 EmbeddingClient，对接 OpenAI-compatible API。
+// OpenAIEmbeddingClient 对接 OpenAI-compatible /v1/embeddings。
 //
-// 为什么复用 OpenAIClient 的 Base URL 设计模式但使用独立结构体：
-// Embedding 和 LLM 虽然使用同一协议族，但超时、重试策略可能不同
-//（embedding 批量调用需更长超时）。独立结构体允许独立配置。
+// DashScope "兼容模式" 不完全兼容：缺少 encoding_format 时拒绝数组 input。
+// 通过 isDashScope 标记自动附加 "encoding_format":"float"。
 type OpenAIEmbeddingClient struct {
-	baseURL    string
-	apiKey     string
-	httpClient *http.Client
-	maxRetries int
+	baseURL      string
+	apiKey       string
+	defaultModel string
+	httpClient   *http.Client
+	maxRetries   int
+	isDashScope  bool
 }
 
-// NewOpenAIEmbeddingClient 创建 OpenAIEmbeddingClient 实例。
-func NewOpenAIEmbeddingClient(baseURL, apiKey string, timeout time.Duration) *OpenAIEmbeddingClient {
+// NewOpenAIEmbeddingClient 创建客户端实例。
+//
+// defaultModel 用于 EmbeddingRequest.Model 为空时的回退模型名称。
+func NewOpenAIEmbeddingClient(baseURL, apiKey, defaultModel string, timeout time.Duration) *OpenAIEmbeddingClient {
 	return &OpenAIEmbeddingClient{
-		baseURL: strings.TrimRight(baseURL, "/"),
-		apiKey:  apiKey,
-		httpClient: &http.Client{
-			Timeout: timeout,
-		},
-		maxRetries: defaultMaxRetries,
+		baseURL:      strings.TrimRight(baseURL, "/"),
+		apiKey:       apiKey,
+		defaultModel: defaultModel,
+		httpClient:   &http.Client{Timeout: timeout},
+		maxRetries:   defaultMaxRetries,
+		isDashScope:  strings.Contains(baseURL, "dashscope"),
 	}
 }
 
-// openAIEmbeddingsRequest OpenAI /v1/embeddings 请求体。
-type openAIEmbeddingsRequest struct {
-	Model string   `json:"model"`
-	Input []string `json:"input"`
+// dashScopeEmbeddingsRequest DashScope 需要 encoding_format 字段才能接受数组 input。
+type dashScopeEmbeddingsRequest struct {
+	Model          string   `json:"model"`
+	Input          []string `json:"input"`
+	EncodingFormat string   `json:"encoding_format"`
 }
 
-// openAIEmbeddingsResponse OpenAI /v1/embeddings 响应体。
-type openAIEmbeddingsResponse struct {
-	Object string `json:"object"`
-	Data   []struct {
-		Object    string    `json:"object"`
-		Index     int       `json:"index"`
-		Embedding []float32 `json:"embedding"`
-	} `json:"data"`
-	Model string `json:"model"`
+// embeddingDataItem 单个 embedding 结果。
+type embeddingDataItem struct {
+	Object    string    `json:"object"`
+	Index     int       `json:"index"`
+	Embedding []float32 `json:"embedding"`
+}
+
+// embeddingAPIResponse 通用 embedding API 响应（OpenAI 和 DashScope 兼容模式共用）。
+type embeddingAPIResponse struct {
+	Data  []embeddingDataItem `json:"data"`
 	Usage struct {
 		TotalTokens int `json:"total_tokens"`
 	} `json:"usage"`
 }
 
 // CreateEmbeddings 调用 /v1/embeddings 生成向量。
-//
-// 使用共享的 doHTTPRequest 避免与 llm_client 重复代码。
-// 对 429/503 执行指数退避重试（与 LLM 客户端一致）。
 func (c *OpenAIEmbeddingClient) CreateEmbeddings(ctx context.Context, req EmbeddingRequest) (*EmbeddingResponse, error) {
-	// TODO(adapter/embedding): 校验 Input 非空、Model 非空或有默认模型。
-	// 空 model 目前由上层用“默认模型”语义传入，但客户端本身并不知道默认模型是什么。
-	body := openAIEmbeddingsRequest{
-		Model: req.Model,
-		Input: req.Input,
-	}
-
-	jsonBody, err := json.Marshal(body)
+	jsonBody, err := c.marshalRequest(req)
 	if err != nil {
-		return nil, fmt.Errorf("序列化 embedding 请求失败: %w", err)
+		return nil, err
 	}
 
-	// 带重试的 HTTP 请求（复用 llm_client 的共享 doHTTPRequest）
-	var respBody []byte
+	respBody, err := c.doRequest(ctx, jsonBody)
+	if err != nil {
+		return nil, err
+	}
+
+	return c.parseResponse(respBody, len(req.Input))
+}
+
+// marshalRequest 序列化请求体，DashScope 自动附加 encoding_format。
+func (c *OpenAIEmbeddingClient) marshalRequest(req EmbeddingRequest) ([]byte, error) {
+	model := req.Model
+	if model == "" {
+		model = c.defaultModel
+	}
+	if c.isDashScope {
+		return json.Marshal(dashScopeEmbeddingsRequest{
+			Model:          model,
+			Input:          req.Input,
+			EncodingFormat: "float",
+		})
+	}
+	return json.Marshal(struct {
+		Model string   `json:"model"`
+		Input []string `json:"input"`
+	}{model, req.Input})
+}
+
+// doRequest 带重试的 POST 请求。
+func (c *OpenAIEmbeddingClient) doRequest(ctx context.Context, jsonBody []byte) ([]byte, error) {
+	var lastErr error
 	for attempt := 0; attempt <= c.maxRetries; attempt++ {
 		if attempt > 0 {
 			delay := retryBaseDelay * time.Duration(1<<(attempt-1))
@@ -131,47 +142,44 @@ func (c *OpenAIEmbeddingClient) CreateEmbeddings(ctx context.Context, req Embedd
 			}
 		}
 
-		respBody, err = doHTTPRequest(ctx, c.baseURL, c.apiKey, "/v1/embeddings", jsonBody, c.httpClient)
+		resp, err := doHTTPRequest(ctx, c.baseURL, c.apiKey, "/embeddings", jsonBody, c.httpClient)
 		if err == nil {
-			break
+			return resp, nil
 		}
-
-		// 仅 429/503 重试
+		lastErr = err
 		if !isRetryable(err) {
-			return nil, fmt.Errorf("请求 embedding 服务失败: %w", err)
+			return nil, fmt.Errorf("embedding 请求失败: %w", err)
 		}
 	}
+	return nil, fmt.Errorf("embedding 重试 %d 次后仍失败: %w", c.maxRetries, lastErr)
+}
 
-	if err != nil {
-		return nil, fmt.Errorf("重试 %d 次后 embedding 仍失败: %w", c.maxRetries, err)
-	}
-
-	var apiResp openAIEmbeddingsResponse
+// parseResponse 解析 API 响应为统一格式。
+func (c *OpenAIEmbeddingClient) parseResponse(respBody []byte, expected int) (*EmbeddingResponse, error) {
+	var apiResp embeddingAPIResponse
 	if err := json.Unmarshal(respBody, &apiResp); err != nil {
 		return nil, fmt.Errorf("解析 embedding 响应失败: %w", err)
 	}
 
-	embeddings := make([][]float32, len(apiResp.Data))
+	embeddings := make([][]float32, expected)
 	for _, d := range apiResp.Data {
-		if d.Index < 0 || d.Index >= len(embeddings) {
-			return nil, fmt.Errorf("embedding index 越界: %d (总数 %d)", d.Index, len(embeddings))
+		if d.Index < 0 || d.Index >= expected {
+			return nil, fmt.Errorf("embedding index 越界: %d (期望 0-%d)", d.Index, expected-1)
 		}
 		if embeddings[d.Index] != nil {
 			return nil, fmt.Errorf("embedding index 重复: %d", d.Index)
 		}
 		embeddings[d.Index] = d.Embedding
 	}
-	// TODO(adapter/embedding): 检查每个 input 都返回了 embedding。
-	// 当前缺失 index 会留下 nil 向量，后续 BatchInsert 可能以空向量写入或维度不一致。
 
-	dimension := 0
+	dim := 0
 	if len(embeddings) > 0 && len(embeddings[0]) > 0 {
-		dimension = len(embeddings[0])
+		dim = len(embeddings[0])
 	}
 
 	return &EmbeddingResponse{
 		Embeddings: embeddings,
-		Dimension:  dimension,
+		Dimension:  dim,
 		TokensUsed: apiResp.Usage.TotalTokens,
 	}, nil
 }

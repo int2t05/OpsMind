@@ -92,8 +92,8 @@ func setupChatHandlerTest(t *testing.T) *chatHandlerEnv {
 	// 组装依赖链
 	knowledgeRepo := repository.NewKnowledgeRepo(db)
 	chatRepo := repository.NewChatRepo(db)
-	chatSvc := service.NewChatService(knowledgeRepo, chatRepo, nil, nil, nil, 5)
-	chatH := handler.NewChatHandler(chatSvc, nil)
+	chatSvc := service.NewChatService(knowledgeRepo, chatRepo, nil, nil, nil, 5, "")
+	chatH := handler.NewChatHandler(chatSvc, nil, "")
 
 	// 路由
 	r := gin.New()

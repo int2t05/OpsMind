@@ -45,6 +45,7 @@ type knowledgeRepo interface {
 	CreateArticle(article *model.KnowledgeArticle) error
 	UpdateArticle(article *model.KnowledgeArticle) error
 	UpdateArticleStatus(id int64, status int) error
+	UpdateArticleProcessStatus(id int64, processStatus, processError string) error
 	CreateKB(kb *model.KnowledgeBase) error
 	UpdateKB(kb *model.KnowledgeBase) error
 	ListKBs() ([]model.KnowledgeBase, error)
@@ -503,13 +504,12 @@ func (s *KnowledgeService) UploadDocuments(kbID int64, userID int64, filename st
 	}
 
 	if s.processor != nil {
-		// TODO(service/knowledge): Processor 回调只更新 status 数字，丢弃 errMsg。
-		// 需要持久化 process_error，前端才能展示失败原因和重试指导。
 		task := rag.ProcessTask{
 			ArticleID: article.ID,
 			KBID:      kbID,
 			Content:   text,
 			OnStatusChange: func(aID int64, status, errMsg string) {
+				_ = s.repo.UpdateArticleProcessStatus(aID, status, errMsg)
 				_ = s.repo.UpdateArticleStatus(aID, mapProcessStatus(status))
 			},
 		}
@@ -549,6 +549,10 @@ func (s *KnowledgeService) RetryDocument(articleID int64) error {
 		ArticleID: articleID,
 		KBID:      article.KBID,
 		Content:   article.Content,
+		OnStatusChange: func(aID int64, status, errMsg string) {
+			_ = s.repo.UpdateArticleProcessStatus(aID, status, errMsg)
+			_ = s.repo.UpdateArticleStatus(aID, mapProcessStatus(status))
+		},
 	}
 	if err := s.processor.Submit(task); err != nil {
 		return errcode.AppError{Code: errcode.ErrUnknown, Message: "提交处理任务失败: " + err.Error()}
@@ -617,18 +621,18 @@ func mapProcessStatus(status string) int {
 	}
 }
 
-// mapArticleToProcessStatus 将文章状态映射为处理阶段描述。
+// mapArticleToProcessStatus 返回文章的处理状态字符串。
 func mapArticleToProcessStatus(article *model.KnowledgeArticle) string {
+	if article.ProcessStatus != "" {
+		return article.ProcessStatus
+	}
+	// 兼容旧数据：无 process_status 时按审核状态推断
 	switch article.Status {
-	case model.ArticleStatusDraft:
-		return "pending"
-	case model.ArticleStatusApproved:
+	case model.ArticleStatusApproved, model.ArticleStatusPublished:
 		return "completed"
-	case model.ArticleStatusPublished:
-		return "published"
 	case model.ArticleStatusDisabled:
 		return "disabled"
 	default:
-		return "unknown"
+		return "pending"
 	}
 }

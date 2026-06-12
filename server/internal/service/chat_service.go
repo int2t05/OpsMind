@@ -47,7 +47,8 @@ type chatPipeline interface {
 // knowledgeRepo/chatRepo/pipeline 使用接口类型，便于测试 mock。
 // llmClient 使用 adapter.LLMClient 接口，configMgr 可以为 nil。
 type ChatService struct {
-	defaultTopK   int // 默认检索 TopK（从配置读取）
+	defaultTopK   int    // 默认检索 TopK（从配置读取）
+	defaultModel  string // configMgr 不可用时回退到此模型
 	knowledgeRepo chatKnowledgeRepo
 	chatRepo      chatSessionRepo
 	pipeline      chatPipeline
@@ -59,7 +60,7 @@ type ChatService struct {
 //
 // pipeline/llmClient/configMgr 可以为 nil（测试或降级场景）。
 // knowledgeRepo/chatRepo/pipeline 直接使用具体接口类型，编译期校验传入类型。
-func NewChatService(knowledgeRepo chatKnowledgeRepo, chatRepo chatSessionRepo, pipeline chatPipeline, llmClient adapter.LLMClient, configMgr *LLMConfigManager, defaultTopK int) *ChatService {
+func NewChatService(knowledgeRepo chatKnowledgeRepo, chatRepo chatSessionRepo, pipeline chatPipeline, llmClient adapter.LLMClient, configMgr *LLMConfigManager, defaultTopK int, defaultModel string) *ChatService {
 	if defaultTopK <= 0 {
 		defaultTopK = 5
 	}
@@ -70,6 +71,7 @@ func NewChatService(knowledgeRepo chatKnowledgeRepo, chatRepo chatSessionRepo, p
 		llmClient:     llmClient,
 		configMgr:     configMgr,
 		defaultTopK:   defaultTopK,
+		defaultModel:  defaultModel,
 	}
 }
 
@@ -151,13 +153,16 @@ func (s *ChatService) CreateChatSession(req request.CreateChatRequest, userID in
 		}
 
 		// Step 3: LLM 生成
-		model := "default"
+		model := s.defaultModel
 		maxTokens := 2048
 		if s.configMgr != nil {
 			if cfg := s.configMgr.GetConfig(); cfg != nil {
 				model = cfg.LLMModel
 				maxTokens = cfg.MaxTokens
 			}
+		}
+		if model == "" {
+			model = "default"
 		}
 
 		llmResp, llmErr := s.llmClient.ChatCompletion(ctx, adapter.ChatRequest{

@@ -29,13 +29,14 @@ import (
 
 // ChatHandler 智能问答接口。
 type ChatHandler struct {
-	svc       *service.ChatService
-	llmClient adapter.LLMClient // 真实 token 级流式（nil 时降级到模拟流式）
+	svc          *service.ChatService
+	llmClient    adapter.LLMClient // 真实 token 级流式（nil 时降级到模拟流式）
+	defaultModel string            // streamWithLLM 回退模型
 }
 
 // NewChatHandler 创建 ChatHandler 实例。
-func NewChatHandler(svc *service.ChatService, llmClient adapter.LLMClient) *ChatHandler {
-	return &ChatHandler{svc: svc, llmClient: llmClient}
+func NewChatHandler(svc *service.ChatService, llmClient adapter.LLMClient, defaultModel string) *ChatHandler {
+	return &ChatHandler{svc: svc, llmClient: llmClient, defaultModel: defaultModel}
 }
 
 // =============================================================================
@@ -213,8 +214,7 @@ func (h *ChatHandler) StreamChatSession(c *gin.Context) {
 func (h *ChatHandler) streamWithLLM(c *gin.Context, flusher http.Flusher, fallbackAnswer string, req request.CreateChatRequest) {
 	ctx := c.Request.Context()
 	streamReq := adapter.ChatRequest{
-		// TODO(handler/chat): 这里应使用当前默认 LLM 配置中的 model/max_tokens，而不是空 model + 2048。
-		// 否则不同提供商可能直接拒绝请求。
+		Model: h.defaultModel,
 		Messages: []adapter.ChatMessage{
 			{Role: "user", Content: req.Question},
 		},

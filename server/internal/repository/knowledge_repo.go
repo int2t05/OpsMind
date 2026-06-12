@@ -146,6 +146,17 @@ func (r *KnowledgeRepo) UpdateArticleStatus(id int64, status int) error {
 	return r.db.Model(&model.KnowledgeArticle{}).Where("id = ?", id).Update("status", status).Error
 }
 
+// UpdateArticleProcessStatus 更新文档的异步处理状态和错误信息。
+func (r *KnowledgeRepo) UpdateArticleProcessStatus(id int64, processStatus, processError string) error {
+	updates := map[string]interface{}{
+		"process_status": processStatus,
+	}
+	if processError != "" {
+		updates["process_error"] = processError
+	}
+	return r.db.Model(&model.KnowledgeArticle{}).Where("id = ?", id).Updates(updates).Error
+}
+
 // =============================================================================
 // KnowledgeChunk
 // =============================================================================

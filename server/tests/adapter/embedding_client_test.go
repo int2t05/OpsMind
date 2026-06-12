@@ -1,6 +1,6 @@
 // Package adapter_test 测试 EmbeddingClient 适配器。
 //
-// 使用 mock HTTP server 验证 OpenAI-compatible /v1/embeddings 接口。
+// 使用 mock HTTP server 验证 OpenAI-compatible /embeddings 接口。
 // 所有测试不依赖外部 Embedding 服务。
 package adapter_test
 
@@ -19,7 +19,7 @@ import (
 // mockEmbeddingServer 创建模拟 OpenAI-compatible embeddings API 的 HTTP 测试服务器。
 func mockEmbeddingServer(handler http.HandlerFunc) *httptest.Server {
 	mux := http.NewServeMux()
-	mux.HandleFunc("/v1/embeddings", handler)
+	mux.HandleFunc("/embeddings", handler)
 	return httptest.NewServer(mux)
 }
 
@@ -69,7 +69,7 @@ func TestCreateEmbeddings_Single(t *testing.T) {
 	})
 	defer server.Close()
 
-	client := adapter.NewOpenAIEmbeddingClient(server.URL, "test-key", 10*time.Second)
+	client := adapter.NewOpenAIEmbeddingClient(server.URL, "test-key", "", 10*time.Second)
 
 	resp, err := client.CreateEmbeddings(context.Background(), adapter.EmbeddingRequest{
 		Model: "bge-m3",
@@ -121,7 +121,7 @@ func TestCreateEmbeddings_Batch(t *testing.T) {
 	})
 	defer server.Close()
 
-	client := adapter.NewOpenAIEmbeddingClient(server.URL, "test-key", 10*time.Second)
+	client := adapter.NewOpenAIEmbeddingClient(server.URL, "test-key", "", 10*time.Second)
 
 	resp, err := client.CreateEmbeddings(context.Background(), adapter.EmbeddingRequest{
 		Model: "text-embedding-3-small",
@@ -166,7 +166,7 @@ func TestCreateEmbeddings_DimensionValidation(t *testing.T) {
 	})
 	defer server.Close()
 
-	client := adapter.NewOpenAIEmbeddingClient(server.URL, "test-key", 10*time.Second)
+	client := adapter.NewOpenAIEmbeddingClient(server.URL, "test-key", "", 10*time.Second)
 
 	// bge-m3 → 1024 维
 	resp1, err1 := client.CreateEmbeddings(context.Background(), adapter.EmbeddingRequest{
@@ -200,7 +200,7 @@ func TestCreateEmbeddings_HTTPError(t *testing.T) {
 	})
 	defer server.Close()
 
-	client := adapter.NewOpenAIEmbeddingClient(server.URL, "test-key", 10*time.Second)
+	client := adapter.NewOpenAIEmbeddingClient(server.URL, "test-key", "", 10*time.Second)
 
 	_, err := client.CreateEmbeddings(context.Background(), adapter.EmbeddingRequest{
 		Model: "bge-m3",
@@ -228,7 +228,7 @@ func TestCreateEmbeddings_EmptyInput(t *testing.T) {
 	})
 	defer server.Close()
 
-	client := adapter.NewOpenAIEmbeddingClient(server.URL, "test-key", 10*time.Second)
+	client := adapter.NewOpenAIEmbeddingClient(server.URL, "test-key", "", 10*time.Second)
 
 	resp, err := client.CreateEmbeddings(context.Background(), adapter.EmbeddingRequest{
 		Model: "bge-m3",

@@ -88,7 +88,7 @@ func TestChatMock_Success(t *testing.T) {
 		response: &adapter.ChatResponse{Content: "VPN配置方法如下...", FinishReason: "stop"},
 	}
 
-	svc := service.NewChatService(kbRepo, sessionRepo, pipeline, llm, nil, 5)
+	svc := service.NewChatService(kbRepo, sessionRepo, pipeline, llm, nil, 5, "")
 
 	resp, err := svc.CreateChatSession(request.CreateChatRequest{
 		Question: "VPN怎么配置",
@@ -118,7 +118,7 @@ func TestChatMock_RAGFail(t *testing.T) {
 		response: &adapter.ChatResponse{Content: "回答", FinishReason: "stop"},
 	}
 
-	svc := service.NewChatService(kbRepo, sessionRepo, pipeline, llm, nil, 5)
+	svc := service.NewChatService(kbRepo, sessionRepo, pipeline, llm, nil, 5, "")
 
 	_, err := svc.CreateChatSession(request.CreateChatRequest{
 		Question: "test",
@@ -146,7 +146,7 @@ func TestChatMock_LLMFail(t *testing.T) {
 		err: fmt.Errorf("LLM 服务不可用"),
 	}
 
-	svc := service.NewChatService(kbRepo, sessionRepo, pipeline, llm, nil, 5)
+	svc := service.NewChatService(kbRepo, sessionRepo, pipeline, llm, nil, 5, "")
 
 	// LLM 失败时降级返回兜底文本（不返回 error）
 	resp, err := svc.CreateChatSession(request.CreateChatRequest{
@@ -177,7 +177,7 @@ func TestChatMock_LowConfidence(t *testing.T) {
 		response: &adapter.ChatResponse{Content: "答案", FinishReason: "stop"},
 	}
 
-	svc := service.NewChatService(kbRepo, sessionRepo, pipeline, llm, nil, 5)
+	svc := service.NewChatService(kbRepo, sessionRepo, pipeline, llm, nil, 5, "")
 
 	resp, err := svc.CreateChatSession(request.CreateChatRequest{
 		Question: "test",

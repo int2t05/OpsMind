@@ -115,7 +115,7 @@ func NewOpenAIClient(baseURL, apiKey string, timeout time.Duration) *OpenAIClien
 // ChatCompletion — 同步调用
 // =============================================================================
 
-// openAICompletionRequest OpenAI /v1/chat/completions 请求体。
+// openAICompletionRequest OpenAI /chat/completions 请求体。
 type openAICompletionRequest struct {
 	Model       string        `json:"model"`
 	Messages    []ChatMessage `json:"messages"`
@@ -124,7 +124,7 @@ type openAICompletionRequest struct {
 	Stream      bool          `json:"stream"`
 }
 
-// openAICompletionResponse OpenAI /v1/chat/completions 响应体。
+// openAICompletionResponse OpenAI /chat/completions 响应体。
 type openAICompletionResponse struct {
 	Choices []struct {
 		Index int `json:"index"`
@@ -151,7 +151,7 @@ func (c *OpenAIClient) ChatCompletion(ctx context.Context, req ChatRequest) (*Ch
 		Stream:      false,
 	}
 
-	respBody, err := c.doRequest(ctx, "/v1/chat/completions", body)
+	respBody, err := c.doRequest(ctx, "/chat/completions", body)
 	if err != nil {
 		return nil, err
 	}
@@ -207,7 +207,7 @@ func (c *OpenAIClient) ChatCompletionStream(ctx context.Context, req ChatRequest
 	}
 
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost,
-		c.baseURL+"/v1/chat/completions", bytes.NewReader(jsonBody))
+		c.baseURL+"/chat/completions", bytes.NewReader(jsonBody))
 	if err != nil {
 		return nil, fmt.Errorf("创建流式请求失败: %w", err)
 	}

@@ -80,7 +80,7 @@ func main() {
 	if embedAPIKey == "" {
 		embedAPIKey = cfg.LLM.APIKey
 	}
-	embeddingClient := adapter.NewOpenAIEmbeddingClient(embedBaseURL, embedAPIKey, 30*time.Second)
+	embeddingClient := adapter.NewOpenAIEmbeddingClient(embedBaseURL, embedAPIKey, cfg.Embedding.Model, 30*time.Second)
 	slog.Info("LLM/Embedding 客户端已初始化",
 		"llm_base_url", cfg.LLM.BaseURL,
 		"embedding_base_url", embedBaseURL,
@@ -128,18 +128,30 @@ func main() {
 	slog.Info("LLM 配置服务已初始化")
 
 	// RAG 引擎组件
-	// TODO(cmd/main): Chunker、BM25Retriever、Pipeline、Processor 目前没有完整装配。
-	// ChatService 注入 nil pipeline 会让问答绕过 RAG，KnowledgeService 注入 nil chunker 会让发布路径不可用。
 	embedder := rag.NewEmbedder(embeddingClient, 20)
 	docParser := rag.NewDocParser()
+	chunker := rag.NewChunker(1000, 200)
+
+	// 向量检索器（包装 Embedder + pgvector）
+	vectorRetriever := rag.NewVectorRetriever(embedder, vectorStore)
+
+	// BM25 混合检索器（中文分词 + 倒排索引，懒加载 + TTL）
+	segmenter := rag.NewGseSegmenter()
+	bm25Retriever := rag.NewBM25Retriever(segmenter, 30*time.Minute)
+
+	// RAG 管道（查询改写 → 多路检索 → 混合检索 → 重排序）
+	pipeline := rag.NewPipeline(vectorRetriever, bm25Retriever, llmClient, embedder)
+
+	// 文档异步处理器（goroutine pool：解析→分块→embedding→pgvector 写入）
+	processor := rag.NewProcessor(docParser, chunker, embedder, vectorStore, 2)
 
 	// KnowledgeService（CRUD + pgvector 管道 + 文档上传）
-	knowledgeService := service.NewKnowledgeService(knowledgeRepo, nil, embedder, vectorStore, docParser, nil)
-	slog.Info("KnowledgeService 已初始化")
+	knowledgeService := service.NewKnowledgeService(knowledgeRepo, chunker, embedder, vectorStore, docParser, processor)
+	slog.Info("KnowledgeService 已初始化（含 Chunker + Processor）")
 
 	// ChatService（自建 Pipeline + LLMClient）
-	chatService := service.NewChatService(knowledgeRepo, chatRepo, nil, llmClient, llmConfigSvc.GetManager(), cfg.AI.DefaultTopK)
-	slog.Info("ChatService 已初始化")
+	chatService := service.NewChatService(knowledgeRepo, chatRepo, pipeline, llmClient, llmConfigSvc.GetManager(), cfg.AI.DefaultTopK, cfg.LLM.Model)
+	slog.Info("ChatService 已初始化（含 RAG Pipeline）")
 
 	// AuditService
 	auditService := service.NewAuditService(auditRepo, userRepo)
@@ -150,7 +162,7 @@ func main() {
 	roleHandler := handler.NewRoleHandler(roleService)
 	ticketHandler := handler.NewTicketHandler(ticketService, knowledgeService)
 	knowledgeHandler := handler.NewKnowledgeHandler(knowledgeService)
-	chatHandler := handler.NewChatHandler(chatService, llmClient)
+	chatHandler := handler.NewChatHandler(chatService, llmClient, cfg.LLM.Model)
 	messageHandler := handler.NewMessageHandler(messageService)
 	dashboardHandler := handler.NewDashboardHandler(dashboardService)
 	auditHandler := handler.NewAuditHandler(auditService)
