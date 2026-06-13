@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { getToken, setToken as saveToken, removeToken, getUserInfo, setUserInfo as saveUserInfo, removeUserInfo } from '../utils/auth'
+import { getToken, setToken as saveToken, removeToken, setRefreshToken as saveRefresh, removeRefreshToken, getUserInfo, setUserInfo as saveUserInfo, removeUserInfo } from '../utils/auth'
 import type { MenuItem } from '@/types/menu'
 
 interface UserInfo {
@@ -30,9 +30,10 @@ export const useAuthStore = defineStore('auth', () => {
     return permissions.value.includes(perm)
   }
 
-  const setToken = (newToken: string) => {
+  const setToken = (newToken: string, refreshToken?: string) => {
     token.value = newToken
     saveToken(newToken)
+    if (refreshToken) saveRefresh(refreshToken)
   }
 
   const clearAuth = () => {
@@ -42,6 +43,7 @@ export const useAuthStore = defineStore('auth', () => {
     permissions.value = []
     menus.value = []
     removeToken()
+    removeRefreshToken()
     removeUserInfo()
   }
 

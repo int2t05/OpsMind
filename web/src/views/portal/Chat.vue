@@ -317,7 +317,7 @@ function scrollToBottom() {
 
 .step-badge.done {
   background: rgba(46, 160, 67, 0.12);
-  color: #3fb950;
+  color: var(--color-success);
 }
 
 .step-badge.failed {

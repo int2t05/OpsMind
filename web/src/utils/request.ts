@@ -1,13 +1,14 @@
 /**
  * Axios 实例封装
  *
- * 创建统一的 HTTP 客户端，配置：
+ * 提供统一的 HTTP 客户端，配置：
  * - 请求拦截器：注入 Authorization: Bearer <token> + 全局 loading 计数器
- * - 响应拦截器：处理 401（跳转登录）、403（提示无权限）、统一提取 data + loading 递减
+ * - 响应拦截器：自动 token 刷新（401 时）、权限错误处理（403）、统一提取 data + loading 递减
  */
 
 import axios, { type AxiosRequestConfig } from 'axios'
-import { getToken, removeToken } from './auth'
+import { getToken, setToken as saveToken, removeToken, getRefreshToken, setRefreshToken as saveRefresh, removeRefreshToken } from './auth'
+import { refreshToken } from '@/api/auth'
 import router from '@/router'
 
 // 响应拦截器已将 AxiosResponse 的 data 提取，因此返回类型应为 T 而非 AxiosResponse<T>。
@@ -57,42 +58,78 @@ raw.interceptors.request.use(
   },
 )
 
-// 响应拦截器：统一错误处理 + loading 递减
+// Token 刷新状态管理
+let isRefreshing = false
+let refreshSubscribers: Array<(token: string) => void> = []
+
+function subscribeTokenRefresh(cb: (token: string) => void) {
+  refreshSubscribers.push(cb)
+}
+
+function onTokenRefreshed(newToken: string) {
+  refreshSubscribers.forEach(cb => cb(newToken))
+  refreshSubscribers = []
+}
+
+// 响应拦截器：统一错误处理 + Token 自动刷新 + loading 递减
 raw.interceptors.response.use(
   (response) => {
     decLoading()
-    // 统一提取 data 字段
     return response.data
   },
-  (error) => {
+  async (error) => {
     decLoading()
-    const { response } = error
+    const { response, config } = error
 
     if (response) {
-      switch (response.status) {
-        case 401:
-          // 未登录或令牌过期，清除 token 并跳转登录页
-          // 防止无限循环：若当前已在登录页则不重复跳转
+      // 401 时尝试刷新 Token
+      if (response.status === 401 && config && !config._retry) {
+        const rt = getRefreshToken()
+        if (rt && !isRefreshing) {
+          isRefreshing = true
+          config._retry = true
+          try {
+            const res = await refreshToken(rt)
+            const newToken = res.data.access_token
+            const newRefresh = res.data.refresh_token
+            saveToken(newToken)
+            if (newRefresh) saveRefresh(newRefresh)
+            config.headers.Authorization = `Bearer ${newToken}`
+            onTokenRefreshed(newToken)
+            isRefreshing = false
+            return raw(config)
+          } catch {
+            isRefreshing = false
+            refreshSubscribers = []
+            removeToken()
+            removeRefreshToken()
+            if (router.currentRoute.value.path !== '/login') {
+              router.push('/login')
+            }
+            return Promise.reject(error)
+          }
+        } else if (isRefreshing) {
+          // 其他请求等待刷新完成
+          return new Promise((resolve) => {
+            subscribeTokenRefresh((token: string) => {
+              config.headers.Authorization = `Bearer ${token}`
+              resolve(raw(config))
+            })
+          })
+        } else {
           removeToken()
+          removeRefreshToken()
           if (router.currentRoute.value.path !== '/login') {
             router.push('/login')
           }
-          break
-        case 403:
-          // 无权限 — 输出错误并跳转登录页（角色不匹配时后端返回 403）
-          // TODO(web/request): 403 不应统一跳登录页。
-          // 已登录但无权限应跳 403 页面或提示无权限，避免用户误以为登录失效。
-          console.error('无权限访问该资源')
-          if (router.currentRoute.value.path !== '/login') {
-            router.push('/login')
-          }
-          break
-        default:
-          console.error(response.data?.message || '请求失败')
+        }
+      } else if (response.status === 403) {
+        // 已登录但无权限 — 不去登录页，仅输出错误
+        console.error('无权限访问该资源')
+      } else {
+        console.error(response.data?.message || '请求失败')
       }
     } else {
-      // TODO(web/request): 网络错误应区分 timeout、abort、DNS/连接失败。
-      // 统一“网络错误”不利于前端展示重试策略。
       console.error('网络错误')
     }
 

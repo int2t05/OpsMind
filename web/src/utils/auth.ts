@@ -6,6 +6,7 @@
  */
 
 const TOKEN_KEY = 'opsmind_token'
+const REFRESH_KEY = 'opsmind_refresh_token'
 const USER_KEY = 'opsmind_user'
 
 import type { MenuItem } from '@/types/menu'
@@ -30,6 +31,18 @@ export function setToken(token: string): void {
 
 export function removeToken(): void {
   localStorage.removeItem(TOKEN_KEY)
+}
+
+export function getRefreshToken(): string | null {
+  return localStorage.getItem(REFRESH_KEY)
+}
+
+export function setRefreshToken(token: string): void {
+  localStorage.setItem(REFRESH_KEY, token)
+}
+
+export function removeRefreshToken(): void {
+  localStorage.removeItem(REFRESH_KEY)
 }
 
 /**

@@ -15,6 +15,7 @@
             @click="selectKB(kb)"
           >
             <span class="kb-name">{{ kb.name }}</span>
+            <button class="btn-edit-kb" @click.stop="startEditKB(kb)" title="编辑知识库">✎</button>
           </li>
         </ul>
         <div v-if="kbList.length === 0" class="empty-hint">暂无知识库</div>
@@ -69,7 +70,8 @@
                 <button v-if="a.status===3" class="btn-sm btn-success" @click="handlePublish(a.id)">发布</button>
                 <button v-if="a.status===4" class="btn-sm btn-warning" @click="handleDisable(a.id)">停用</button>
                 <button v-if="a.status===5" class="btn-sm btn-success" @click="handleEnable(a.id)">启用</button>
-                <button v-if="a.source_type===2 && a.process_status==='failed'" class="btn-sm btn-warning" @click="handleRetryDocument(a.id)">重试</button>
+                <button v-if="a.source_type===2 && a.process_status==='failed'" class="btn-sm btn-warning" @click="handleRetryDocument(a.id)">重试处理</button>
+                <button v-if="a.process_status==='failed'" class="btn-sm btn-warning" @click="handleRetrySync(a.id)">重试发布</button>
                 <button v-if="a.status===1||a.status===6" class="btn-sm btn-default" @click="goEdit(a.id)">编辑</button>
               </td>
             </tr>
@@ -80,6 +82,19 @@
 
         <Pagination v-if="selectedKB && total>0" :total="total" v-model:current-page="currentPage" v-model:page-size="pageSize" @update:current-page="fetchArticles" @update:page-size="fetchArticles" />
       </main>
+    </div>
+
+    <!-- 编辑知识库对话框 -->
+    <div v-if="showEditKBDialog" class="dialog-overlay" @click.self="showEditKBDialog=false">
+      <div class="dialog">
+        <h3>编辑知识库</h3>
+        <div class="form-group"><label>名称</label><input v-model="editKBForm.name" type="text" /></div>
+        <div class="form-group"><label>描述</label><textarea v-model="editKBForm.description" rows="3" /></div>
+        <div class="dialog-actions">
+          <button class="btn-cancel" @click="showEditKBDialog=false">取消</button>
+          <button class="btn-primary" @click="handleUpdateKB" :disabled="!editKBForm.name">保存</button>
+        </div>
+      </div>
     </div>
 
     <!-- 新建知识库对话框 -->
@@ -98,12 +113,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import Pagination from '@/components/common/Pagination.vue'
 import { articleStatusClass as statusClass, articleStatusText as statusText, processClass, processText } from '@/utils/knowledge'
 import { useToast } from '@/composables/useToast'
-import { listKnowledgeBases, createKnowledgeBase, listArticles, submitReview, publishArticle, disableArticle, enableArticle, retryDocument } from '@/api/knowledge'
+import { listKnowledgeBases, createKnowledgeBase, updateKnowledgeBase, listArticles, submitReview, publishArticle, disableArticle, enableArticle, retrySyncArticle, retryDocument } from '@/api/knowledge'
 
 interface KB { id: number; name: string }
 // v2: 统一文章模型字段
@@ -119,10 +134,26 @@ const pageSize = ref(10)
 const statusFilter = ref(-1)
 const sourceTypeFilter = ref(-1)  // v2: 来源类型筛选
 const showKBDialog = ref(false)
+const showEditKBDialog = ref(false)
+const editingKB = ref<KB | null>(null)
 const newKB = ref({ name: '', description: '' })
+const editKBForm = ref({ name: '', description: '' })
 const toast = useToast()
 
+const hasProcessingDocs = computed(() => articles.value.some(a => a.process_status && a.process_status !== 'completed' && a.process_status !== 'failed'))
+let pollTimer: ReturnType<typeof setInterval> | null = null
+
 onMounted(() => { fetchKBs() })
+onUnmounted(() => { if (pollTimer) clearInterval(pollTimer) })
+
+// 文档处理状态轮询（每 5 秒刷新正在处理中的文档）
+function startDocPolling() {
+  if (pollTimer) return
+  pollTimer = setInterval(() => {
+    if (hasProcessingDocs.value) fetchArticles()
+    else { clearInterval(pollTimer!); pollTimer = null }
+  }, 5000)
+}
 
 const fetchKBs = async () => {
   try { const res = await listKnowledgeBases(); kbList.value = Array.isArray(res.data) ? res.data : [] } catch (e) { console.error(e); toast.showToast('加载知识库列表失败', 'error') }
@@ -137,10 +168,16 @@ const fetchArticles = async () => {
     const res = await listArticles(selectedKB.value.id, params)
     const list = Array.isArray(res.data) ? res.data : ((res.data as any).articles || (res.data as any).items || [])
     articles.value = list; total.value = (res as any).total || list.length || 0
+    startDocPolling()
   } catch (e) { console.error(e); toast.showToast('加载文章列表失败', 'error') }
 }
+const startEditKB = (kb: KB) => { editingKB.value = kb; editKBForm.value = { name: kb.name, description: '' }; showEditKBDialog.value = true }
 const handleCreateKB = async () => {
   try { await createKnowledgeBase(newKB.value); showKBDialog.value = false; newKB.value = { name: '', description: '' }; await fetchKBs() } catch (e: any) { alert(e?.message || '创建失败') }
+}
+const handleUpdateKB = async () => {
+  if (!editingKB.value) return
+  try { await updateKnowledgeBase(editingKB.value.id, editKBForm.value); showEditKBDialog.value = false; await fetchKBs() } catch (e: any) { alert(e?.message || '更新失败') }
 }
 const goCreate = () => { router.push(`/admin/knowledge/new?kb_id=${selectedKB.value!.id}`) }
 const goEdit = (id: number) => { router.push(`/admin/knowledge/${id}`) }
@@ -151,6 +188,9 @@ const handleEnable = async (id: number) => { try { await enableArticle(id); awai
 const handleRetryDocument = async (id: number) => {
   if (!selectedKB.value) return
   try { await retryDocument(selectedKB.value.id, id); await fetchArticles() } catch (e: any) { alert(e?.message) }
+}
+const handleRetrySync = async (id: number) => {
+  try { await retrySyncArticle(id); await fetchArticles() } catch (e: any) { alert(e?.message) }
 }
 
 // v2 辅助函数；statusClass/statusText/processClass/processText → @/utils/knowledge.ts
@@ -200,6 +240,7 @@ const formatTime = (t?: string) => t ? new Date(t).toLocaleString('zh-CN') : '-'
 .process-tag.completed { background: var(--tag-published-bg); color: var(--tag-published-text); }
 .process-tag.failed { background: var(--tag-rejected-bg); color: var(--tag-rejected-text); }
 .dialog-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 100; }
+/* overlay uses fixed black — readable in both dark/light themes */
 .dialog { background: var(--bg-elevated); border: 1px solid var(--border-default); border-radius: 8px; padding: 24px; width: 400px; }
 .dialog h3 { margin-bottom: 16px; font-size: 16px; color: var(--text-primary); }
 .form-group { margin-bottom: 12px; }
@@ -207,4 +248,7 @@ const formatTime = (t?: string) => t ? new Date(t).toLocaleString('zh-CN') : '-'
 .form-group input, .form-group textarea { width: 100%; padding: 8px 10px; background: var(--bg-subtle); border: 1px solid var(--border-default); border-radius: 4px; color: var(--text-primary); font-size: 13px; resize: vertical; }
 .dialog-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
 .empty-hint { padding: 60px; text-align: center; color: var(--text-secondary); font-size: 14px; }
+.btn-edit-kb { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--text-tertiary); cursor: pointer; font-size: 12px; padding: 2px 6px; border-radius: 3px; }
+.btn-edit-kb:hover { color: var(--accent); background: var(--bg-subtle); }
+.kb-item { position: relative; }
 </style>

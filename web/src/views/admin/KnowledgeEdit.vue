@@ -348,7 +348,7 @@ function formatFileSize(bytes: number) {
 .file-remove:hover { color: var(--tag-rejected-text); }
 
 .upload-result { margin-top: 16px; padding: 12px 16px; border-radius: 6px; font-size: 14px; }
-.upload-result.success { background: rgba(46, 160, 67, 0.1); color: #3fb950; border: 1px solid rgba(46, 160, 67, 0.2); }
+.upload-result.success { background: rgba(46, 160, 67, 0.1); color: var(--color-success); border: 1px solid rgba(46, 160, 67, 0.2); }
 .upload-result.error { background: rgba(248, 81, 73, 0.1); color: var(--tag-rejected-text); border: 1px solid rgba(248, 81, 73, 0.2); }
 
 /* 处理状态 */

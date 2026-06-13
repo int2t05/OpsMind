@@ -78,7 +78,7 @@ const handleLogin = async () => {
     const res = await login(form.value)
     const data = res.data
 
-    authStore.setToken(data.access_token)
+    authStore.setToken(data.access_token, data.refresh_token)
     authStore.setUserInfo({
       user: data.user,
       roles: data.roles,

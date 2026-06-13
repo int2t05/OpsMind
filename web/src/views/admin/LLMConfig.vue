@@ -469,7 +469,7 @@ function providerText(type: number) {
 
 .provider-tag.llamacpp {
   background: rgba(46, 160, 67, 0.15);
-  color: #3fb950;
+  color: var(--color-success);
 }
 
 .provider-tag.openai {

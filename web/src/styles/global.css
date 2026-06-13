@@ -231,3 +231,15 @@ body .n-config-provider {
   background: var(--accent) !important;
   opacity: 0.12 !important;
 }
+
+/* ===== Color aliases for components ===== */
+:root, [data-theme='dark'] {
+  --btn-primary-text: #fff;
+  --color-success: #3fb950;
+  --color-danger: #e5484d;
+}
+[data-theme='light'] {
+  --btn-primary-text: #fff;
+  --color-success: #16a34a;
+  --color-danger: #dc2626;
+}

@@ -160,7 +160,7 @@ onMounted(loadRoles)
 .actions { display: flex; gap: 8px; }
 .btn-action { padding: 4px 12px; border-radius: 6px; font-size: 12px; font-weight: 500; border: 1px solid var(--border-default); background: var(--bg-overlay); color: var(--text-primary); cursor: pointer; transition: all 0.15s; }
 .btn-action:hover { background: var(--border-default); }
-.btn-danger { color: #e5484d; border-color: rgba(229,72,77,0.3); }
+.btn-danger { color: var(--color-danger); border-color: rgba(229,72,77,0.3); }
 .btn-danger:hover { background: rgba(229,72,77,0.12); }
 .btn-primary { padding: 6px 16px; border-radius: 6px; font-size: 13px; font-weight: 500; background: var(--accent); color: #fff; border: none; cursor: pointer; }
 .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -173,7 +173,7 @@ onMounted(loadRoles)
 .dialog-body { display: flex; flex-direction: column; gap: 12px; }
 .dialog-footer { display: flex; justify-content: flex-end; gap: 8px; margin-top: 24px; }
 .field-label { font-size: 13px; font-weight: 500; color: var(--text-secondary); }
-.required { color: #e5484d; }
+.required { color: var(--color-danger); }
 .field-input { padding: 8px 12px; border: 1px solid var(--border-default); border-radius: 6px; background: var(--bg-base); color: var(--text-primary); font-size: 13px; }
 .field-input:focus { outline: none; border-color: var(--accent); }
 .permissions-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }

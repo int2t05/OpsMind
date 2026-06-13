@@ -65,6 +65,18 @@
         </div>
       </div>
 
+      <!-- 知识候选 -->
+      <div class="card">
+        <h3>转为知识候选</h3>
+        <div class="record-form">
+          <label class="kb-label">目标知识库 ID</label>
+          <input v-model.number="candidateKBID" type="number" class="field-input" placeholder="输入知识库 ID" style="width:120px" />
+          <button class="btn-primary" :disabled="!candidateKBID || creatingCandidate" @click="handleCreateCandidate">
+            {{ creatingCandidate ? '创建中...' : '创建知识候选' }}
+          </button>
+        </div>
+      </div>
+
       <!-- 处理记录 -->
       <div class="card">
         <h3>处理记录</h3>
@@ -89,7 +101,7 @@
 // TODO(admin/TicketDetail): 使用 (res as any) 强制类型转换 — 等 API 泛型补全后移除。
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { getTicketDetail, updateTicketStatus, addTicketRecord } from '@/api/admin'
+import { getTicketDetail, updateTicketStatus, addTicketRecord, createKnowledgeCandidate } from '@/api/admin'
 import type { TicketDetail } from '@/api/ticket'
 import { urgencyText, ticketStatusClass as statusClass, scopeText, actionText } from '@/utils/ticket'
 import { useToast } from '@/composables/useToast'
@@ -100,6 +112,8 @@ const ticket = ref<TicketDetail | null>(null)
 const actionContent = ref('')
 const recordAction = ref('note')
 const recordContent = ref('')
+const candidateKBID = ref<number | null>(null)
+const creatingCandidate = ref(false)
 const toast = useToast()
 
 onMounted(async () => {
@@ -134,6 +148,18 @@ async function doAddRecord() {
     const res = await getTicketDetail(ticket.value!.id) as any; ticket.value = res?.data || res
   } catch (e: unknown) { const msg = e instanceof Error ? e.message : '操作失败'; toast.showToast(msg, 'error') }
   finally { savingRecord.value = false }
+}
+
+async function handleCreateCandidate() {
+  if (!candidateKBID.value || !ticket.value) return
+  creatingCandidate.value = true
+  try {
+    await createKnowledgeCandidate(ticket.value.id, candidateKBID.value)
+    toast.showToast('知识候选创建成功', 'success')
+    candidateKBID.value = null
+  } catch (e: any) {
+    toast.showToast(e?.response?.data?.message || e?.message || '创建失败', 'error')
+  } finally { creatingCandidate.value = false }
 }
 
 // statusClass/urgencyText/scopeText/actionText → @/utils/ticket.ts
