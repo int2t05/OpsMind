@@ -1,107 +1,40 @@
 <template>
   <div class="chat-page">
     <div class="chat-container">
+      <!-- 知识库错误提示 -->
+      <div v-if="kbError" class="kb-error-banner">{{ kbError }}</div>
+
       <!-- 知识库选择 -->
       <div class="kb-selector" v-if="knowledgeBases.length > 0">
-    <!-- 知识库错误提示 -->
-    <div v-if="kbError" class="kb-error-banner">{{ kbError }}</div>
-
         <label class="kb-label">选择知识库</label>
         <select v-model="selectedKB" class="kb-select">
-          <option v-for="kb in knowledgeBases" :key="kb.id" :value="kb.id">
-            {{ kb.name }}
-          </option>
+          <option v-for="kb in knowledgeBases" :key="kb.id" :value="kb.id">{{ kb.name }}</option>
         </select>
-
-        <!-- v2: RAG 高级设置 -->
-        <button class="btn-advanced" :class="{ active: showAdvanced }" @click="showAdvanced = !showAdvanced">
-          ⚙ 高级
-        </button>
+        <button class="btn-advanced" :class="{ active: showAdvanced }" @click="showAdvanced = !showAdvanced">⚙ 高级</button>
       </div>
+      <div v-else-if="!kbError" class="kb-empty-hint">暂无可用知识库</div>
 
-      <!-- v2: RAG 高级设置面板 -->
-    <!-- 知识库为空提示 -->
-    <div v-if="knowledgeBases.length === 0 && !kbError" class="kb-empty-hint">暂无可用知识库</div>
+      <!-- RAG 高级设置面板 -->
+      <ChatAdvancedPanel v-if="showAdvanced" />
 
-      <div v-if="showAdvanced" class="advanced-panel">
-        <div class="advanced-row">
-          <label class="advanced-label">Top K</label>
-          <input v-model.number="chatStore.ragOptions.top_k" type="number" min="1" max="20" class="advanced-input" />
-        </div>
-        <div class="advanced-toggles">
-          <label class="advanced-toggle">
-            <input type="checkbox" v-model="chatStore.ragOptions.query_rewrite" />
-            <span>查询改写</span>
-          </label>
-          <label class="advanced-toggle">
-            <input type="checkbox" v-model="chatStore.ragOptions.multi_route" />
-            <span>多路检索</span>
-          </label>
-          <label class="advanced-toggle">
-            <input type="checkbox" v-model="chatStore.ragOptions.hybrid" />
-            <span>混合检索</span>
-          </label>
-          <label class="advanced-toggle">
-            <input type="checkbox" v-model="chatStore.ragOptions.rerank" />
-            <span>重排序</span>
-          </label>
-        </div>
-      </div>
+      <!-- RAG 管道步骤指示器 -->
+      <ChatPipelineSteps />
 
-      <!-- v2: RAG 管道步骤指示器 -->
-      <div v-if="chatStore.currentStep || chatStore.pipelineMetrics" class="pipeline-steps">
-        <div v-if="chatStore.currentStep" class="step-current">
-          <span class="step-dot"></span>
-          {{ chatStore.currentStep }}
-        </div>
-        <div v-if="chatStore.pipelineMetrics" class="step-metrics">
-          <span v-for="s in chatStore.pipelineMetrics.steps" :key="s.id" :class="['step-badge', s.success ? 'done' : 'failed']">
-            {{ s.label }} {{ s.duration_ms }}ms
-          </span>
-        </div>
-      </div>
-
-      <!-- 消息列表（子组件） -->
-      <ChatMessageList
-        ref="msgListRef"
-        :messages="chatStore.messages"
-        :loading="chatStore.loading"
-        :is-streaming="chatStore.streaming"
-      />
+      <!-- 消息列表 -->
+      <ChatMessageList ref="msgListRef" :messages="chatStore.messages" :loading="chatStore.loading" :is-streaming="chatStore.streaming" />
 
       <!-- 输入区域 -->
       <div class="input-area">
-        <textarea
-          v-model="question"
-          class="chat-input"
-          rows="3"
-          placeholder="输入您的问题..."
-          :disabled="chatStore.loading || !selectedKB"
-          @keydown.enter.exact.prevent="handleSend"
-        ></textarea>
+        <textarea v-model="question" class="chat-input" rows="3" placeholder="输入您的问题..." :disabled="chatStore.loading || !selectedKB" @keydown.enter.exact.prevent="handleSend" />
         <div class="input-actions">
-          <button
-            class="btn-send"
-            :disabled="!question.trim() || chatStore.loading || !selectedKB"
-            @click="handleSend"
-          >
-            {{ chatStore.loading ? '思考中...' : '发送' }}
-          </button>
+          <button class="btn-send" :disabled="!question.trim() || chatStore.loading || !selectedKB" @click="handleSend">{{ chatStore.loading ? '思考中...' : '发送' }}</button>
         </div>
       </div>
 
       <!-- 低置信度引导 -->
       <div v-if="chatStore.currentSession?.can_submit_ticket" class="ticket-cta">
         <p>暂未找到足够匹配的知识，建议提交申告由运维人员人工处理</p>
-        <router-link
-          :to="{
-            path: '/portal/tickets/submit',
-            query: { chat_context: JSON.stringify({ question: chatStore.currentSession.question, answer: chatStore.currentSession.answer }) }
-          }"
-          class="btn-submit-ticket"
-        >
-          提交申告
-        </router-link>
+        <router-link :to="{ path: '/portal/tickets/submit', query: { chat_context: JSON.stringify({ question: chatStore.currentSession.question, answer: chatStore.currentSession.answer }) } }" class="btn-submit-ticket">提交申告</router-link>
       </div>
 
       <!-- 反馈区域 -->
@@ -120,6 +53,8 @@ import { ref, onMounted, nextTick } from 'vue'
 import { useChatStore } from '@/stores/chat'
 import { listKnowledgeBasesForPortal } from '@/api/knowledge'
 import ChatMessageList from './ChatMessageList.vue'
+import ChatAdvancedPanel from './ChatAdvancedPanel.vue'
+import ChatPipelineSteps from './ChatPipelineSteps.vue'
 
 const chatStore = useChatStore()
 const question = ref('')
@@ -222,108 +157,6 @@ function scrollToBottom() {
 }
 .btn-advanced:hover { border-color: var(--accent); color: var(--text-primary); }
 .btn-advanced.active { border-color: var(--accent); color: var(--accent); }
-
-/* v2: 高级设置面板 */
-.advanced-panel {
-  padding: 12px 14px;
-  background: var(--bg-overlay);
-  border: 1px solid var(--border-default);
-  border-radius: 8px;
-  margin-bottom: 12px;
-}
-
-.advanced-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 10px;
-}
-
-.advanced-label {
-  font-size: 12px;
-  color: var(--text-secondary);
-  flex-shrink: 0;
-}
-
-.advanced-input {
-  width: 64px;
-  padding: 4px 8px;
-  background: var(--bg-base);
-  border: 1px solid var(--border-default);
-  border-radius: 4px;
-  color: var(--text-primary);
-  font-size: 13px;
-  font-family: inherit;
-  text-align: center;
-}
-
-.advanced-toggles {
-  display: flex;
-  gap: 16px;
-  flex-wrap: wrap;
-}
-
-.advanced-toggle {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 12px;
-  color: var(--text-secondary);
-  cursor: pointer;
-}
-
-/* v2: 管道步骤指示器 */
-.pipeline-steps {
-  padding: 8px 14px;
-  margin-bottom: 12px;
-  background: var(--bg-overlay);
-  border: 1px solid var(--border-default);
-  border-radius: 6px;
-}
-
-.step-current {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  color: var(--accent);
-  margin-bottom: 6px;
-}
-
-.step-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--accent);
-  animation: pulse 1.5s ease-in-out infinite;
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.3; }
-}
-
-.step-metrics {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.step-badge {
-  font-size: 11px;
-  padding: 2px 8px;
-  border-radius: 4px;
-}
-
-.step-badge.done {
-  background: rgba(46, 160, 67, 0.12);
-  color: var(--color-success);
-}
-
-.step-badge.failed {
-  background: rgba(248, 81, 73, 0.12);
-  color: var(--tag-rejected-text);
-}
 
 /* 消息区域 */
 .messages-area {

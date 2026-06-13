@@ -19,10 +19,7 @@ export function getConfig(key: string) {
   return request.get<ApiResponse<ConfigValue>>(`/api/v1/admin/configs/${key}`)
 }
 
-/** 更新或创建系统配置 */
-export function updateConfig(key: string, value: string | number) {
+/** 设置系统配置（支持 number 自动转 string） */
+export function setConfig(key: string, value: string | number) {
   return request.put<ApiResponse<ConfigValue>>(`/api/v1/admin/configs/${key}`, { value: String(value) })
 }
-
-/** 设置系统配置（别名，支持 number 自动转 string） */
-export const setConfig = updateConfig

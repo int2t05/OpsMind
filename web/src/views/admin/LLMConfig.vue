@@ -474,7 +474,7 @@ function providerText(type: number) {
 
 .provider-tag.openai {
   background: rgba(16, 163, 127, 0.15);
-  color: #10a37f;
+  color: var(--color-success);
 }
 
 .card-actions {
