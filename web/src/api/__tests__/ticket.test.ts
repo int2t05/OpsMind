@@ -6,6 +6,7 @@ vi.mock('../../utils/request', () => ({
     post: vi.fn(),
     get: vi.fn(),
     put: vi.fn(),
+    patch: vi.fn(),
   }
 }))
 
@@ -62,12 +63,12 @@ describe('ticket API', () => {
   })
 
   describe('supplementTicket', () => {
-    it('should POST supplement with content', async () => {
-      ;(request.post as any).mockResolvedValue({ code: 0, data: null })
+    it('should PATCH supplement with content', async () => {
+      ;(request.patch as any).mockResolvedValue({ code: 0, data: null })
 
       await supplementTicket(42, { content: '补充说明' })
 
-      expect(request.post).toHaveBeenCalledWith('/api/v1/portal/tickets/42/supplement', {
+      expect(request.patch).toHaveBeenCalledWith('/api/v1/portal/tickets/42/supplement', {
         content: '补充说明'
       })
     })
