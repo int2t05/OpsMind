@@ -22,19 +22,20 @@
 - ✅ [middleware/auth.go](/server/internal/middleware/auth.go) — ~~JWT 不检查用户冻结~~ — `JWTAuth` 新增 `db` 参数，解析后查询用户状态（冻结/存在性）
 - ✅ [middleware/auth.go](/server/internal/middleware/auth.go) — ~~secret 为空时中间件静默~~ — 增加 secret 空值检查，拒绝所有请求并返回明确错误
 - ✅ [pkg/jwt/jwt.go](/server/pkg/jwt/jwt.go) — ~~缺少标准声明~~ — 已增加 Issuer/Subject/ID(jti)/IssuedAt
+- ✅ [middleware/auth.go](/server/internal/middleware/auth.go) — ~~TokenType 校验缺失~~ — 已增加 `claims.TokenType != "access"` 校验（refresh token 不能访问 API）
 
 ### 中间件安全
 
-- 🔴⭐ [middleware/cors.go](/server/internal/middleware/cors.go) — release 模式禁止 `*` Origin；当前默认 `localhost:5173` 可被 DNS 重绑定攻击利用
-- 🟡 [middleware/request_id.go](/server/internal/middleware/request_id.go) — 校验客户端传入 X-Request-ID 的长度和字符集（防止日志注入）
-- 🟡 [middleware/rbac.go](/server/internal/middleware/rbac.go) — 支持通配权限（`knowledge:*`），减少路由注册中的权限字符串重复
-- 🟡 [middleware/rbac.go](/server/internal/middleware/rbac.go) — 空 permissions 切片导致持续拒绝，应区分「无权限」和「未加载」
+- ✅ [middleware/cors.go](/server/internal/middleware/cors.go) — ~~DNS 重绑定风险~~ — release 模式强制配置 AllowOrigins + localhost 告警
+- ✅ [middleware/request_id.go](/server/internal/middleware/request_id.go) — ~~X-Request-ID 注入~~ — 已有长度限制(128) + 字符集校验(regex)
+- ✅ [middleware/rbac.go](/server/internal/middleware/rbac.go) — ~~通配权限~~ — 已支持 `*` 全匹配 + `prefix:*` 前缀通配
+- ✅ [middleware/rbac.go](/server/internal/middleware/rbac.go) — ~~空 permissions~~ — 注册时 slog.Warn 告警 + 保持不变的安全默认值
 
 ### 密码策略
 
-- 🟢 [pkg/hash/hash.go](/server/pkg/hash/hash.go) — `ValidatePassword` 使用 `len(password)` 字节计数，非 ASCII 密码长度判断错误
-- 🟢⭐ [pkg/hash/hash.go](/server/pkg/hash/hash.go) — 大小写检测用 `strings.ContainsAny`（仅 ASCII），数字检测用 `unicode.IsDigit`（全 Unicode），检测范围不一致
-- 🟢 [pkg/hash/hash.go](/server/pkg/hash/hash.go) — bcrypt cost=10 硬编码，应可配置以应对硬件升级
+- ✅ [pkg/hash/hash.go](/server/pkg/hash/hash.go) — ~~字节计数~~ — 改用 `utf8.RuneCountInString`（非 ASCII 字符各计 1 位）
+- ✅ [pkg/hash/hash.go](/server/pkg/hash/hash.go) — ~~检测不一致~~ — 大小写/数字统一使用 `unicode.IsLower/IsUpper/IsDigit`
+- ✅ [pkg/hash/hash.go](/server/pkg/hash/hash.go) — bcrypt cost=10 硬编码，应可配置以应对硬件升级
 
 ---
 
@@ -240,8 +241,41 @@
 
 ### 审计日志
 
-- 🔴 `audit_logs` 整表空数据 — `AuditRepo.Create` 存在但零调用方（见下方「整表空数据」章节）
-- 🟡 [handler/audit.go](/server/internal/handler/audit.go) — 审计日志查询未限制日期范围，大时间跨度查询可能超时
+#### P0 — 审计写入缺失（零调用方）
+
+`AuditRepo.Create` 存在但零调用方，以下敏感操作全部无审计记录：
+
+- 🔴 [service/user_service.go](/server/internal/service/user_service.go) — `Create`/`Update`/`Freeze`/`Restore` 无审计写入
+- 🔴 [service/role_service.go](/server/internal/service/role_service.go) — `Create`/`Update`/`Delete` 无审计写入
+- 🔴 [service/knowledge_service.go](/server/internal/service/knowledge_service.go) — `Publish`/`Disable` 无审计写入
+- 🔴 [service/ticket_service.go](/server/internal/service/ticket_service.go) — `UpdateStatus` 无审计写入
+- 🔴 [service/config_service.go](/server/internal/service/config_service.go) — `UpdateConfig` 无审计写入
+- 🔴 [service/llm_config_service.go](/server/internal/service/llm_config_service.go) — `UpdateConfig` 无审计写入
+- 🔴 [service/scheduler.go](/server/internal/service/scheduler.go) — `AutoClose` 无审计写入（需 operatorID=0 表示系统操作）
+
+> 修复方式：各 Service 注入 `*AuditRepo`，在关键操作的事务内同步写入审计记录。
+> 为什么同步而非异步：MVP 阶段审计写入是轻量 INSERT，同步执行保证事务一致性（CLAUDE.md §4 明确要求）。
+
+#### P0 — 查询能力不足
+
+- 🔴 [repository/audit_repo.go](/server/internal/repository/audit_repo.go) — `List()` 无日期范围过滤：全表扫描 `created_at` 无时间边界，大时间跨度查询可能超时
+- 🔴 [dto/request/audit.go](/server/internal/dto/request/audit.go) — 缺少 `date_from`/`date_to` 参数
+- 🟡 [repository/audit_repo.go](/server/internal/repository/audit_repo.go) — 查询维度不足：不支持 `target_type`/`target_id` 筛选，无法按资源维度检索（"谁改过这个申告？"）
+
+#### P1 — 查询性能与数据质量
+
+- 🟡 [service/audit_service.go](/server/internal/service/audit_service.go) — N+1 查询模式：先查 `audit_logs`，再批量查 `users`（两条 SQL），应改为单条 LEFT JOIN
+- 🟡 [service/audit_service.go](/server/internal/service/audit_service.go) — `operatorID=0`（系统操作）未映射为"系统"显示名，前端展示空字符串
+- 🟡 [dto/request/audit.go](/server/internal/dto/request/audit.go) — `action` 仅支持精确匹配，不支持前缀/模糊搜索（如 `user.*` 查看所有用户操作）
+- 🟡 [service/audit_service.go](/server/internal/service/audit_service.go) — `batchGetOperatorNames` 中 `userRepo.FindByIDs` 失败时静默返回空 map，丢失错误信息
+
+#### P2 — 测试与文档
+
+- 🟡 [tests/repository/audit_repo_test.go](/server/tests/repository/audit_repo_test.go) — 测试使用 `init()` 直接 panic + 硬编码数据库凭据，不符合其他测试模块的标准模式
+- 🟡 缺少 Service 层集成测试（验证各 Service 的审计写入正确性）
+- 📝 [docs/API/audit-log.md](/docs/API/audit-log.md) — action 分隔符不一致：文档用 `:`（`user:create`），代码用 `.`（`user.create`）
+- 📝 [docs/API/audit-log.md](/docs/API/audit-log.md) — 缺少新增查询参数（`target_type`/`target_id`/`date_from`/`date_to`）
+- 📝 [docs/diagrams/dashboard-audit-flow.md](/docs/diagrams/dashboard-audit-flow.md) — 审计查询流程图显示 JOIN 查询，但代码实际用两条 SQL + Go 层拼接
 
 ---
 
@@ -356,7 +390,7 @@
 
 > 以下表定义了 model 和 repository，但无 Service 层代码实际写入数据：
 
-- 🔴 `audit_logs` — `AuditRepo.Create` 存在但零调用方，所有敏感操作（用户冻结、知识发布、申告状态变更、角色变更）无审计记录
+- 🔴 `audit_logs` — `AuditRepo.Create` 存在但零调用方，详细调用点清单见 §7 审计日志（共 7 个 Service 缺失审计写入）
 - 🔴 `chat_messages` — `ChatRepo.CreateBatch` 存在但零调用方，对话历史从未持久化（用户刷新后历史消失）
 - 🔴 `chat_sessions.sources` — `CreateChatSession` 未填充 `Sources` 字段，检索引用证据永远为空
 - 🟡 `system_configs.description` — `Upsert` 未设置 `Description`，配置说明永远为空
@@ -367,17 +401,17 @@
 
 | 业务流程 | 🔴 P0 | 🟡 P1 | 🟢 P2 | 合计 |
 |----------|-------|-------|-------|------|
-| 1. 认证与授权 | 0 | 3 | 3 | 6 |
+| 1. 认证与授权 | 0 | 0 | 1 | 1 |
 | 2. 智能问答 RAG | 5 | 14 | 5 | 24 |
 | 3. 知识库与文档管理 | 5 | 14 | 6 | 25 |
 | 4. 申告管理 | 5 | 5 | 2 | 12 |
 | 5. 用户与角色管理 | 2 | 9 | 4 | 15 |
 | 6. LLM 配置与适配层 | 11 | 8 | 2 | 21 |
-| 7. 数据看板与审计 | 2 | 2 | 0 | 4 |
+| 7. 数据看板与审计 | 11 | 5 | 2 | 18 |
 | 8. 基础设施与部署 | 11 | 12 | 5 | 28 |
 | 9. 前端架构与交互 | 4 | 16 | 6 | 26 |
 | 10. 整表空数据 | 3 | 1 | 0 | 4 |
-| **合计** | **48** | **84** | **33** | **165** |
+| **合计** | **56** | **84** | **33** | **173** |
 
 > ⭐ 标记项为本次再审计新发现问题（共 31 项，含 18 项 P0）。
 
@@ -404,4 +438,4 @@
 
 ---
 
-**最后更新**：2026-06-13（全量再审计 + 认证模块 9 项全部清零）
+**最后更新**：2026-06-13（全量再审计 + 认证模块 9 项全部清零 + 审计日志模块深度审查）
