@@ -22,4 +22,9 @@ export function addTicketRecord(id: number, data: AddRecordParams) {
   return request.post<ApiResponse<null>>(`/api/v1/admin/tickets/${id}/records`, data)
 }
 
+/** 从申告创建知识库候选文章 */
+export function createKnowledgeCandidate(id: number, kbID: number) {
+  return request.post<ApiResponse<{ article_id: number }>>(`/api/v1/admin/tickets/${id}/knowledge-candidate`, { kb_id: kbID })
+}
+
 export type { TicketItem, TicketDetail, TicketRecord }

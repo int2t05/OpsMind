@@ -79,7 +79,7 @@ export function getLLMConfig(id: number) {
 
 /** 创建 LLM 配置 */
 export function createLLMConfig(data: CreateLLMConfigParams) {
-  return request.post<ApiResponse<null>>('/api/v1/admin/llm-configs', data)
+  return request.post<ApiResponse<LLMConfigItem>>('/api/v1/admin/llm-configs', data)
 }
 
 /** 更新 LLM 配置 */

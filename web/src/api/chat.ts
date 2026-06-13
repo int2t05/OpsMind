@@ -174,3 +174,8 @@ export async function streamChatSession(
 export function submitFeedback(sessionID: number, feedback: number) {
   return request.post<ApiResponse<null>>(`/api/v1/portal/chat-sessions/${sessionID}/feedback`, { feedback })
 }
+
+/** 获取会话详情 */
+export function getChatDetail(id: number) {
+  return request.get<ApiResponse<ChatSessionResponse>>(`/api/v1/portal/chat-sessions/${id}`)
+}
