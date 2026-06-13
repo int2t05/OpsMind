@@ -140,6 +140,9 @@ func (s *UserService) Update(id int64, req request.UpdateUserRequest) error {
 
 	// 包裹在事务中：Update + AssignRoles 原子执行
 	return s.db.Transaction(func(tx *gorm.DB) error {
+		// TODO(service/user): GetByID → 修改字段 → Save 存在丢失更新竞态。
+		// 并发的 ChangePassword（仅更新 password_hash 列）可能被此处的 Save（全字段覆盖）冲掉。
+		// 应改用 UpdateColumns 只写 RealName/Phone/Email 三列，避免覆盖未修改字段。
 		if err := tx.Save(user).Error; err != nil {
 			return err
 		}

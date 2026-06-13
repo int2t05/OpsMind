@@ -95,6 +95,8 @@ export async function streamChatSession(
   callbacks: StreamCallbacks,
   signal?: AbortSignal
 ): Promise<void> {
+  // TODO(web/api/chat): SSE 流使用原生 fetch 绕过 Axios 拦截器，token 过期无法自动刷新。
+  // 流式请求中断后用户看到的回答不完整且无恢复机制。应在流式层实现 401 重试或 token 预刷新。
   const token = getToken()
 
   try {

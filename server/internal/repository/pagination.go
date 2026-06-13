@@ -14,7 +14,7 @@ import "gorm.io/gorm"
 // 7 个 repo 的 List 方法有完全相同的 Count + Offset + Limit + Order 模式，
 // 泛型函数将分页逻辑集中一处，各 repo 只需一行调用。
 //
-// 注意：此函数当前零调用方——7 个 Repo 手动实现分页。
+// TODO(repository): 分页辅助函数当前零调用方——7 个 Repo 手动实现分页。
 // 保留此文件作为分页模式参考；如需统一可在后续迭代中迁移。
 //
 // T 为模型类型（如 model.KnowledgeArticle），返回查询结果切片、总数和可能的错误。

@@ -327,6 +327,8 @@ async function doSave() {
     max_tokens: form.max_tokens, vector_dimension: form.vector_dimension, is_default: form.is_default,
   }
   try {
+    // TODO(admin/LLMConfig): 新建配置时 editingId 为 null，! 断言会导致 updateLLMConfig(null, body)
+    // 请求错误的 URL 路径。应先判断 editingMode 决定调用 createLLMConfig 还是 updateLLMConfig。
     await updateLLMConfig(editingId.value!, body)
   } catch { /* 静默保存，测试连接时会报告具体错误 */ }
 }

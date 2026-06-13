@@ -118,6 +118,8 @@ func main() {
 	}
 
 	// MinIO 对象存储
+	// TODO(cmd/main): MinIO 初始化失败后 storageClient 为 nil，传给 KnowledgeService/Processor 可能导致 panic。
+	// 应在初始化失败时将 storageClient 设为降级实现（如本地文件存储），而非 nil。
 	var storageClient adapter.StorageClient
 	minioEndpoint := cfg.MinIO.Endpoint
 	if minioEndpoint == "" {

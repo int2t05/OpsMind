@@ -212,7 +212,9 @@ func (p *Processor) processTask(task ProcessTask) {
 			Content:         chunk,
 			ChunkIndex:      i,
 			Embedding:       vectors[i],
-			EmbeddingModel:  "", // 空字符串表示使用 EmbeddingClient 配置的默认模型
+			// TODO(rag/processor): EmbeddingModel 应优先从 KB 配置读取，而非硬编码空字符串。
+			// 空字符串回退到全局默认模型，当 KB 绑定了独立 LLM 配置时可能出现模型不匹配。
+			EmbeddingModel:  "",
 			VectorDimension: len(vectors[i]),
 		}
 	}

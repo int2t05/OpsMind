@@ -50,6 +50,10 @@ func Logger() gin.HandlerFunc {
 			attrs = append(attrs, "user_id", userID)
 		}
 
+		// TODO(middleware/logger): 将 HTTP 状态 ≥400 时的业务错误码写入日志行。
+		// 当前只记录 HTTP status，无法直接关联到 errcode 中定义的业务错误码（如 10001/20001）。
+		// 可配合 response.Error() 通过 c.Set 写入显式 errCode，在此处读取并记录。
+
 		msg := c.Request.Method + " " + c.Request.URL.Path
 		switch {
 		case status >= 500:

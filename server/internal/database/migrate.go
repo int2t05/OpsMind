@@ -45,8 +45,11 @@ func AutoMigrate(db *gorm.DB) error {
 		"CREATE INDEX IF NOT EXISTS idx_chat_created_at ON chat_sessions(created_at DESC)",
 		"CREATE INDEX IF NOT EXISTS idx_audit_created_at ON audit_logs(created_at DESC)",
 	}
-	// TODO(database/migrate): 这些索引 SQL 与 migrations/001_init.sql 之间存在重复定义风险。
-	// 后续应选择单一迁移来源，避免 AutoMigrate 与 SQL migration 对同一索引策略产生漂移。
+	// TODO(database/migrate): GORM AutoMigrate 已为 created_at 创建 ASC 索引，
+	// 此处再创建 DESC 索引导致同一列存在两个索引，加倍存储和写入开销。
+	// 应统一为单一索引策略（保留 DESC，通知 AutoMigrate 跳过 created_at 索引）。
+	// 且这些索引 SQL 与 migrations/001_init.sql 之间存在重复定义风险，
+	// 后续应选择单一迁移来源，避免 AutoMigrate 与 SQL migration 索引策略漂移。
 	for _, sql := range descIndexes {
 		if err := db.Exec(sql).Error; err != nil {
 			return err

@@ -85,6 +85,7 @@ async function handleSend() {
   const q = question.value.trim()
   if (!q || !selectedKB.value) return
   // 只靠 input min/max 不能阻止手动输入或脚本修改。
+  // TODO(portal/Chat): 增加显式的输入校验（trim + max rune count），前端校验是纵深防御的第一层。
 
   question.value = ''
   await chatStore.sendQuestion(q, selectedKB.value)

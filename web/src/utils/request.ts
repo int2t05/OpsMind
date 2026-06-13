@@ -99,6 +99,8 @@ raw.interceptors.response.use(
             isRefreshing = false
             return raw(config)
           } catch {
+            // TODO(web/request): 刷新失败时 refreshSubscribers 被清空但已订阅的 Promise 未 resolve/reject，
+            // 导致订阅者永久挂起（内存泄漏）。应在清空前遍历通知所有订阅者刷新失败。
             isRefreshing = false
             refreshSubscribers = []
             removeToken()

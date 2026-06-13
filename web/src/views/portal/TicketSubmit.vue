@@ -142,6 +142,8 @@ const form = reactive({
   affected_systems: [] as string[],
   contact_phone: '',
   contact_email: '',
+  // TODO(portal/TicketSubmit): chat_context 来自 URL query 参数直接拼接，无 JSON 解析校验。
+  // 攻击者可通过 ?chat_context={"malicious":true} 注入任意值。应先 JSON.parse 并校验结构再使用。
   chat_context: (route.query.chat_context as string) || '',
 })
 

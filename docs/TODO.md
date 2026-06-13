@@ -316,7 +316,7 @@
 - 🟡 [router/admin.go](/server/internal/router/admin.go) — 权限字符串散落各处，建议集中为常量文件
 - 🟡 [router/portal.go](/server/internal/router/portal.go) — 门户路由无角色校验：仅需 JWT，不验证用户是否为报障人角色
 - 🟡 [middleware/logger.go](/server/internal/middleware/logger.go) — `json.Marshal` 错误被丢弃
-- 🟢 [middleware/logger.go](/server/internal/middleware/logger.go) — 将 request-ID/userID/错误码写入日志行（当前仅记录 method/path/status/latency）
+- 🟢 [middleware/logger.go](/server/internal/middleware/logger.go) — request-ID/userID 已记录，缺少**业务错误码**写入日志行（当前仅 HTTP status，无法关联 errcode 10001/20001 等）
 
 ### Repository 层
 
@@ -327,6 +327,7 @@
 ### 调度器
 
 - 🟢 [service/scheduler.go](/server/internal/service/scheduler.go) — `Start` 应防重复调用（当前无幂等保护）
+- 🟢⭐ [service/scheduler.go](/server/internal/service/scheduler.go) — **调度器首次启动不立即执行 AutoClose**：必须等待首个完整 cron 周期，频繁重启时超期工单可能长时间未关闭
 
 ### 日志与错误
 
@@ -350,7 +351,7 @@
 - 🟡⭐ **系统性 `as any` 类型侵蚀**（~15 个文件）：`(res as any).data || res` 模式遍布组件和 Store，TypeScript 类型检查形同虚设。根因是组件不确定响应拦截器是否已解包 `ApiResponse<T>` 包装。
 - 🟡⭐ [stores/auth.ts](/web/src/stores/auth.ts) — **循环依赖风险**：`api/auth.ts` 从 `@/stores/auth` 导入类型，若 store 未来从 API 导入则形成循环
 - 🟡 [stores/chat.ts](/web/src/stores/chat.ts) — 反馈提交错误仅 `console.error`，用户点击「已解决/未解决」后静默失败
-- 🟡 [views/admin/TicketSubmit.vue](/web/src/views/admin/TicketSubmit.vue) — `chat_context` 来自 URL query 参数直接传入 API，无校验（JSON 注入风险）
+- 🟡 [views/portal/TicketSubmit.vue](/web/src/views/portal/TicketSubmit.vue) — `chat_context` 来自 URL query 参数直接传入 API，无校验（JSON 注入风险）
 
 ### 配置管理
 
@@ -438,4 +439,4 @@
 
 ---
 
-**最后更新**：2026-06-13（全量再审计 + 认证模块 9 项全部清零 + 审计日志模块深度审查）
+**最后更新**：2026-06-13（全量 TODO 注释一致性审计：代码 ↔ TODO.md 双向校验，补全 16 处代码中缺失的 TODO 注释，修正 1 处错误路径，新增 1 项 scheduler 发现）

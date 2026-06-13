@@ -152,6 +152,8 @@ export const useChatStore = defineStore('chat', () => {
       await submitFeedbackApi(currentSession.value.session_id, feedback)
       currentSession.value.feedback = feedback
     } catch (err) {
+      // TODO(web/stores/chat): 反馈提交失败仅 console.error，用户点击后静默失败。
+      // 应通过 toast 提示用户重试，避免用户误以为反馈已生效。
       console.error('提交反馈失败', err)
     }
   }

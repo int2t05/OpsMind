@@ -142,6 +142,10 @@ func Load(configPath string) (*AppConfig, error) {
 
 	// TODO(config): 记录实际生效配置时应对 password/api_key/secret 做脱敏。
 	// 后续如果添加配置诊断日志，避免把敏感值打到 stdout 或容器日志。
+	//
+	// TODO(config): time.Duration 字段的 BindEnv 映射需注意格式差异。
+	// Viper 要求 time.Duration 为字符串形式（如 "2h"），裸数字 3600 会导致解析失败。
+	// 应在 Validate() 中检测 duration 字段为零值并生成可操作的错误消息。
 	return &cfg, nil
 }
 
