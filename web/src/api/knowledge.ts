@@ -129,7 +129,7 @@ export function retrySyncArticle(id: number) {
 }
 
 // =============================================================================
-// v2 文档上传/处理（替代旧 RAG 同步）
+// 文档上传与处理
 // =============================================================================
 
 /** 上传文档到知识库（multipart form） */
@@ -161,7 +161,7 @@ export function retryDocument(kbID: number, articleID: number) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// Embedding 配置 API 已迁移至 llm_config.ts（v2 Task 6.5 清理）
+// Embedding 配置 API 已迁移至 llm_config.ts（Task 6.5 清理）
 //
 // 旧接口 (embedding-configs) 已被后端移除，前端使用新的 LLM 配置 API 替代。
 // 详见：web/src/api/llm_config.ts

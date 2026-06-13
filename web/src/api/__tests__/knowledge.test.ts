@@ -15,7 +15,7 @@ import {
   retryDocument,
 } from '../knowledge'
 
-describe('knowledge v2 API', () => {
+describe('knowledge API', () => {
   describe('uploadDocuments', () => {
     it('should POST multipart form to upload documents', async () => {
       ;(request.post as any).mockResolvedValue({ code: 0, data: { articles: [{ id: 1 }] } })

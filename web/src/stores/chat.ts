@@ -54,11 +54,11 @@ export const useChatStore = defineStore('chat', () => {
   const streaming = ref(false)  // 是否正在流式输出中
   const selectedKBID = ref<number | null>(null)
 
-  // v2: RAG 管道步骤（当前执行的步骤标签）
+  //RAG 管道步骤（当前执行的步骤标签）
   const currentStep = ref('')
-  // v2: 管道执行指标（done 事件时设置）
+  //  管道执行指标（done 事件时设置）
   const pipelineMetrics = ref<PipelineMetrics | null>(null)
-  // v2: RAG 高级选项
+  //RAG 高级选项
   const ragOptions = ref<RAGOptions>({
     top_k: 5,
     query_rewrite: true,

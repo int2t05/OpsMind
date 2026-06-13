@@ -6,7 +6,7 @@
       <span v-if="article" :class="['status-tag', statusClass(article.status)]">{{ statusText(article.status) }}</span>
     </div>
 
-    <!-- v2: 编辑模式下 tab 切换 — 手动编写 / 文档上传 -->
+    <!--  编辑模式下 tab 切换 — 手动编写 / 文档上传 -->
     <div v-if="isNew" class="mode-tabs">
       <button :class="['mode-tab', { active: inputMode === 'manual' }]" @click="inputMode = 'manual'">
         手动编写
@@ -26,13 +26,13 @@
         </select>
       </div>
 
-      <!-- v2: title（替代 v1 question） -->
+      <!--  title（替代 question） -->
       <div class="form-group">
         <label>标题 <span class="required">*</span></label>
         <input v-model="form.title" type="text" placeholder="文章标题（如：VPN 配置指南）" :disabled="!canEdit" />
       </div>
 
-      <!-- v2: content（替代 v1 answer）-->
+      <!--  content（替代 answer）-->
       <div class="form-group">
         <label>内容 <span class="required">*</span></label>
         <textarea v-model="form.content" placeholder="文章正文内容（支持 Markdown）" rows="12" :disabled="!canEdit" />
@@ -167,7 +167,7 @@ const isNew = computed(() => !articleId || articleId === 'new')
 const isReview = computed(() => article.value?.status === 2)
 const canEdit = computed(() => isNew.value || article.value?.status === 1 || article.value?.status === 6)
 
-// v2: 输入模式（仅新建时可用）
+// 输入模式（仅新建时可用）
 const inputMode = ref<'manual' | 'upload'>('manual')
 
 const kbList = ref<any[]>([])
@@ -176,7 +176,7 @@ const saving = ref(false)
 const tagInput = ref('')
 const reviewComment = ref('')
 
-// v2: title + content 替代 question + answer
+// title + content 替代 question + answer
 const form = ref({
   kb_id: kbIdFromQuery ? Number(kbIdFromQuery) : 0,
   title: '',
@@ -244,7 +244,7 @@ const handleReview = async (approved: boolean) => {
 const handlePublish = async () => { try { await publishArticle(Number(articleId)); await fetchArticle() } catch (e: any) { alert(e?.message) } }
 const handleDisable = async () => { if (!confirm('确定停用？')) return; try { await disableArticle(Number(articleId)); await fetchArticle() } catch (e: any) { alert(e?.message) } }
 const handleEnable = async () => { try { await enableArticle(Number(articleId)); await fetchArticle() } catch (e: any) { alert(e?.message) } }
-// v2 文档处理重试
+// 文档处理重试
 const handleRetryDocument = async () => {
   if (!article.value) return
   try {
@@ -315,7 +315,7 @@ function formatFileSize(bytes: number) {
 .page-header h1 { font-size: 20px; font-weight: 600; color: var(--text-primary); }
 .btn-back { padding: 6px 12px; background: var(--bg-elevated); border: 1px solid var(--border-default); color: var(--text-secondary); border-radius: 4px; cursor: pointer; font-size: 13px; }
 
-/* v2 模式切换 */
+/* 模式切换 */
 .mode-tabs { display: flex; gap: 0; margin-bottom: 20px; border-bottom: 2px solid var(--border-default); }
 .mode-tab { padding: 10px 24px; background: none; border: none; color: var(--text-secondary); font-size: 14px; cursor: pointer; font-family: inherit; border-bottom: 2px solid transparent; margin-bottom: -2px; }
 .mode-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
@@ -331,7 +331,7 @@ function formatFileSize(bytes: number) {
 .form-group input:disabled, .form-group textarea:disabled { opacity: 0.6; }
 .form-select { cursor: pointer; }
 
-/* v2 上传区域 */
+/* 上传区域 */
 .upload-zone { border: 2px dashed var(--border-default); border-radius: 8px; padding: 40px; text-align: center; cursor: pointer; transition: border-color 0.2s, background 0.2s; }
 .upload-zone:hover, .upload-zone--dragover { border-color: var(--accent); background: rgba(94, 106, 210, 0.06); }
 .upload-icon { font-size: 40px; margin-bottom: 12px; }

@@ -121,7 +121,7 @@ import { useToast } from '@/composables/useToast'
 import { listKnowledgeBases, createKnowledgeBase, updateKnowledgeBase, listArticles, submitReview, publishArticle, disableArticle, enableArticle, retrySyncArticle, retryDocument } from '@/api/knowledge'
 
 interface KB { id: number; name: string }
-// v2: 统一文章模型字段
+// 统一文章模型字段
 interface Article { id: number; title: string; content: string; category?: string; status: number; source_type: number; word_count?: number; process_status?: string; updated_at?: string }
 
 const router = useRouter()
@@ -132,7 +132,7 @@ const total = ref(0)
 const currentPage = ref(1)
 const pageSize = ref(10)
 const statusFilter = ref(-1)
-const sourceTypeFilter = ref(-1)  // v2: 来源类型筛选
+const sourceTypeFilter = ref(-1)  // 来源类型筛选
 const showKBDialog = ref(false)
 const showEditKBDialog = ref(false)
 const editingKB = ref<KB | null>(null)
@@ -193,7 +193,7 @@ const handleRetrySync = async (id: number) => {
   try { await retrySyncArticle(id); await fetchArticles() } catch (e: any) { alert(e?.message) }
 }
 
-// v2 辅助函数；statusClass/statusText/processClass/processText → @/utils/knowledge.ts
+// 辅助函数；statusClass/statusText/processClass/processText → @/utils/knowledge.ts
 const sourceIcon = (t: number) => { const m: Record<number,string> = { 1:'✍️',2:'📄' }; return m[t]||'❓' }
 const formatTime = (t?: string) => t ? new Date(t).toLocaleString('zh-CN') : '-'
 </script>

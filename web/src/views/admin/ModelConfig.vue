@@ -9,7 +9,7 @@
       <p>加载配置中...</p>
     </div>
 
-    <!-- v2: LLM 配置入口 -->
+    <!--  LLM 配置入口 -->
     <div class="llm-config-link">
       <router-link to="/admin/llm-config" class="link-card">
         <div class="link-title">LLM 配置</div>
@@ -124,7 +124,7 @@ async function handleSave() {
   color: var(--text-primary);
 }
 
-/* v2: LLM 配置入口链接 */
+/*  LLM 配置入口链接 */
 .llm-config-link { margin-bottom: 24px; }
 
 .link-card {

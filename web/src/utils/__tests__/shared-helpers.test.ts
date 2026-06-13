@@ -30,7 +30,7 @@ describe('urgencyClass', () => {
 })
 
 describe('ticketStatusClass', () => {
-  it('v2 状态映射', () => {
+  it('状态映射', () => {
     expect(ticketStatusClass(1)).toBe('pending')
     expect(ticketStatusClass(2)).toBe('processing')
     expect(ticketStatusClass(3)).toBe('supplement')
@@ -61,7 +61,7 @@ describe('actionText', () => {
 // ═══════════════════════════════════════════════════════════════
 
 describe('articleStatusText', () => {
-  it('v2 状态映射 (1-6)', () => {
+  it('状态映射 (1-6)', () => {
     expect(articleStatusText(1)).toBe('草稿')
     expect(articleStatusText(2)).toBe('待审核')
     expect(articleStatusText(3)).toBe('已通过')
@@ -72,7 +72,7 @@ describe('articleStatusText', () => {
 })
 
 describe('articleStatusClass', () => {
-  it('v2 CSS 类映射', () => {
+  it('CSS 类映射', () => {
     expect(articleStatusClass(1)).toBe('draft')
     expect(articleStatusClass(2)).toBe('pending')
     expect(articleStatusClass(4)).toBe('published')

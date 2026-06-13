@@ -1,7 +1,7 @@
 /**
  * LLM 配置 API 封装（后台管理端）
  *
- * v2 新增：替代 v1 的 embedding-configs 端点，
+ * 新增：替代 的 embedding-configs 端点，
  * 统一管理 LLM 和 Embedding 提供商配置（llama.cpp / OpenAI-compatible）。
  */
 import request from '@/utils/request'

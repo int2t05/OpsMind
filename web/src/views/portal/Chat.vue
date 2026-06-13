@@ -143,7 +143,7 @@ function scrollToBottom() {
   flex: 1;
 }
 
-/* v2: 高级设置按钮 */
+/*  高级设置按钮 */
 .btn-advanced {
   padding: 6px 12px;
   background: var(--bg-overlay);

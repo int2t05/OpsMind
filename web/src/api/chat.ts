@@ -14,14 +14,14 @@ import { getToken } from '../utils/auth'
 // 类型定义
 // =============================================================================
 
-/** v2 RAG 管道步骤事件 */
+/** RAG 管道步骤事件 */
 export interface StepEvent {
   id: string
   label: string
   duration_ms?: number
 }
 
-/** v2 RAG 高级选项 */
+/** RAG 高级选项 */
 export interface RAGOptionsParams {
   top_k?: number
   query_rewrite?: boolean
@@ -33,7 +33,7 @@ export interface RAGOptionsParams {
 export interface CreateChatParams {
   question: string
   kb_id: number
-  rag_options?: RAGOptionsParams  // v2: RAG 高级选项
+  rag_options?: RAGOptionsParams  //RAG 高级选项
 }
 
 export interface SourceItem {
@@ -52,7 +52,7 @@ export interface ChatSessionResponse {
   duration_ms: number
   feedback: number
   created_at: string
-  /** v2: RAG 管道执行指标（由 done 事件的 metadata 携带） */
+  /**RAG 管道执行指标（由 done 事件的 metadata 携带） */
   pipeline?: {
     steps: Array<{ id: string; label: string; duration_ms: number; success: boolean }>
     total_duration_ms: number
@@ -63,7 +63,7 @@ export interface ChatSessionResponse {
 export interface StreamCallbacks {
   /** 收到文本片段时调用 */
   onToken: (content: string) => void
-  /** v2: 收到 RAG 管道步骤事件 */
+  /**  收到 RAG 管道步骤事件 */
   onStep?: (step: StepEvent) => void
   /** 流式传输完成，返回完整会话数据 */
   onDone: (session: ChatSessionResponse) => void
