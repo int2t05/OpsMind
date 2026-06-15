@@ -1,7 +1,7 @@
 # OpsMind 代码改进清单
 
 > 基于 2026-06-15 全量代码再审计（前后端 130+ 源文件 + 文档交叉校验），按业务流程重组。
-> 覆盖 [docs/diagrams/](docs/diagrams/) 中 10 份业务流程图对应的全部模块 + [docs/API/](docs/API/) 9 份接口文档。
+> 覆盖 [diagrams/](diagrams/) 中 10 份业务流程图对应的全部模块 + [API/](API/) 9 份接口文档。
 > 优先级：🔴 P0 生产隐患 / 🟡 P1 架构债务 / 🟢 P2 优化改进
 > ⭐ 标记为 2026-06-15 审计新发现的问题。
 > 📝 标记为文档一致性缺陷（代码实现与 API 文档/PRD/TECH.md 不一致）。
@@ -9,8 +9,8 @@
 ---
 ## 1. 认证与授权
 
-> 对应图：[auth-flow.md](docs/diagrams/auth-flow.md) — 登录 → JWT 双令牌 → 中间件链 → RBAC 权限校验
-> 对应文档：[docs/API/auth.md](docs/API/auth.md)
+> 对应图：[auth-flow.md](diagrams/auth-flow.md) — 登录 → JWT 双令牌 → 中间件链 → RBAC 权限校验
+> 对应文档：[API/auth.md](API/auth.md)
 
 ### JWT 令牌安全
 
@@ -41,13 +41,13 @@
 
 ### 路由一致性
 
-- ✅ [router/router.go](/server/internal/router/router.go) — ~~Auth 路由路径与文档不一致~~ — 已改为 `/api/v1/auth/me` 子路由组，与 [docs/API/auth.md](docs/API/auth.md) 文档一致。前端 [api/auth.ts](/web/src/api/auth.ts) 同步更新。
+- ✅ [router/router.go](/server/internal/router/router.go) — ~~Auth 路由路径与文档不一致~~ — 已改为 `/api/v1/auth/me` 子路由组，与 [API/auth.md](API/auth.md) 文档一致。前端 [api/auth.ts](/web/src/api/auth.ts) 同步更新。
 
 ---
 ## 2. 智能问答 RAG
 
-> 对应图：[chat-rag-flow.md](docs/diagrams/chat-rag-flow.md) — SSE 流式 → Pipeline 执行 → 多路检索 → 混合融合 → 重排序 → LLM 生成
-> 对应文档：[docs/API/chat.md](docs/API/chat.md)
+> 对应图：[chat-rag-flow.md](diagrams/chat-rag-flow.md) — SSE 流式 → Pipeline 执行 → 多路检索 → 混合融合 → 重排序 → LLM 生成
+> 对应文档：[API/chat.md](API/chat.md)
 
 ### SSE 流式输出（核心路径）
 
@@ -67,7 +67,7 @@
 - 🟡 [rag/multi_route.go](/server/internal/rag/multi_route.go) — LLM 输出子查询的清洗逻辑脆弱（正则匹配依赖特定格式）
 - 🟡⭐ [rag/multi_route.go](/server/internal/rag/multi_route.go) — k（子查询数量）无上限，k=100 可致百倍检索放大
 - 🟡 [rag/hybrid.go](/server/internal/rag/hybrid.go) — 单路结果直接返回时未按 topK 截断
-- 🟡 [service/chat_service.go](/server/internal/service/chat_service.go) — 前端 RAGOptions 完全被忽略：`CreateChatSession` 硬编码全部 `true`，高级设置表单无效。📝 [docs/PRD.md §3.1](docs/PRD.md) 记载「每个步骤可独立开关（`rag_options`）」但代码未实现。
+- 🟡 [service/chat_service.go](/server/internal/service/chat_service.go) — 前端 RAGOptions 完全被忽略：`CreateChatSession` 硬编码全部 `true`，高级设置表单无效。📝 [PRD.md §3.1](PRD.md) 记载「每个步骤可独立开关（`rag_options`）」但代码未实现。
 - 🟡 [rag/types.go](/server/internal/rag/types.go) — RAGOptions 使用裸 `bool`，零值问题致空 JSON `{}` 全部禁用，与文档默认「全部启用」矛盾
 
 ### BM25 检索
@@ -87,7 +87,7 @@
 
 ### 文档一致性
 
-- 📝⭐ [docs/API/chat.md](docs/API/chat.md) — SSE `done` 事件文档记载含 `metadata.pipeline.steps[]` 及 `total_duration_ms`，但 `CreateChatSession` 未填充 `Pipeline` 字段，前端收到的 metadata 中 pipeline 永远为空。
+- 📝⭐ [API/chat.md](API/chat.md) — SSE `done` 事件文档记载含 `metadata.pipeline.steps[]` 及 `total_duration_ms`，但 `CreateChatSession` 未填充 `Pipeline` 字段，前端收到的 metadata 中 pipeline 永远为空。
 
 ### 输入校验
 
@@ -96,8 +96,8 @@
 ---
 ## 3. 知识库与文档管理
 
-> 对应图：[knowledge-publish-flow.md](docs/diagrams/knowledge-publish-flow.md) + [document-upload-flow.md](docs/diagrams/document-upload-flow.md) — 文章生命周期 → 分块 → Embedding → pgvector；文档上传 → 解析 → 异步处理
-> 对应文档：[docs/API/knowledge.md](docs/API/knowledge.md)
+> 对应图：[knowledge-publish-flow.md](diagrams/knowledge-publish-flow.md) + [document-upload-flow.md](diagrams/document-upload-flow.md) — 文章生命周期 → 分块 → Embedding → pgvector；文档上传 → 解析 → 异步处理
+> 对应文档：[API/knowledge.md](API/knowledge.md)
 
 ### 知识发布管道（核心路径）
 
@@ -108,9 +108,9 @@
 
 ### 文章状态机
 
-- 📝⭐ [docs/API/knowledge.md](docs/API/knowledge.md) vs [model/enums.go](/server/internal/model/enums.go) — **文章状态编号不一致**：API 文档定义生命周期为「草稿(1)→已提交审核(2)→审核通过(3)→已发布(4)→已停用(5)/驳回(6)」，代码定义 Disabled=0、Draft=1、Reviewing=2、Approved=3、Published=4、Rejected=5。Disabled 在文档中编号 5（与 Closed 混淆），代码中编号 0。
-- 🟡 [service/knowledge_service.go](/server/internal/service/knowledge_service.go) — Enable 仅重置 status 为 Draft，不重新执行分块/Embedding/pgvector 写入。📝 [docs/API/knowledge.md](docs/API/knowledge.md) 记载「启用后需重新执行分块→embedding→pgvector 写入（因为停用时向量已删除）」。
-- 🟡 [service/knowledge_service.go](/server/internal/service/knowledge_service.go) — Disable 未校验当前状态是否为已发布（Draft 可直接 Disable）。📝 [docs/API/knowledge.md](docs/API/knowledge.md) 记载「状态：已发布(4) → 已停用(5)」。
+- 📝⭐ [API/knowledge.md](API/knowledge.md) vs [model/enums.go](/server/internal/model/enums.go) — **文章状态编号不一致**：API 文档定义生命周期为「草稿(1)→已提交审核(2)→审核通过(3)→已发布(4)→已停用(5)/驳回(6)」，代码定义 Disabled=0、Draft=1、Reviewing=2、Approved=3、Published=4、Rejected=5。Disabled 在文档中编号 5（与 Closed 混淆），代码中编号 0。
+- 🟡 [service/knowledge_service.go](/server/internal/service/knowledge_service.go) — Enable 仅重置 status 为 Draft，不重新执行分块/Embedding/pgvector 写入。📝 [API/knowledge.md](API/knowledge.md) 记载「启用后需重新执行分块→embedding→pgvector 写入（因为停用时向量已删除）」。
+- 🟡 [service/knowledge_service.go](/server/internal/service/knowledge_service.go) — Disable 未校验当前状态是否为已发布（Draft 可直接 Disable）。📝 [API/knowledge.md](API/knowledge.md) 记载「状态：已发布(4) → 已停用(5)」。
 - 🟡 [service/knowledge_service.go](/server/internal/service/knowledge_service.go) — 文章 `status`（审核流程）和 `process_status`（文档处理）两个状态机概念混淆
 - 🟡 [service/knowledge_service.go](/server/internal/service/knowledge_service.go) — Publish/Disable 应接收请求 ctx 而非 `context.Background`
 - 🟡 [repository/knowledge_repo.go](/server/internal/repository/knowledge_repo.go) — `UpdateArticleStatus` 不检查 `RowsAffected`，更新不存在的 ID 静默成功
@@ -124,7 +124,7 @@
 - 🟡 [service/knowledge_service.go](/server/internal/service/knowledge_service.go) — `RetryDocument` 未校验当前是否处于 failed 状态，可对已成功文档重复入队
 - 🟡 [handler/knowledge.go](/server/internal/handler/knowledge.go) — 文档上传应结合 MIME sniffing 判断文件类型，而非仅信任扩展名
 - 🟡 [handler/knowledge.go](/server/internal/handler/knowledge.go) — `GetDocumentStatus` 未校验 `kb_id` 与 article.KBID 一致，URL 资源层级校验缺失
-- 📝⭐ [handler/knowledge.go](/server/internal/handler/knowledge.go) — **上传 API 字段名与文档不一致**：[docs/API/knowledge.md](docs/API/knowledge.md) 指定 multipart 字段名 `files`（复数，多文件），代码读取 `c.FormFile("file")`（单数，仅单文件）。响应形状也不一致：文档返回 `documents` 数组含 `file_size`，代码返回扁平对象含 `article_id`/`filename`/`kb_id`。
+- 📝⭐ [handler/knowledge.go](/server/internal/handler/knowledge.go) — **上传 API 字段名与文档不一致**：[API/knowledge.md](API/knowledge.md) 指定 multipart 字段名 `files`（复数，多文件），代码读取 `c.FormFile("file")`（单数，仅单文件）。响应形状也不一致：文档返回 `documents` 数组含 `file_size`，代码返回扁平对象含 `article_id`/`filename`/`kb_id`。
 
 ### 内容质量
 
@@ -142,8 +142,8 @@
 ---
 ## 4. 申告管理
 
-> 对应图：[ticket-lifecycle.md](docs/diagrams/ticket-lifecycle.md) + [ticket-state-machine.md](docs/diagrams/ticket-state-machine.md) — 创建→处理→补充→解决→关闭 + AutoClose
-> 对应文档：[docs/API/tickets.md](docs/API/tickets.md)
+> 对应图：[ticket-lifecycle.md](diagrams/ticket-lifecycle.md) + [ticket-state-machine.md](diagrams/ticket-state-machine.md) — 创建→处理→补充→解决→关闭 + AutoClose
+> 对应文档：[API/tickets.md](API/tickets.md)
 
 ### 数据完整性与事务
 
@@ -168,13 +168,13 @@
 
 ### 文档一致性
 
-- 📝⭐ [docs/PRD.md §3.3](docs/PRD.md) vs [model/enums.go](/server/internal/model/enums.go) — **影响范围取值不一致**：PRD 文档记载 impact_scope 取值 0/1/2/3，enums.go 实际定义 ImpactPersonal=1、ImpactDept=2、ImpactCompany=3（无 0 值）。需统一定义并更新文档。
+- 📝⭐ [PRD.md §3.3](PRD.md) vs [model/enums.go](/server/internal/model/enums.go) — **影响范围取值不一致**：PRD 文档记载 impact_scope 取值 0/1/2/3，enums.go 实际定义 ImpactPersonal=1、ImpactDept=2、ImpactCompany=3（无 0 值）。需统一定义并更新文档。
 
 ---
 ## 5. 用户与角色管理
 
-> 对应图：[user-rbac-flow.md](docs/diagrams/user-rbac-flow.md) — 用户 CRUD + 角色权限 + 菜单树
-> 对应文档：[docs/API/users.md](docs/API/users.md) + [docs/API/roles.md](docs/API/roles.md)
+> 对应图：[user-rbac-flow.md](diagrams/user-rbac-flow.md) — 用户 CRUD + 角色权限 + 菜单树
+> 对应文档：[API/users.md](API/users.md) + [API/roles.md](API/roles.md)
 
 ### 数据安全
 
@@ -209,8 +209,8 @@
 ---
 ## 6. LLM 配置与适配层
 
-> 对应图：[llm-config-flow.md](docs/diagrams/llm-config-flow.md) — CRUD + TestConnection + atomic.Value 热替换 + API Key 脱敏
-> 对应文档：[docs/API/llm-config.md](docs/API/llm-config.md)
+> 对应图：[llm-config-flow.md](diagrams/llm-config-flow.md) — CRUD + TestConnection + atomic.Value 热替换 + API Key 脱敏
+> 对应文档：[API/llm-config.md](API/llm-config.md)
 
 ### LLM 客户端
 
@@ -223,17 +223,17 @@
 ### LLM 配置管理
 
 - 🔴⭐ [service/llm_config_service.go](/server/internal/service/llm_config_service.go) — **事务内使用 repo 原始 DB 而非 tx**：`ClearDefault()` 和 `Create()` 在 `db.Transaction()` 内调但用 `s.repo` 的 `*gorm.DB`，操作在事务外执行，原子性为空壳
-- 🔴⭐ [handler/llm_config.go](/server/internal/handler/llm_config.go) — **TestConnection 测试的是全局默认客户端而非被测配置**：始终用 `h.llmClient`，选择 `:id` 配置无意义——功能完全失效。📝 [docs/API/llm-config.md](docs/API/llm-config.md) 记载测试「指定配置的连接」，但代码实现与之完全不符。
-- 🔴⭐ [handler/llm_config.go](/server/internal/handler/llm_config.go) — **UpdateConfig 会清空 api_key**：若请求不传 `api_key`，零值 `""` 覆盖数据库中已存储的密钥。📝 [docs/API/llm-config.md](docs/API/llm-config.md) 记载「api_key 不传时保留原有密钥（不传 ≠ 清空）」，代码行为与文档相反。
+- 🔴⭐ [handler/llm_config.go](/server/internal/handler/llm_config.go) — **TestConnection 测试的是全局默认客户端而非被测配置**：始终用 `h.llmClient`，选择 `:id` 配置无意义——功能完全失效。📝 [API/llm-config.md](API/llm-config.md) 记载测试「指定配置的连接」，但代码实现与之完全不符。
+- 🔴⭐ [handler/llm_config.go](/server/internal/handler/llm_config.go) — **UpdateConfig 会清空 api_key**：若请求不传 `api_key`，零值 `""` 覆盖数据库中已存储的密钥。📝 [API/llm-config.md](API/llm-config.md) 记载「api_key 不传时保留原有密钥（不传 ≠ 清空）」，代码行为与文档相反。
 - 🔴 [service/llm_config_service.go](/server/internal/service/llm_config_service.go) — `atomic.Store` 直接存指针，未复制 cfg；调用方修改原对象 → 并发读看到中间态（数据竞态）
 - 🔴 [service/llm_config_service.go](/server/internal/service/llm_config_service.go) — 构造函数不应 panic：mock 类型不匹配会直接崩溃进程，应返回 error
-- 🔴⭐ [model/llm_config.go](/server/internal/model/llm_config.go) — **API Key 明文存储**：数据库泄露 = 所有 LLM 提供商密钥暴露。需 AES-256 加密存储。📝 [docs/API/llm-config.md](docs/API/llm-config.md) 记载「api_key 在数据库中以 AES-256 加密存储」，但代码完全未实现加密。
+- 🔴⭐ [model/llm_config.go](/server/internal/model/llm_config.go) — **API Key 明文存储**：数据库泄露 = 所有 LLM 提供商密钥暴露。需 AES-256 加密存储。📝 [API/llm-config.md](API/llm-config.md) 记载「api_key 在数据库中以 AES-256 加密存储」，但代码完全未实现加密。
 - 🔴⭐ [repository/llm_config_repo.go](/server/internal/repository/llm_config_repo.go) — **缺少 `is_default` 部分唯一索引**：并发创建默认配置可产生多条 `is_default=true` 记录
 - 🟡 [service/llm_config_service.go](/server/internal/service/llm_config_service.go) — 默认配置切换后未重建 LLM/Embedding 客户端（仅替换了配置值，已初始化的 HTTP 客户端仍指向旧 Base URL）
 - 🟡 [service/llm_config_service.go](/server/internal/service/llm_config_service.go) — 缺少输入校验：providerType 白名单、baseURL 格式、maxTokens/vectorDimension 范围
 - 🟡 [service/llm_config_service.go](/server/internal/service/llm_config_service.go) — 删除配置前未检查 FK 引用（knowledge_bases.llm_config_id）
 - 🟡 [handler/llm_config.go](/server/internal/handler/llm_config.go) — CreateConfig 默认值 8192/1024 应在 Service 层而非 Handler 层
-- 📝⭐ [handler/llm_config.go:216](/server/internal/handler/llm_config.go) — **TestConnection 错误码与 API 文档不一致**：[docs/API/llm-config.md](docs/API/llm-config.md) 记载失败时 `code=0, data.success=false`，代码返回 `code=20001`（ErrAIUnavailable）。行为与文档约定相反。
+- 📝⭐ [handler/llm_config.go:216](/server/internal/handler/llm_config.go) — **TestConnection 错误码与 API 文档不一致**：[API/llm-config.md](API/llm-config.md) 记载失败时 `code=0, data.success=false`，代码返回 `code=20001`（ErrAIUnavailable）。行为与文档约定相反。
 
 ### 适配层通用
 
@@ -246,8 +246,8 @@
 ---
 ## 7. 数据看板与审计
 
-> 对应图：[dashboard-audit-flow.md](docs/diagrams/dashboard-audit-flow.md) — 7 项聚合统计 + 趋势图 + 审计日志查询
-> 对应文档：[docs/API/dashboard.md](docs/API/dashboard.md) + [docs/API/audit-log.md](docs/API/audit-log.md)
+> 对应图：[dashboard-audit-flow.md](diagrams/dashboard-audit-flow.md) — 7 项聚合统计 + 趋势图 + 审计日志查询
+> 对应文档：[API/dashboard.md](API/dashboard.md) + [API/audit-log.md](API/audit-log.md)
 
 ### 看板统计
 
@@ -288,14 +288,14 @@
 
 - 🟡 [tests/repository/audit_repo_test.go](/server/tests/repository/audit_repo_test.go) — 测试使用 `init()` 直接 panic + 硬编码数据库凭据，不符合其他测试模块的标准模式
 - 🟡 缺少 Service 层集成测试（验证各 Service 的审计写入正确性）
-- 📝 [docs/API/audit-log.md](/docs/API/audit-log.md) — action 分隔符不一致：文档用 `:`（`user:create`），代码用 `.`（`user.create`）
-- 📝 [docs/API/audit-log.md](/docs/API/audit-log.md) — 缺少新增查询参数（`target_type`/`target_id`/`date_from`/`date_to`）
-- 📝 [docs/diagrams/dashboard-audit-flow.md](/docs/diagrams/dashboard-audit-flow.md) — 审计查询流程图显示 JOIN 查询，但代码实际用两条 SQL + Go 层拼接
+- 📝 [API/audit-log.md](/docs/API/audit-log.md) — action 分隔符不一致：文档用 `:`（`user:create`），代码用 `.`（`user.create`）
+- 📝 [API/audit-log.md](/docs/API/audit-log.md) — 缺少新增查询参数（`target_type`/`target_id`/`date_from`/`date_to`）
+- 📝 [diagrams/dashboard-audit-flow.md](/docs/diagrams/dashboard-audit-flow.md) — 审计查询流程图显示 JOIN 查询，但代码实际用两条 SQL + Go 层拼接
 
 ---
 ## 8. 基础设施与部署
 
-> 对应图：[architecture.md](docs/diagrams/architecture.md) + [request-lifecycle.md](docs/diagrams/request-lifecycle.md) — 启动流程 → 中间件链 → 路由 → 数据库
+> 对应图：[architecture.md](diagrams/architecture.md) + [request-lifecycle.md](diagrams/request-lifecycle.md) — 启动流程 → 中间件链 → 路由 → 数据库
 
 ### 启动流程（main.go）
 
@@ -351,7 +351,7 @@
 
 ### 文档一致性
 
-- 📝⭐ [docs/TECH.md §2.1](docs/TECH.md) — **模块文件计数偏差**：TECH.md 记载「11 handlers」（实际 12 个 .go 文件 + common.go）、「12 services」（实际 13 个 .go 文件 + tx_manager.go）、「12 model 文件」（实际 10 个 .go 文件）、「15 web API 文件」（实际 12 个 .ts 文件）、「11 RAG 文件」（实际 12 个含 retriever.go）。文件计数需更新或改为"约 N 个"。
+- 📝⭐ [TECH.md §2.1](TECH.md) — **模块文件计数偏差**：TECH.md 记载「11 handlers」（实际 12 个 .go 文件 + common.go）、「12 services」（实际 13 个 .go 文件 + tx_manager.go）、「12 model 文件」（实际 10 个 .go 文件）、「15 web API 文件」（实际 12 个 .ts 文件）、「11 RAG 文件」（实际 12 个含 retriever.go）。文件计数需更新或改为"约 N 个"。
 - 📝⭐ docs 目录引用 `docs/v2/` 和 `server/migrations/v2/`，但两个目录均不存在，迁移脚本缺失。
 
 ---
@@ -377,7 +377,7 @@
 
 - 🔴⭐ [views/admin/LLMConfig.vue](/web/src/views/admin/LLMConfig.vue) — **创建配置时测试连接崩溃**：`handleTestConnection` 调 `updateLLMConfig(editingId.value!)`，新建时 `editingId` 为 null，`!` 断言导致运行时崩溃
 - 🟡 [views/admin/LLMConfig.vue](/web/src/views/admin/LLMConfig.vue) — 每次编辑必须重新输入 API Key（后端返回脱敏值，前端清空表单）
-- 🟡⭐ [views/admin/ModelConfig.vue](/web/src/views/admin/ModelConfig.vue) + [views/admin/SystemConfig.vue](/web/src/views/admin/SystemConfig.vue) — **重复配置管理**：两页面独立管理 `ai.default_top_k` 和 `ai.confidence_threshold`，修改互不可见，最后写入胜出。📝 [docs/PRD.md §3.1](docs/PRD.md) 记载这两个参数应为统一 AI 配置，而非分散在两个独立页面。
+- 🟡⭐ [views/admin/ModelConfig.vue](/web/src/views/admin/ModelConfig.vue) + [views/admin/SystemConfig.vue](/web/src/views/admin/SystemConfig.vue) — **重复配置管理**：两页面独立管理 `ai.default_top_k` 和 `ai.confidence_threshold`，修改互不可见，最后写入胜出。📝 [PRD.md §3.1](PRD.md) 记载这两个参数应为统一 AI 配置，而非分散在两个独立页面。
 
 ### 组件拆分与重复代码
 
