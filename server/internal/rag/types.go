@@ -120,7 +120,7 @@ type PipelineMetrics struct {
 
 // StepMetric 单个管道步骤的执行指标。
 type StepMetric struct {
-	StepID     string `json:"step_id"`     // 步骤标识：query_rewrite / multi_route / hybrid_retrieve / rerank / llm_generate
+	StepID     string `json:"step_id"`     // 步骤标识：query_rewrite / multi_route / vector_retrieve / bm25_retrieve / hybrid_fuse / rerank / llm_generate
 	Label      string `json:"label"`       // 步骤显示名称（中文）
 	DurationMS int64  `json:"duration_ms"` // 步骤耗时（毫秒）
 	Success    bool   `json:"success"`     // 是否成功
