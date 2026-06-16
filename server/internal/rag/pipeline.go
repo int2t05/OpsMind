@@ -60,9 +60,18 @@ func NewPipeline(vectorRet, bm25Ret Retriever, llm adapter.LLMClient, emb *Embed
 // Execute 执行 RAG 管道，返回检索结果和管道指标。
 //
 // kbID 为知识库 ID，opts 控制各步骤开关和参数。
+//
+// 步骤降级策略：
+//   - 查询改写 / 多路检索 / 重排序：LLM 不可用时静默跳过（llmClient == nil 或调用失败）
+//   - 向量检索：核心路径，失败直接返回错误
+//   - BM25 检索：失败降级为仅向量结果
+//
+// Rerank 使用原始 query（而非改写后的查询）评估相关性，
+// 原因是多路检索生成的路由查询可能偏离用户原始意图。
 func (p *Pipeline) Execute(ctx context.Context, query string, kbID int64, opts RAGOptions, onStep StepCallback) (*RAGResult, error) {
-	// TODO(rag/pipeline): Execute 开始时应 Normalize opts。
-	// 当前 TopK/RerankCount/RouteCount 为 0 时会导致 LIMIT 0 或多路检索不执行，和“零值使用默认配置”的注释不一致。
+	// 入口规范化：零值字段使用默认值，保证后续步骤无需单独处理零值
+	opts.Normalize()
+
 	start := time.Now()
 	metrics := PipelineMetrics{}
 	var steps []StepMetric
@@ -90,13 +99,9 @@ func (p *Pipeline) Execute(ctx context.Context, query string, kbID int64, opts R
 
 	// ─── Step 1: 查询改写 ───
 	rewrittenQuery := query
-	if opts.QueryRewrite {
+	if opts.QueryRewrite && p.llmClient != nil {
 		_ = track("query_rewrite", "查询改写", func() error {
-			// TODO(rag/pipeline): p.llmClient 为 nil 时应跳过 LLM 辅助步骤。
-			// 当前 nil 会在 QueryRewrite/MultiRoute/Rerank 内 panic 或产生不可控错误。
-			// TODO: history 始终传 nil，QueryRewrite 的上下文消歧功能从未生效。
-			// 应由调用方通过 RAGOptions 传入最近 N 轮对话历史。
-			rw, err := QueryRewrite(ctx, p.llmClient, query, nil)
+			rw, err := QueryRewrite(ctx, p.llmClient, query, opts.History)
 			if err != nil {
 				return err
 			}
@@ -107,7 +112,7 @@ func (p *Pipeline) Execute(ctx context.Context, query string, kbID int64, opts R
 
 	// ─── Step 2: 多路检索 ───
 	routes := []string{rewrittenQuery}
-	if opts.MultiRoute && opts.RouteCount > 1 {
+	if opts.MultiRoute && opts.RouteCount > 1 && p.llmClient != nil {
 		_ = track("multi_route", "多路检索", func() error {
 			rts, err := MultiRoute(ctx, p.llmClient, rewrittenQuery, opts.RouteCount)
 			if err != nil {
@@ -117,8 +122,8 @@ func (p *Pipeline) Execute(ctx context.Context, query string, kbID int64, opts R
 			return nil
 		})
 	}
-	// TODO: 多路检索时 rewrittenQuery 可能与 routes[0] 不一致。
-	// 后续 Rerank 步骤使用 rewrittenQuery 而非实际检索路由，可能导致 Query-Document 相关性评分偏差。
+
+	// ─── Step 3: 检索（向量 + 可选 BM25） ───
 	// Retriever 接口内部处理 embedding 生成，Pipeline 不直接调用 Embedder。
 	var allChunks []RetrievalResult
 	if opts.Hybrid && p.bm25Retriever != nil {
@@ -189,24 +194,25 @@ func (p *Pipeline) Execute(ctx context.Context, query string, kbID int64, opts R
 	}
 
 	// ─── Step 4: 重排序 ───
-	if opts.Rerank && len(allChunks) > 1 {
+	if opts.Rerank && len(allChunks) > 1 && p.llmClient != nil {
+		// 重排序前按 RerankCount 截断候选池，避免多路检索结果过多时
+		// prompt 过长、成本上升甚至超过上下文窗口
+		candidates := allChunks
+		if len(candidates) > opts.RerankCount {
+			candidates = candidates[:opts.RerankCount]
+		}
+
 		_ = track("rerank", "重排序", func() error {
-			// TODO(rag/pipeline): 重排序前应按 RerankCount 截断候选，而不是把所有 routes 的结果都塞给 LLM。
-			// 多路检索结果过多时 prompt 会变长、成本上升，还可能超过上下文窗口。
-			reranked, err := Rerank(ctx, p.llmClient, rewrittenQuery, allChunks)
+			// 使用原始 query 而非 rewrittenQuery 评估相关性：
+			// 多路检索生成的路由查询可能偏离用户原始意图，
+			// 重排序应以用户真实问题为准。
+			reranked, err := Rerank(ctx, p.llmClient, query, candidates)
 			if err != nil {
 				return err
 			}
 			allChunks = reranked
 			return nil
 		})
-	}
-
-	// 校验 RerankCount >= TopK，否则重排序候选池小于目标数
-	if opts.Rerank && opts.RerankCount < opts.TopK {
-		// TODO(rag/pipeline): 这个校验发生在 Rerank 之后，已经太晚。
-		// 应在检索和融合前完成，否则候选池大小仍可能错误。
-		opts.RerankCount = opts.TopK * 3
 	}
 
 	// 截取 TopK

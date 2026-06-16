@@ -34,23 +34,23 @@ type Retriever interface {
 
 // RAGOptions 控制 RAG 管道各步骤的开关和参数。
 //
-// 所有字段均为可选，零值表示使用默认配置（全部开启，TopK=5）。
+// 所有字段均可选，零值由 Normalize() 填充为默认值。
+// 调用方应优先使用 DefaultRAGOptions() 或显式设置所有字段后调用 Normalize()。
 type RAGOptions struct {
-	// TODO(rag/types): bool 零值无法表达“未传则默认 true”和“用户显式 false”的区别。
+	// TODO(rag/types): bool 零值无法表达"未传则默认 true"和"用户显式 false"的区别。
 	// 请求层需要用 *bool 或先 DefaultRAGOptions 再覆盖，否则默认选项容易被零值关闭。
-	TopK          int  `json:"top_k"`          // 最终返回的检索结果数，默认 5
-	QueryRewrite  bool `json:"query_rewrite"`  // 是否启用查询改写
-	MultiRoute    bool `json:"multi_route"`    // 是否启用多路检索（生成子查询）
-	Hybrid        bool `json:"hybrid"`         // 是否启用 BM25+向量混合检索
-	Rerank        bool `json:"rerank"`         // 是否启用重排序
-	RouteCount    int  `json:"route_count"`    // 多路检索生成的子查询数，默认 3
-	RerankCount   int  `json:"rerank_count"`   // 送入重排序的候选数，默认 topK*3
+	TopK          int                  `json:"top_k"`          // 最终返回的检索结果数，默认 5
+	QueryRewrite  bool                 `json:"query_rewrite"`  // 是否启用查询改写
+	MultiRoute    bool                 `json:"multi_route"`    // 是否启用多路检索（生成子查询）
+	Hybrid        bool                 `json:"hybrid"`         // 是否启用 BM25+向量混合检索
+	Rerank        bool                 `json:"rerank"`         // 是否启用重排序
+	RouteCount    int                  `json:"route_count"`    // 多路检索生成的子查询数，默认 3
+	RerankCount   int                  `json:"rerank_count"`   // 送入重排序的候选数，默认 topK*3
+	History       []map[string]string  `json:"-"`              // 对话历史（不入 JSON），用于查询改写上下文消歧；仅 role="user"|"assistant" 的条目有效
 }
 
 // DefaultRAGOptions 返回默认的 RAG 检索选项。
 func DefaultRAGOptions() RAGOptions {
-	// TODO(rag/types): 增加 Normalize/Validate 方法统一处理 TopK、RouteCount、RerankCount 的范围。
-	// 现在各调用方可能各自补默认值，行为容易不一致。
 	return RAGOptions{
 		TopK:         5,
 		QueryRewrite: true,
@@ -59,6 +59,33 @@ func DefaultRAGOptions() RAGOptions {
 		Rerank:       true,
 		RouteCount:   3,
 		RerankCount:  15,
+	}
+}
+
+// Normalize 将零值字段填充为默认值，确保管道行为一致。
+//
+// 为什么放在 RAGOptions 而非 Pipeline.Execute 内部：
+// Pipeline 作为编排器不应关心默认值策略；RAGOptions 作为值对象
+// 应自行保证自身有效性，遵循"自验证值对象"惯例。
+//
+// 规则：
+//   - TopK <= 0 → 5
+//   - RouteCount <= 0 → 3
+//   - RerankCount <= 0 → TopK * 3
+//   - RerankCount < TopK → TopK * 3（重排序候选池不小于目标返回数，否则 TopK 截取无意义）
+func (opts *RAGOptions) Normalize() {
+	if opts.TopK <= 0 {
+		opts.TopK = 5
+	}
+	if opts.RouteCount <= 0 {
+		opts.RouteCount = 3
+	}
+	if opts.RerankCount <= 0 {
+		opts.RerankCount = opts.TopK * 3
+	}
+	// 确保重排序候选池不小于目标返回数
+	if opts.RerankCount < opts.TopK {
+		opts.RerankCount = opts.TopK * 3
 	}
 }
 

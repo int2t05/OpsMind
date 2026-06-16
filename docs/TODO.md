@@ -66,11 +66,11 @@
 
 ### RAG 管道
 
-- 🔴 [rag/pipeline.go](/server/internal/rag/pipeline.go) — `llmClient` 为 nil 时，QueryRewrite/MultiRoute/Rerank 会 panic（nil 指针解引用）
+- ✅ [rag/pipeline.go](/server/internal/rag/pipeline.go) — ~~`llmClient` 为 nil 时，QueryRewrite/MultiRoute/Rerank 会 panic（nil 指针解引用）~~ — 已添加 `p.llmClient != nil` 守卫，LLM 不可用时静默跳过辅助步骤
 - 🔴⭐ [rag/rerank.go](/server/internal/rag/rerank.go) — 重排序 prompt 无长度截断：候选 chunk 全量拼接，可超出 LLM 上下文窗口致 400 错误
-- 🟡 [rag/pipeline.go](/server/internal/rag/pipeline.go) — QueryRewrite 的 history 始终为 nil，上下文消歧功能未生效
-- 🟡 [rag/pipeline.go](/server/internal/rag/pipeline.go) — 重排序候选过多时应提前截断：Rerank 在重排**前**未按 `RerankCount` 截断候选列表；事后检查（第 207 行）为时已晚
-- 🟡 [rag/pipeline.go](/server/internal/rag/pipeline.go) — Execute 缺少入口 opts 规范化：TopK=0 → LIMIT 0，RouteCount=0 → 多路检索跳过，与「零值使用默认」注释不一致
+- ✅ [rag/pipeline.go](/server/internal/rag/pipeline.go) — ~~QueryRewrite 的 history 始终为 nil，上下文消歧功能未生效~~ — RAGOptions 新增 `History` 字段，chat_service 传入会话历史
+- ✅ [rag/pipeline.go](/server/internal/rag/pipeline.go) — ~~重排序候选过多时应提前截断：Rerank 在重排**前**未按 `RerankCount` 截断候选列表；事后检查（第 207 行）为时已晚~~ — Rerank 前按 RerankCount 截断候选池；RerankCount < TopK 校验已前置至 Normalize()
+- ✅ [rag/pipeline.go](/server/internal/rag/pipeline.go) — ~~Execute 缺少入口 opts 规范化：TopK=0 → LIMIT 0，RouteCount=0 → 多路检索跳过，与「零值使用默认」注释不一致~~ — RAGOptions.Normalize() 在 Execute 入口自动填充零值默认值
 - 🟡 [rag/query_rewrite.go](/server/internal/rag/query_rewrite.go) — llm 为 nil 时应降级返回原 query，而非 panic
 - 🟡 [rag/multi_route.go](/server/internal/rag/multi_route.go) — LLM 输出子查询的清洗逻辑脆弱（`TrimLeft` 依赖特定前缀格式）
 - 🟡⭐ [rag/multi_route.go](/server/internal/rag/multi_route.go) — k（子查询数量）无上限，k=100 可致百倍检索放大
@@ -547,4 +547,4 @@
 19. 上传 API 字段名与文档不一致（文档 `files` vs 代码 `file`）
 
 ---
-**最后更新**：2026-06-16（RAG 模块深度审计：覆盖 pipeline/query_rewrite/multi_route/hybrid/bm25/rerank/chunker/embedder/processor/document_parser/retriever/embedding_client/llm_service 共 13 个文件，§2 扩容至 55 项）
+**最后更新**：2026-06-16（pipeline.go 全部 6 项 TODO 修复完成：Normalize 入口规范化、llmClient nil 守卫、History 上下文消歧、Rerank 原始 query、RerankCount 截断前置、RerankCount 校验前置）

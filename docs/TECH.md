@@ -120,27 +120,36 @@ OpsMind 采用**单体分层架构（Modular Monolith）**，按 Handler → Ser
 
 ```go
 type RAGOptions struct {
-    TopK         int   // 返回分块数，默认 5，范围 1-20
-    QueryRewrite bool  // 查询改写，默认 true
-    MultiRoute   bool  // 多路检索，默认 true
-    Hybrid       bool  // BM25 混合检索，默认 true
-    Rerank       bool  // 重排序，默认 true
-    RouteCount   int   // 子查询数，默认 3
-    RerankCount  int   // 进入重排序候选数，默认 15 (topK*3)
+    TopK         int                 // 返回分块数，默认 5（零值 → Normalize() 填 5）
+    QueryRewrite bool                // 查询改写，默认 true
+    MultiRoute   bool                // 多路检索，默认 true
+    Hybrid       bool                // BM25 混合检索，默认 true
+    Rerank       bool                // 重排序，默认 true
+    RouteCount   int                 // 子查询数，默认 3（零值 → Normalize() 填 3）
+    RerankCount  int                 // 进入重排序候选数，默认 topK*3（零值 → Normalize() 填 topK*3）
+    History      []map[string]string // 对话历史（不入 JSON），用于查询改写上下文消歧
 }
 ```
 
+`Normalize()` 方法在 Pipeline.Execute 入口处自动调用，零值字段按以下规则填充：
+- TopK ≤ 0 → 5
+- RouteCount ≤ 0 → 3
+- RerankCount ≤ 0 → TopK × 3
+- RerankCount < TopK → TopK × 3（确保重排序候选池≥目标数）
+
 降级矩阵：
 
-| 步骤 | 失败行为 |
-|------|----------|
-| 查询改写 | 降级——使用原始 question |
-| 多路检索 | 降级——使用单路检索 |
-| 向量检索 | **阻塞**——核心路径，返回错误 |
-| BM25 检索 | 降级——仅用向量结果 |
-| RRF 融合 | 降级——使用单路结果 |
-| 重排序 | 降级——使用 RRF 排序结果 |
-| LLM 生成 | **阻塞**——核心路径，返回错误 |
+| 步骤 | 失败行为 | 额外条件 |
+|------|----------|----------|
+| 查询改写 | 降级——使用原始 question | llmClient == nil 时静默跳过 |
+| 多路检索 | 降级——使用单路检索 | llmClient == nil 时静默跳过 |
+| 向量检索 | **阻塞**——核心路径，返回错误 | — |
+| BM25 检索 | 降级——仅用向量结果 | — |
+| RRF 融合 | 降级——使用单路结果 | — |
+| 重排序 | 降级——使用融合排序结果 | llmClient == nil 时静默跳过；重排前按 RerankCount 截断候选池 |
+| LLM 生成 | **阻塞**——核心路径，返回错误 | — |
+
+重排序使用原始用户 query（而非改写后的查询），原因是多路检索生成的路由查询可能偏离用户原始意图。
 
 ## 5. 配置与环境变量
 

@@ -8,13 +8,19 @@
 
 ```
 用户问题
-  → 查询改写 (可选)    — LLM 消除指代歧义
+  → 查询改写 (可选)    — LLM 消除指代歧义（利用会话历史上下文）
   → 多路检索 (可选)    — LLM 生成 2-4 个子查询
   → 向量检索          — pgvector cosine 相似度
   → BM25 检索 (可选)  — 稀疏检索 + RRF 融合
-  → 重排序   (可选)    — LLM 重新评分候选分块
+  → 重排序   (可选)    — LLM 重新评分候选分块（使用原始 query，非改写查询）
   → LLM 生成          — 带上下文生成答案 (SSE 流式)
 ```
+
+**管道入口规范化：** Pipeline.Execute 入口自动调用 `RAGOptions.Normalize()`，
+将零值字段（TopK/RouteCount/RerankCount）填充为默认值，避免 LIMIT 0 等异常行为。
+
+**llmClient 守卫：** LLM 辅助步骤（查询改写/多路检索/重排序）在 llmClient 为 nil 时静默跳过，
+不再 panic。适合纯检索测试或 LLM 不可用场景。
 
 ## 1. 创建会话
 

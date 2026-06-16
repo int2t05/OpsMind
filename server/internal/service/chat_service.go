@@ -142,11 +142,19 @@ func (s *ChatService) StreamChat(ctx context.Context, sessionID int64, question 
 		return nil, errcode.AppError{Code: errcode.ErrForbidden, Message: "无权访问该会话"}
 	}
 
-	// 加载历史消息
+	// 加载历史消息（用于 LLM 上下文 + RAG 查询改写消歧）
 	var history []adapter.ChatMessage
 	msgs, _ := s.chatRepo.FindMessagesBySession(sessionID)
 	for _, m := range msgs {
 		history = append(history, adapter.ChatMessage{Role: m.Role, Content: m.Content})
+	}
+
+	// 构建 RAG 查询改写所需的对话历史（格式：[]map[string]string）
+	var ragHistory []map[string]string
+	for _, m := range msgs {
+		if m.Role == "user" || m.Role == "assistant" {
+			ragHistory = append(ragHistory, map[string]string{"role": m.Role, "content": m.Content})
+		}
 	}
 
 	// RAG 管道选项：从 env 配置读取默认值
@@ -156,6 +164,7 @@ func (s *ChatService) StreamChat(ctx context.Context, sessionID int64, question 
 		MultiRoute:   s.ragDefaults.MultiRoute,
 		Hybrid:       s.ragDefaults.Hybrid,
 		Rerank:       s.ragDefaults.Rerank,
+		History:      ragHistory,
 	}
 
 	llmEvents, err := s.llmService.StreamChat(ctx, question, session.KBID, opts, history)
