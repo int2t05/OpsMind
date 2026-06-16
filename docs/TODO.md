@@ -58,9 +58,9 @@
 - ✅ [service/chat_service.go](/server/internal/service/chat_service.go) — ~~`FinalAnswer` 和流式各一次 LLM 调用~~ — `SyncChat`/`StreamChat` 各自一次。
 - ✅ [service/llm_service.go](/server/internal/service/llm_service.go) — ~~RAG 步骤事件未实时流式发送~~ — `executeRAG` 已接入 `onStep rag.StepCallback`，`StreamChat` 实时转换 `rag.StepEvent` 为 SSE step 事件。
 - ✅ [service/llm_service.go](/server/internal/service/llm_service.go) — ~~多轮对话历史无长度截断~~ — `buildMessages` 已实现滑动窗口截断，上限由 `maxHistoryMessages`（默认 10，环境变量 `OPSMIND_AI_MAX_HISTORY_MESSAGES`）控制。
-- 🟡⭐ [handler/chat.go](/server/internal/handler/chat.go) — SSE 响应头在 Flusher 检查前发送：`c.Status(200)` 在 188 行先于 Flusher 断言（190 行）。若不支持 SSE，客户端收到 `Content-Type: text/event-stream` 头 + JSON 错误体，不可解析。应调换顺序：先检查 Flusher，再写 SSE 头。
-- 🟡⭐ [service/chat_service.go](/server/internal/service/chat_service.go) — StreamChat done 持久化静默丢错：`UpdateSession`/`CreateBatch` 的 error 被 `_` 吞掉（167-180 行）。消息写入 DB 失败时用户看到完整回答，但刷新后消息丢失。
-- 🟡 [service/chat_service.go](/server/internal/service/chat_service.go) + [dto/request/chat.go](/server/internal/dto/request/chat.go) — 新 API 流失了前端 RAGOptions 通道：`SendMessageRequest` 仅含 `question`，RAG 选项全部硬编码 `true`（141-147 行）。前端高级设置面板无法控制管道步骤开关。📝 [API/chat.md](API/chat.md) 原文档记载 `rag_options` 但新接口未保留。
+- ✅ [handler/chat.go](/server/internal/handler/chat.go) — ~~SSE 响应头在 Flusher 检查前发送~~ — 已调换顺序：先检查 Flusher，再写 SSE 响应头。
+- ✅ [service/chat_service.go](/server/internal/service/chat_service.go) — ~~StreamChat done 持久化静默丢错~~ — `UpdateSession`/`CreateBatch` 失败时写入 `slog.Error`。
+- ✅ [service/chat_service.go](/server/internal/service/chat_service.go) + [config/](/server/internal/config/) — ~~RAG 选项硬编码~~ — 新增 `RAGDefaults` 结构体 + env 配置（`OPSMIND_AI_RAG_QUERY_REWRITE` 等 4 项），`ChatService.StreamChat` 从 `s.ragDefaults` 读取管道开关。
 - 🟢 [service/llm_service.go](/server/internal/service/llm_service.go) — 系统 prompt 硬编码在 `buildMessages`（329 行），不支持按知识库定制 AI 角色。
 
 ### RAG 管道

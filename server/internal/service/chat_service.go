@@ -6,6 +6,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -45,12 +46,21 @@ type chatPipeline interface {
 	Execute(ctx context.Context, query string, kbID int64, opts rag.RAGOptions, onStep rag.StepCallback) (*rag.RAGResult, error)
 }
 
+// RAGDefaults RAG 管道默认开关（从 env 配置读取）。
+type RAGDefaults struct {
+	TopK         int
+	QueryRewrite bool
+	MultiRoute   bool
+	Hybrid       bool
+	Rerank       bool
+}
+
 // ChatService 智能问答服务。
 //
 // knowledgeRepo/chatRepo/pipeline 使用接口类型，便于测试 mock。
 // llmService 统一管理 RAG+LLM 调用编排（流式）。
 type ChatService struct {
-	defaultTopK   int
+	ragDefaults   RAGDefaults
 	knowledgeRepo chatKnowledgeRepo
 	chatRepo      chatSessionRepo
 	pipeline      chatPipeline
@@ -60,16 +70,16 @@ type ChatService struct {
 // NewChatService 创建 ChatService 实例。
 //
 // llmService 可以为 nil（测试或降级场景）。
-func NewChatService(knowledgeRepo chatKnowledgeRepo, chatRepo chatSessionRepo, pipeline chatPipeline, llmService *LLMService, defaultTopK int) *ChatService {
-	if defaultTopK <= 0 {
-		defaultTopK = 5
+func NewChatService(knowledgeRepo chatKnowledgeRepo, chatRepo chatSessionRepo, pipeline chatPipeline, llmService *LLMService, ragDefaults RAGDefaults) *ChatService {
+	if ragDefaults.TopK <= 0 {
+		ragDefaults.TopK = 5
 	}
 	return &ChatService{
 		knowledgeRepo: knowledgeRepo,
 		chatRepo:      chatRepo,
 		pipeline:      pipeline,
 		llmService:    llmService,
-		defaultTopK:   defaultTopK,
+		ragDefaults:   ragDefaults,
 	}
 }
 
@@ -138,12 +148,14 @@ func (s *ChatService) StreamChat(ctx context.Context, sessionID int64, question 
 	for _, m := range msgs {
 		history = append(history, adapter.ChatMessage{Role: m.Role, Content: m.Content})
 	}
+
+	// RAG 管道选项：从 env 配置读取默认值
 	opts := rag.RAGOptions{
-		TopK:         s.defaultTopK,
-		QueryRewrite: true,
-		MultiRoute:   true,
-		Hybrid:       true,
-		Rerank:       true,
+		TopK:         s.ragDefaults.TopK,
+		QueryRewrite: s.ragDefaults.QueryRewrite,
+		MultiRoute:   s.ragDefaults.MultiRoute,
+		Hybrid:       s.ragDefaults.Hybrid,
+		Rerank:       s.ragDefaults.Rerank,
 	}
 
 	llmEvents, err := s.llmService.StreamChat(ctx, question, session.KBID, opts, history)
@@ -165,20 +177,24 @@ func (s *ChatService) StreamChat(ctx context.Context, sessionID int64, question 
 				srcJSON, _ := json.Marshal(evt.Metadata.Sources)
 
 				// 更新会话摘要
-				_ = s.chatRepo.UpdateSession(&model.ChatSession{
+				if err := s.chatRepo.UpdateSession(&model.ChatSession{
 					ID:         sessionID,
 					Answer:     evt.Metadata.Answer,
 					Sources:    srcJSON,
 					Confidence: evt.Metadata.Confidence,
 					DurationMs: evt.Metadata.DurationMS,
-				})
+				}); err != nil {
+					slog.Error("StreamChat 更新会话失败", "session_id", sessionID, "err", err)
+				}
 
 				// 持久化消息（user + assistant）
-				_ = s.chatRepo.CreateBatch([]model.ChatMessage{
+				if err := s.chatRepo.CreateBatch([]model.ChatMessage{
 					{Role: "user", Content: question, SessionID: sessionID},
 					{Role: "assistant", Content: evt.Metadata.Answer, SessionID: sessionID,
 						Sources: srcJSON, Confidence: evt.Metadata.Confidence},
-				})
+				}); err != nil {
+					slog.Error("StreamChat 持久化消息失败", "session_id", sessionID, "err", err)
+				}
 
 				evt.Metadata.SessionID = sessionID
 				evt.Metadata.Question = question

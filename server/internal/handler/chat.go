@@ -180,18 +180,18 @@ func (h *ChatHandler) StreamChatMessage(c *gin.Context) {
 	userID, _ := getCurrentUserID(c)
 	ctx := c.Request.Context()
 
+	flusher, ok := c.Writer.(http.Flusher)
+	if !ok {
+		response.Error(c, errcode.ErrUnknown, "当前服务器不支持 SSE 流式输出")
+		return
+	}
+
 	// 设置 SSE 响应头
 	c.Header("Content-Type", "text/event-stream")
 	c.Header("Cache-Control", "no-cache")
 	c.Header("Connection", "keep-alive")
 	c.Header("X-Accel-Buffering", "no")
 	c.Status(http.StatusOK)
-
-	flusher, ok := c.Writer.(http.Flusher)
-	if !ok {
-		response.Error(c, errcode.ErrUnknown, "当前服务器不支持 SSE 流式输出")
-		return
-	}
 
 	eventCh, err := h.svc.StreamChat(ctx, sessionID, req.Question, userID)
 	if err != nil {

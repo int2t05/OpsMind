@@ -93,12 +93,16 @@ type EmbeddingConfig struct {
 
 // AIConfig 是 AI 问答相关配置。
 //
-// ConfidenceThreshold 控制 RAG 检索置信度阈值，
-// 低于此阈值的问答结果会引导用户提交申告（can_submit_ticket=true）。
+// RAG 管道步骤可通过 rag_* 开关单独控制，均默认启用。
+// ConfidenceThreshold 低于此阈值的问答结果会引导用户提交申告（can_submit_ticket=true）。
 type AIConfig struct {
-	DefaultTopK          int     `mapstructure:"default_top_k"`
-	ConfidenceThreshold  float64 `mapstructure:"confidence_threshold"`
-	MaxHistoryMessages   int     `mapstructure:"max_history_messages"` // 多轮对话历史消息数上限（默认 10，即最近 5 轮 Q&A）
+	DefaultTopK         int     `mapstructure:"default_top_k"`
+	ConfidenceThreshold float64 `mapstructure:"confidence_threshold"`
+	MaxHistoryMessages  int     `mapstructure:"max_history_messages"`
+	RAGQueryRewrite     bool    `mapstructure:"rag_query_rewrite"`
+	RAGMultiRoute       bool    `mapstructure:"rag_multi_route"`
+	RAGHybrid           bool    `mapstructure:"rag_hybrid"`
+	RAGRerank           bool    `mapstructure:"rag_rerank"`
 }
 
 // Load 加载配置文件并应用环境变量覆盖。
@@ -196,6 +200,10 @@ func bindEnvs(v *viper.Viper) {
 	v.BindEnv("ai.default_top_k", "OPSMIND_AI_DEFAULT_TOP_K")
 	v.BindEnv("ai.confidence_threshold", "OPSMIND_AI_CONFIDENCE_THRESHOLD")
 	v.BindEnv("ai.max_history_messages", "OPSMIND_AI_MAX_HISTORY_MESSAGES")
+	v.BindEnv("ai.rag_query_rewrite", "OPSMIND_AI_RAG_QUERY_REWRITE")
+	v.BindEnv("ai.rag_multi_route", "OPSMIND_AI_RAG_MULTI_ROUTE")
+	v.BindEnv("ai.rag_hybrid", "OPSMIND_AI_RAG_HYBRID")
+	v.BindEnv("ai.rag_rerank", "OPSMIND_AI_RAG_RERANK")
 
 	// CORS
 	v.BindEnv("cors.allow_origins", "OPSMIND_CORS_ALLOW_ORIGINS")
@@ -241,6 +249,11 @@ func setDefaults(v *viper.Viper) {
 	// AI
 	v.SetDefault("ai.default_top_k", 5)
 	v.SetDefault("ai.confidence_threshold", 0.6)
+	v.SetDefault("ai.max_history_messages", 10)
+	v.SetDefault("ai.rag_query_rewrite", true)
+	v.SetDefault("ai.rag_multi_route", true)
+	v.SetDefault("ai.rag_hybrid", true)
+	v.SetDefault("ai.rag_rerank", true)
 
 	// CORS
 	v.SetDefault("cors.allow_origins", "http://localhost:5173")
