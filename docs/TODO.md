@@ -58,6 +58,10 @@
 - ✅ [service/chat_service.go](/server/internal/service/chat_service.go) — ~~`FinalAnswer` 和流式各一次 LLM 调用~~ — `SyncChat`/`StreamChat` 各自一次。
 - ✅ [service/llm_service.go](/server/internal/service/llm_service.go) — ~~RAG 步骤事件未实时流式发送~~ — `executeRAG` 已接入 `onStep rag.StepCallback`，`StreamChat` 实时转换 `rag.StepEvent` 为 SSE step 事件。
 - ✅ [service/llm_service.go](/server/internal/service/llm_service.go) — ~~多轮对话历史无长度截断~~ — `buildMessages` 已实现滑动窗口截断，上限由 `maxHistoryMessages`（默认 10，环境变量 `OPSMIND_AI_MAX_HISTORY_MESSAGES`）控制。
+- 🟡⭐ [handler/chat.go](/server/internal/handler/chat.go) — SSE 响应头在 Flusher 检查前发送：`c.Status(200)` 在 188 行先于 Flusher 断言（190 行）。若不支持 SSE，客户端收到 `Content-Type: text/event-stream` 头 + JSON 错误体，不可解析。应调换顺序：先检查 Flusher，再写 SSE 头。
+- 🟡⭐ [service/chat_service.go](/server/internal/service/chat_service.go) — StreamChat done 持久化静默丢错：`UpdateSession`/`CreateBatch` 的 error 被 `_` 吞掉（167-180 行）。消息写入 DB 失败时用户看到完整回答，但刷新后消息丢失。
+- 🟡 [service/chat_service.go](/server/internal/service/chat_service.go) + [dto/request/chat.go](/server/internal/dto/request/chat.go) — 新 API 流失了前端 RAGOptions 通道：`SendMessageRequest` 仅含 `question`，RAG 选项全部硬编码 `true`（141-147 行）。前端高级设置面板无法控制管道步骤开关。📝 [API/chat.md](API/chat.md) 原文档记载 `rag_options` 但新接口未保留。
+- 🟢 [service/llm_service.go](/server/internal/service/llm_service.go) — 系统 prompt 硬编码在 `buildMessages`（329 行），不支持按知识库定制 AI 角色。
 
 ### RAG 管道
 
@@ -70,7 +74,6 @@
 - 🟡 [rag/multi_route.go](/server/internal/rag/multi_route.go) — LLM 输出子查询的清洗逻辑脆弱（`TrimLeft` 依赖特定前缀格式）
 - 🟡⭐ [rag/multi_route.go](/server/internal/rag/multi_route.go) — k（子查询数量）无上限，k=100 可致百倍检索放大
 - 🟡 [rag/hybrid.go](/server/internal/rag/hybrid.go) — 单路结果直接返回时未按 topK 截断
-- 🟡 [service/chat_service.go](/server/internal/service/chat_service.go) — 前端 RAGOptions 完全被忽略：`CreateChatSession` 硬编码全部 `true`，高级设置表单无效。📝 [PRD.md §3.1](PRD.md) 记载「每个步骤可独立开关（`rag_options`）」但代码未实现。
 - 🟡 [rag/types.go](/server/internal/rag/types.go) — RAGOptions 使用裸 `bool`，零值问题致空 JSON `{}` 全部禁用，与文档默认「全部启用」矛盾
 - 🟡 [rag/types.go](/server/internal/rag/types.go) — `RetrievalResult.Score` 文档注释称「归一化到 [0,1]」，但 BM25 分数无边界，RRF 融合后可 >1。注释与实现不一致。
 - 🟢 [rag/rerank.go](/server/internal/rag/rerank.go) — `_ = i` 调试残留（第 79 行），无实际用途
