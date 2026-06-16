@@ -126,6 +126,10 @@ func (p *Processor) Stop() {
 func (p *Processor) worker(id int) {
 	defer p.wg.Done()
 
+	// TODO(rag/processor): worker 无 panic recovery——若 processTask 发生 panic，
+	// goroutine 直接退出，poolSize 减小。应加 recover() 并记录错误后继续。
+	// TODO(rag/processor): 所有任务共用 p.ctx，单个任务无独立超时——卡住的下载/embedding
+	// 会永久占用 worker goroutine。应给每个 task 派生带超时的子 context。
 	for task := range p.taskCh {
 		p.processTask(task)
 	}

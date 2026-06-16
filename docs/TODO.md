@@ -48,49 +48,92 @@
 
 > 对应图：[chat-rag-flow.md](diagrams/chat-rag-flow.md) — SSE 流式 → Pipeline 执行 → 多路检索 → 混合融合 → 重排序 → LLM 生成
 > 对应文档：[API/chat.md](API/chat.md)
+> 深度审计日期：2026-06-16 — 覆盖 pipeline / query_rewrite / multi_route / hybrid / bm25 / rerank / chunker / embedder / processor / document_parser / retriever / embedding_client / llm_service 共 13 个文件
 
 ### SSE 流式输出（核心路径）
 
-- ✅ [handler/chat.go](/server/internal/handler/chat.go) + [service/llm_service.go](/server/internal/service/llm_service.go) — ~~**流式答案与存储答案不一致**~~ — 已通过 LLMService 重构为单次 LLM 调用：RAG 检索 → prompt 构建 → `ChatCompletionStream` 流式输出，用户看到的 token 与存入 DB 的答案完全一致。
-- ✅ [handler/chat.go](/server/internal/handler/chat.go) — ~~SSE 流中 LLM 错误被静默吞掉~~ — StreamEvent 支持 `type: "error"` 事件，LLM 中断时前端可感知。
-- ✅ [handler/chat.go](/server/internal/handler/chat.go) — ~~模拟流式先完整生成再 SSE 输出~~ — 已改为真实的 `ChatCompletionStream` token 级流式，LLMService 统一编排。
-- ✅ [service/chat_service.go](/server/internal/service/chat_service.go) — ~~`FinalAnswer` 和流式各一次 LLM 调用~~ — `CreateChatSession` 走 `SyncChat`，`StreamChat` 走 `StreamChat`，各自一次调用。
+- ✅ [handler/chat.go](/server/internal/handler/chat.go) + [service/llm_service.go](/server/internal/service/llm_service.go) — ~~**流式答案与存储答案不一致**~~ — 已通过 LLMService 重构为单次 LLM 调用。
+- ✅ [handler/chat.go](/server/internal/handler/chat.go) — ~~SSE 流中 LLM 错误被静默吞掉~~ — StreamEvent 支持 `type: "error"` 事件。
+- ✅ [handler/chat.go](/server/internal/handler/chat.go) — ~~模拟流式先完整生成再 SSE 输出~~ — 已改为真实 `ChatCompletionStream`。
+- ✅ [service/chat_service.go](/server/internal/service/chat_service.go) — ~~`FinalAnswer` 和流式各一次 LLM 调用~~ — `SyncChat`/`StreamChat` 各自一次。
+- 🟡⭐ [service/llm_service.go](/server/internal/service/llm_service.go) — RAG 步骤事件未实时流式发送：`executeRAG` 传 `nil` StepCallback，前端看不到 query_rewrite/multi_route/vector_retrieve/bm25_retrieve/hybrid_fuse/rerank 进度，仅看到最终的 `llm_generate` 步骤。
+- 🟡⭐ [service/llm_service.go](/server/internal/service/llm_service.go) — 多轮对话历史无长度截断：`buildMessages` 直接注入全部 history，20+ 轮对话时 history + RAG context + question 可超出 LLM 上下文窗口。
 
 ### RAG 管道
 
 - 🔴 [rag/pipeline.go](/server/internal/rag/pipeline.go) — `llmClient` 为 nil 时，QueryRewrite/MultiRoute/Rerank 会 panic（nil 指针解引用）
 - 🔴⭐ [rag/rerank.go](/server/internal/rag/rerank.go) — 重排序 prompt 无长度截断：候选 chunk 全量拼接，可超出 LLM 上下文窗口致 400 错误
 - 🟡 [rag/pipeline.go](/server/internal/rag/pipeline.go) — QueryRewrite 的 history 始终为 nil，上下文消歧功能未生效
-- 🟡 [rag/pipeline.go](/server/internal/rag/pipeline.go) — 重排序候选过多时应提前截断，减少 token 消耗和延迟
+- 🟡 [rag/pipeline.go](/server/internal/rag/pipeline.go) — 重排序候选过多时应提前截断：Rerank 在重排**前**未按 `RerankCount` 截断候选列表；事后检查（第 207 行）为时已晚
+- 🟡 [rag/pipeline.go](/server/internal/rag/pipeline.go) — Execute 缺少入口 opts 规范化：TopK=0 → LIMIT 0，RouteCount=0 → 多路检索跳过，与「零值使用默认」注释不一致
 - 🟡 [rag/query_rewrite.go](/server/internal/rag/query_rewrite.go) — llm 为 nil 时应降级返回原 query，而非 panic
-- 🟡 [rag/multi_route.go](/server/internal/rag/multi_route.go) — LLM 输出子查询的清洗逻辑脆弱（正则匹配依赖特定格式）
+- 🟡 [rag/multi_route.go](/server/internal/rag/multi_route.go) — LLM 输出子查询的清洗逻辑脆弱（`TrimLeft` 依赖特定前缀格式）
 - 🟡⭐ [rag/multi_route.go](/server/internal/rag/multi_route.go) — k（子查询数量）无上限，k=100 可致百倍检索放大
 - 🟡 [rag/hybrid.go](/server/internal/rag/hybrid.go) — 单路结果直接返回时未按 topK 截断
 - 🟡 [service/chat_service.go](/server/internal/service/chat_service.go) — 前端 RAGOptions 完全被忽略：`CreateChatSession` 硬编码全部 `true`，高级设置表单无效。📝 [PRD.md §3.1](PRD.md) 记载「每个步骤可独立开关（`rag_options`）」但代码未实现。
 - 🟡 [rag/types.go](/server/internal/rag/types.go) — RAGOptions 使用裸 `bool`，零值问题致空 JSON `{}` 全部禁用，与文档默认「全部启用」矛盾
+- 🟡 [rag/types.go](/server/internal/rag/types.go) — `RetrievalResult.Score` 文档注释称「归一化到 [0,1]」，但 BM25 分数无边界，RRF 融合后可 >1。注释与实现不一致。
+- 🟢 [rag/rerank.go](/server/internal/rag/rerank.go) — `_ = i` 调试残留（第 79 行），无实际用途
+- 🟢 [rag/pipeline.go](/server/internal/rag/pipeline.go) — 步骤 ID 拼写不一致：`vector_retrieve`（pipeline）vs `vector_retrieval`（retriever 注释/docs）
+- 🟢 [service/chat_service.go](/server/internal/service/chat_service.go) — `pipeline` 字段为死存储：ChatService 通过 LLMService 间接使用 pipeline，自身不再直接调用 `pipeline.Execute`
 
 ### BM25 检索
 
 - 🟡 [rag/bm25.go](/server/internal/rag/bm25.go) — 超 10 万篇后内存 map 压力大，应考虑分片或磁盘索引
 - 🟡 [rag/bm25.go](/server/internal/rag/bm25.go) — BuildIndex 同步分词，请求路径调用造成长尾延迟
 - 🟡 [rag/bm25.go](/server/internal/rag/bm25.go) — LoadDict 错误被丢弃，分词器静默回退到字符级切分
+- 🟡 [rag/bm25.go](/server/internal/rag/bm25.go) — 缺少 token 过滤（停用词/标点/过短/空白），低质量 token 污染评分
+- 🟡 [rag/bm25.go](/server/internal/rag/bm25.go) — topK <= 0 时返回空结果，管线误判为「无检索结果」
+
+### Embedding 与向量检索
+
+- 🟡 [rag/embedder.go](/server/internal/rag/embedder.go) — 部分批次失败静默跳过，破坏 `vectors[i]` 与 `texts[i]` 的索引对应关系。调用方检测长度不匹配后全量失败，浪费之前成功的批次。
+- 🟡 [rag/embedder.go](/server/internal/rag/embedder.go) — 批次失败仅计数不记错误信息，调试困难
+- 🟡 [rag/embedder.go](/server/internal/rag/embedder.go) — 不校验各批次的 embedding 维度一致性，若中途模型变更可致混维向量写入 pgvector 报错
+- 🟡 [rag/embedder.go](/server/internal/rag/embedder.go) — `client` 为 nil 时不校验——构造函数无防护，首次 `Embed` 调用才 panic
+- 🟡 [adapter/vector_store.go](/server/internal/adapter/vector_store.go) — `BatchInsert` 无跨 chunk 维度一致性校验，维度不匹配时 pgvector 报错不友好
+- 🟡 [adapter/vector_store.go](/server/internal/adapter/vector_store.go) — `CosineSearch` 无 topK 范围和空 embedding 防护
+- 🟡 [adapter/vector_store.go](/server/internal/adapter/vector_store.go) — NaN/Inf 用 `> 1e30` 检测而非 `math.IsInf`；静默替换为 0.0 污染向量空间
+
+### 文档处理（chunker / parser / processor）
+
+- 🟡 [rag/chunker.go](/server/internal/rag/chunker.go) — `mergeSplits` 未实现 chunkOverlap：仅 `splitByRunes` 支持 overlap，段落/句子级切分后相邻 chunk 无重叠
+- 🟡 [rag/chunker.go](/server/internal/rag/chunker.go) — 分块前未做文本归一化（全角→半角、多余空白合并），影响 BM25 分词品质和 embedding 稳定性
+- 🟡 [rag/document_parser.go](/server/internal/rag/document_parser.go) — PDF 二进制字节被 `string(b)` 转换破坏：非 UTF-8 字节在 Go string 往返中损坏。应使用 `bytes.NewReader(b)`。
+- 🟡 [rag/document_parser.go](/server/internal/rag/document_parser.go) — DOCX 解析只读 `<w:t>` 元素，丢弃表格/超链接/页眉页脚
+- 🟡 [rag/document_parser.go](/server/internal/rag/document_parser.go) — DOCX XML 命名空间硬编码，非标准 Office 软件生成的 docx 可能返回空内容（无报错）
+- 🟡 [rag/document_parser.go](/server/internal/rag/document_parser.go) — PDF 单页解析失败静默跳过，用户收到部分内容无告警
+- 🔴 [rag/processor.go](/server/internal/rag/processor.go) — Stop 后 Submit 会 panic（向已关闭 channel 发送）；Stop 非幂等（两次 close 同一 channel panic）
+- 🔴 [rag/processor.go](/server/internal/rag/processor.go) — embedding 模型硬编码为空字符串 `""`，应从 KB 配置读取
+- 🟡 [rag/processor.go](/server/internal/rag/processor.go) — worker 无 panic recovery：processTask 崩溃导致 goroutine 退出，poolSize 永久减小
+- 🟡 [rag/processor.go](/server/internal/rag/processor.go) — 所有任务共用 `p.ctx`，单个任务无独立超时——卡住的下载/embedding 永久占用 worker
+- 🟢 [rag/processor.go](/server/internal/rag/processor.go) — `updateStatus("indexing")` 调用两次，前端可能收到重复进度事件
 
 ### 置信度与数据完整性
 
 - 🟡 [service/chat_service.go](/server/internal/service/chat_service.go) — 置信度算法粗糙：直接取 max(chunk.Score)，但 BM25 和 RRF 分数量纲不同
-- ✅ [service/chat_service.go](/server/internal/service/chat_service.go) — ~~Sources（检索引用）未写入~~ — `CreateChatSession` 和 `StreamChat` 均已通过 `json.Marshal(sources)` 写入 `session.Sources` 字段。
+- ✅ [service/chat_service.go](/server/internal/service/chat_service.go) — ~~Sources（检索引用）未写入~~ — 已修复。
 - 🔴 [service/chat_service.go](/server/internal/service/chat_service.go) — `CreateChatSession` 用 `context.Background` 不传播请求取消
-- 🟡 [service/chat_service.go](/server/internal/service/chat_service.go) — `GetChatDetail` 未校验 `session.UserID` 归属，任意用户可通过猜测 ID 查看他人对话
-- ✅ [repository/chat_repo.go](/server/internal/repository/chat_repo.go) — ~~`CreateBatch` 零调用方~~ — 多轮对话重构后 `CreateChatSession` 和 `StreamChat` 均调用 `CreateBatch` 持久化 user+assistant 消息。
-- 🟢⭐ [model/chat.go](/server/internal/model/chat.go) — `ChatMessage.SessionID` 缺少索引。`FindMessagesBySession` 查询按 session_id 过滤，高并发时全表扫描风险。需 `CREATE INDEX idx_chat_messages_session ON chat_messages(session_id)`。
+- 🟡 [service/chat_service.go](/server/internal/service/chat_service.go) — `GetChatDetail` 未校验 `session.UserID` 归属
+- ✅ [repository/chat_repo.go](/server/internal/repository/chat_repo.go) — ~~`CreateBatch` 零调用方~~ — 已修复。
+- 🟢 [model/chat.go](/server/internal/model/chat.go) — `ChatMessage.SessionID` 缺少索引。需 `CREATE INDEX idx_chat_messages_session ON chat_messages(session_id)`。
 
 ### 文档一致性
 
-- 📝⭐ [API/chat.md](API/chat.md) — SSE `done` 事件文档记载含 `metadata.pipeline.steps[]` 及 `total_duration_ms`，但 `CreateChatSession` 未填充 `Pipeline` 字段，前端收到的 metadata 中 pipeline 永远为空。
+- 📝⭐ [API/chat.md](API/chat.md) — SSE `done` 事件文档记载含 `metadata.pipeline.steps[]` 及 `total_duration_ms`，但 `CreateChatSession` 未填充 `Pipeline` 字段。
+- 🟢 [rag/pipeline.go](/server/internal/rag/pipeline.go) — StepMetric 文档注释中步骤 ID `hybrid_retrieve` 不存在于代码中（实际拆分为 `vector_retrieve` + `bm25_retrieve` + `hybrid_fuse`）
 
 ### 输入校验
 
 - 🟢 [dto/request/chat.go](/server/internal/dto/request/chat.go) — Question 字段缺少 `max` 绑定，可发送 MB 级文本直入管道和 LLM
+- 🟢 [dto/request/chat.go](/server/internal/dto/request/chat.go) — RAGOptions 缺少 `route_count`/`rerank_count` 字段，与 `rag.RAGOptions` 类型不同步
+
+### 服务层集成
+
+- 🟡 [service/chat_service.go](/server/internal/service/chat_service.go) — `SubmitFeedback` 校验 feedback 值为 0/1/2 的规则应在 Service 层而非仅 Handler 层
+- 🟡 [cmd/main.go](/server/cmd/main.go) — config.yaml 的 LLM 模型未同步到 `LLMConfigManager` 作为 fallback。DB 无配置时 `getModelConfig()` 回退到 `model="default"`，忽略 `cfg.LLM.Model`
+- 🟢 [cmd/main.go](/server/cmd/main.go) — BM25 索引 TTL 30 分钟，新发布的知识文章在 BM25 检索中最多延迟 30 分钟可见
+- 🟢 [cmd/main.go](/server/cmd/main.go) — Processor goroutine pool 仅 2 个 worker，大量文档上传时排队
 
 ---
 ## 3. 知识库与文档管理
@@ -462,7 +505,7 @@
 | 业务流程 | 🔴 P0 | 🟡 P1 | 🟢 P2 | 合计 |
 |----------|-------|-------|-------|------|
 | 1. 认证与授权 | 0 | 0 | 1 | 1 |
-| 2. 智能问答 RAG | 3 | 15 | 5+1📝 | 23(-4) |
+| 2. 智能问答 RAG | 5 | 36 | 14+1📝 | 55(+32) |
 | 3. 知识库与文档管理 | 5 | 16+2📝 | 6 | 27(+2) |
 | 4. 申告管理 | 5 | 6+1📝 | 2 | 12(+1) |
 | 5. 用户与角色管理 | 2 | 9 | 4 | 15 |
@@ -472,7 +515,7 @@
 | 9. 前端架构与交互 | 4 | 18 | 6 | 28(+2) |
 | 10. 整表空数据 | 3 | 1 | 0 | 4 |
 | 11. TODO ↔ 文档双向一致性 | — | — | — | (新增) |
-| **合计** | **56** | **92** | **34+7📝** | **182** |
+| **合计** | **56** | **113** | **42+7📝** | **211** |
 
 > ⭐ 标记项为 2026-06-15 再审计新发现问题（共 22 项，含 5 项 P0，5 项 📝 文档一致性缺陷）。
 > 📝 标记项为代码实现与 API 文档/PRD/TECH.md 不一致的文档缺陷（共 8 项）。
@@ -500,4 +543,4 @@
 19. 上传 API 字段名与文档不一致（文档 `files` vs 代码 `file`）
 
 ---
-**最后更新**：2026-06-16（SSE 流式输出重构：新增 LLMService 统一编排 RAG+LLM，修复流式/存储答案不一致 P0。5 项 ✅ 已修复。）
+**最后更新**：2026-06-16（RAG 模块深度审计：覆盖 pipeline/query_rewrite/multi_route/hybrid/bm25/rerank/chunker/embedder/processor/document_parser/retriever/embedding_client/llm_service 共 13 个文件，§2 扩容至 55 项）

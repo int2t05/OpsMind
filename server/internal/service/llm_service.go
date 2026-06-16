@@ -293,8 +293,11 @@ func (s *LLMService) executeRAG(ctx context.Context, question string, kbID int64
 	var steps []ChatPipelineStep
 	start := time.Now()
 
-	// StepCallback 将 RAG 步骤事件转为 pipeline steps（管道内部处理），
-	// 在 StreamChat 路径中不做额外 SSE 发送——step 事件在 StreamChat 的 goroutine 中统一管理。
+	// TODO(llm_service): 当前 executeRAG 传 nil StepCallback，RAG 步骤事件（query_rewrite/multi_route/
+	// vector_retrieve/bm25_retrieve/hybrid_fuse/rerank）从未发送给前端。应在 StreamChat 中接入回调，
+	// 将 rag.StepEvent 转为 StreamEvent{Type:"step"} 实时推送。
+	// TODO(llm_service): buildMessages 注入历史消息无长度截断。多轮对话 20+ 轮时，
+	// history + RAG context + question 可能超出 LLM 上下文窗口。应实现滑动窗口或 token 计数截断。
 	result, err := s.pipeline.Execute(ctx, question, kbID, opts, nil)
 	if err != nil {
 		return nil, nil, fmt.Errorf("知识检索失败: %w", err)

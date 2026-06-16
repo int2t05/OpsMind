@@ -197,6 +197,8 @@ func (s *ChatService) CreateChatSession(req request.CreateChatRequest, userID in
 // SubmitFeedback 提交问答反馈。
 func (s *ChatService) SubmitFeedback(sessionID int64, feedback int16) error {
 	// TODO(service/chat): 校验 feedback 只能是 0/1/2 的规则应放在 Service 层。
+	// TODO(service/chat): ChatService.pipeline 字段为死存储——ChatService 通过 LLMService 间接使用 pipeline，
+	// 自身不再直接调用 pipeline.Execute。可移除该字段简化构造。
 	// Handler 已校验但其他调用方或测试替身仍可能绕过。
 	if s.chatRepo == nil {
 		return errcode.AppError{Code: errcode.ErrUnknown, Message: "服务未初始化"}
