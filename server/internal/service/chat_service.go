@@ -1,7 +1,12 @@
 // Package service 实现智能问答业务逻辑。
 //
 // ChatService 使用自建 RAG Pipeline（查询改写→多路检索→混合检索→重排序）
-// 和 LLMClient 进行知识增强问答生成，支持 SSE 流式输出。
+// 和 LLMService 进行知识增强问答生成，支持 SSE 流式输出。
+//
+// 会话与对话分离设计：
+// CreateSession 仅创建会话容器，不触发 LLM。StreamChat 在已有会话中
+// 发送消息并流式返回 AI 答案。这样的好处是职责单一、前端可灵活控制
+// 会话生命周期（如先创建会话占位，再异步发送消息）。
 package service
 
 import (
@@ -49,7 +54,7 @@ type chatPipeline interface {
 // ChatService 智能问答服务。
 //
 // knowledgeRepo/chatRepo/pipeline 使用接口类型，便于测试 mock。
-// llmService 统一管理 RAG+LLM 调用编排（流式/非流式）。
+// llmService 统一管理 RAG+LLM 调用编排（流式）。
 type ChatService struct {
 	defaultTopK   int
 	knowledgeRepo chatKnowledgeRepo
@@ -75,46 +80,77 @@ func NewChatService(knowledgeRepo chatKnowledgeRepo, chatRepo chatSessionRepo, p
 }
 
 // =============================================================================
-// CreateChatSession
+// CreateSession — 创建会话容器
 // =============================================================================
 
-// CreateChatSession 使用 RAG 管道 + LLM 创建问答会话。
+// CreateSession 创建问答会话（仅创建容器，不含 LLM 调用）。
 //
-// 支持多轮对话：req.SessionID > 0 时加载历史消息作为上下文，
-// 并追加新消息到已有会话。
-//
-// 流程：
-//  1. 校验参数 + 加载历史（多轮时）
-//  2. LLMService.SyncChat（含历史上下文）
-//  3. 保存/复用会话 + 持久化 user+assistant 消息
-func (s *ChatService) CreateChatSession(req request.CreateChatRequest, userID int64) (*ChatSessionResponse, error) {
-	if strings.TrimSpace(req.Question) == "" {
-		return nil, errcode.AppError{Code: errcode.ErrParam, Message: "问题不能为空"}
+// 为什么创建和对话分开：前端先创建会话获得 sessionID，
+// 再通过 StreamChat 发送消息。职责分离使会话生命周期可控，
+// 也避免了非流式端点中 LLM 调用超时阻塞 HTTP 请求的问题。
+func (s *ChatService) CreateSession(req request.CreateSessionRequest, userID int64) (*model.ChatSession, error) {
+	if s.knowledgeRepo != nil {
+		if _, err := s.knowledgeRepo.FindKBByID(req.KBID); err != nil {
+			return nil, errcode.AppError{Code: errcode.ErrNotFound, Message: "知识库不存在"}
+		}
 	}
-	if s.knowledgeRepo == nil {
-		return nil, errcode.AppError{Code: errcode.ErrAIUnavailable, Message: fallbackAIUnavailable}
-	}
-	_, err := s.knowledgeRepo.FindKBByID(req.KBID)
-	if err != nil {
-		return nil, errcode.AppError{Code: errcode.ErrNotFound, Message: "知识库不存在"}
+	if s.chatRepo == nil {
+		return nil, errcode.AppError{Code: errcode.ErrUnknown, Message: "服务未初始化"}
 	}
 
-	// 多轮对话：加载历史消息
+	title := strings.TrimSpace(req.Title)
+	if title == "" {
+		title = "新会话"
+	}
+
+	session := &model.ChatSession{
+		UserID:   userID,
+		KBID:     req.KBID,
+		Question: title,
+	}
+	if err := s.chatRepo.Create(session); err != nil {
+		return nil, errcode.AppError{Code: errcode.ErrUnknown, Message: "创建会话失败"}
+	}
+
+	return session, nil
+}
+
+// =============================================================================
+// StreamChat — 流式对话（在已有会话中）
+// =============================================================================
+
+// StreamChat 在已有会话中发送消息并以流式事件通道返回 AI 答案。
+//
+// 会话必须已通过 CreateSession 创建。历史消息自动加载并注入 LLM 上下文。
+// 流的 done 事件触发时，自动持久化 user+assistant 消息到 chat_messages 表，
+// 并更新 chat_sessions 的 answer/confidence/duration_ms 字段。
+//
+// 单次 LLM 调用：用户看到的 token 与存入 DB 的答案完全一致。
+func (s *ChatService) StreamChat(ctx context.Context, sessionID int64, question string, userID int64) (<-chan StreamEvent, error) {
+	if strings.TrimSpace(question) == "" {
+		return nil, errcode.AppError{Code: errcode.ErrParam, Message: "问题不能为空"}
+	}
+	if s.llmService == nil {
+		return nil, errcode.AppError{Code: errcode.ErrAIUnavailable, Message: fallbackAIUnavailable}
+	}
+	if s.chatRepo == nil {
+		return nil, errcode.AppError{Code: errcode.ErrUnknown, Message: "服务未初始化"}
+	}
+
+	// 加载会话并校验归属
+	session, err := s.chatRepo.FindByID(sessionID)
+	if err != nil {
+		return nil, errcode.AppError{Code: errcode.ErrNotFound, Message: "会话不存在"}
+	}
+	if session.UserID != userID {
+		return nil, errcode.AppError{Code: errcode.ErrForbidden, Message: "无权访问该会话"}
+	}
+
+	// 加载历史消息
 	var history []adapter.ChatMessage
-	var session *model.ChatSession
-	isMultiTurn := req.SessionID > 0 && s.chatRepo != nil
-	if isMultiTurn {
-		session, err = s.chatRepo.FindByID(req.SessionID)
-		if err != nil {
-			return nil, errcode.AppError{Code: errcode.ErrNotFound, Message: "会话不存在"}
-		}
-		if session.UserID != userID {
-			return nil, errcode.AppError{Code: errcode.ErrForbidden, Message: "无权访问该会话"}
-		}
-		msgs, _ := s.chatRepo.FindMessagesBySession(req.SessionID)
-		for _, m := range msgs {
-			history = append(history, adapter.ChatMessage{Role: m.Role, Content: m.Content})
-		}
+	msgs, _ := s.chatRepo.FindMessagesBySession(sessionID)
+	for _, m := range msgs {
+		history = append(history, adapter.ChatMessage{Role: m.Role, Content: m.Content})
 	}
 
 	opts := rag.RAGOptions{
@@ -125,69 +161,52 @@ func (s *ChatService) CreateChatSession(req request.CreateChatRequest, userID in
 		Rerank:       true,
 	}
 
-	var answer string
-	var sources []response.SourceItem
-	var confidence float64
-	var pipeMeta *ChatPipelineMeta
-	durationMS := 0
-
-	if s.llmService != nil {
-		// TODO(service/chat): 接收 context.Context 参数。
-		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
-		defer cancel()
-
-		start := time.Now()
-		result, syncErr := s.llmService.SyncChat(ctx, req.Question, req.KBID, opts, history)
-		durationMS = int(time.Since(start).Milliseconds())
-		if syncErr != nil {
-			return nil, errcode.AppError{Code: errcode.ErrRAGUnavailable, Message: syncErr.Error()}
-		}
-		answer = result.Answer
-		sources = result.Sources
-		confidence = result.Confidence
-		pipeMeta = result.Pipeline
-	} else {
-		answer = "当前 AI 服务暂不可用，请提交申告由人工处理"
+	llmEvents, err := s.llmService.StreamChat(ctx, question, session.KBID, opts, history)
+	if err != nil {
+		return nil, errcode.AppError{Code: errcode.ErrRAGUnavailable, Message: err.Error()}
 	}
 
-	canSubmit := len(sources) == 0 || confidence < defaultConfidenceThreshold
+	// 代理事件通道，done 时持久化消息
+	outCh := make(chan StreamEvent, 100)
+	go func() {
+		defer close(outCh)
+		for evt := range llmEvents {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
+			if evt.Type == "done" && evt.Metadata != nil && s.chatRepo != nil {
+				srcJSON, _ := json.Marshal(evt.Metadata.Sources)
 
-	// 持久化会话（新会话创建，已有会话复用）
-	if s.chatRepo != nil {
-		if !isMultiTurn {
-			session = &model.ChatSession{
-				UserID: userID, KBID: req.KBID, Question: req.Question,
-				Answer: answer, Confidence: confidence, DurationMs: durationMS,
+				// 更新会话摘要
+				_ = s.chatRepo.UpdateSession(&model.ChatSession{
+					ID:         sessionID,
+					Answer:     evt.Metadata.Answer,
+					Sources:    srcJSON,
+					Confidence: evt.Metadata.Confidence,
+					DurationMs: evt.Metadata.DurationMS,
+				})
+
+				// 持久化消息（user + assistant）
+				_ = s.chatRepo.CreateBatch([]model.ChatMessage{
+					{Role: "user", Content: question, SessionID: sessionID},
+					{Role: "assistant", Content: evt.Metadata.Answer, SessionID: sessionID,
+						Sources: srcJSON, Confidence: evt.Metadata.Confidence},
+				})
+
+				evt.Metadata.SessionID = sessionID
+				evt.Metadata.Question = question
+				evt.Metadata.Feedback = 0
+				evt.Metadata.CreatedAt = time.Now().Format("2006-01-02 15:04:05")
 			}
-			if len(sources) > 0 {
-				if srcJSON, _ := json.Marshal(sources); len(srcJSON) > 0 {
-					session.Sources = srcJSON
-				}
-			}
-			if err := s.chatRepo.Create(session); err != nil {
-				return nil, errcode.AppError{Code: errcode.ErrUnknown, Message: "保存会话失败"}
+			if ok := sendOrCancel(ctx, outCh, evt); !ok {
+				return
 			}
 		}
+	}()
 
-		// 持久化消息（user + assistant）
-		srcJSON, _ := json.Marshal(sources)
-		_ = s.chatRepo.CreateBatch([]model.ChatMessage{
-			{Role: "user", Content: req.Question, SessionID: session.ID},
-			{Role: "assistant", Content: answer, SessionID: session.ID,
-				Sources: srcJSON, Confidence: confidence},
-		})
-	}
-
-	return &ChatSessionResponse{
-		SessionID:       session.ID,
-		Question:        req.Question,
-		Answer:          answer,
-		Sources:         sources,
-		Confidence:      confidence,
-		CanSubmitTicket: canSubmit,
-		DurationMS:      durationMS,
-		Pipeline:        pipeMeta,
-	}, nil
+	return outCh, nil
 }
 
 // =============================================================================
@@ -196,10 +215,6 @@ func (s *ChatService) CreateChatSession(req request.CreateChatRequest, userID in
 
 // SubmitFeedback 提交问答反馈。
 func (s *ChatService) SubmitFeedback(sessionID int64, feedback int16) error {
-	// TODO(service/chat): 校验 feedback 只能是 0/1/2 的规则应放在 Service 层。
-	// TODO(service/chat): ChatService.pipeline 字段为死存储——ChatService 通过 LLMService 间接使用 pipeline，
-	// 自身不再直接调用 pipeline.Execute。可移除该字段简化构造。
-	// Handler 已校验但其他调用方或测试替身仍可能绕过。
 	if s.chatRepo == nil {
 		return errcode.AppError{Code: errcode.ErrUnknown, Message: "服务未初始化"}
 	}
@@ -215,7 +230,6 @@ func (s *ChatService) SubmitFeedback(sessionID int64, feedback int16) error {
 
 // GetChatDetail 查询问答会话详情（含多轮对话消息历史）。
 func (s *ChatService) GetChatDetail(sessionID int64) (*response.ChatSessionResponse, error) {
-	// TODO(service/chat): 应接收 currentUserID 校验会话归属。
 	if s.chatRepo == nil {
 		return nil, errcode.AppError{Code: errcode.ErrUnknown, Message: "服务未初始化"}
 	}
@@ -268,7 +282,7 @@ func (s *ChatService) GetChatDetail(sessionID int64) (*response.ChatSessionRespo
 
 // ListSessions 分页查询用户的问答会话列表。
 //
-// 每条会话返回首轮问题 + 最后一条回复摘要 + 消息总数。
+// 每条会话返回首轮问题标题 + 最后一条回复摘要 + 消息总数。
 func (s *ChatService) ListSessions(userID int64, page, pageSize int) ([]response.SessionListItem, int64, error) {
 	if s.chatRepo == nil {
 		return nil, 0, errcode.AppError{Code: errcode.ErrUnknown, Message: "服务未初始化"}
@@ -316,143 +330,4 @@ func truncateText(text string, maxRunes int) string {
 		return text
 	}
 	return string(runes[:maxRunes]) + "..."
-}
-
-// =============================================================================
-// StreamChat — SSE 流式问答
-// =============================================================================
-
-// StreamChat 创建/追加问答会话并以流式事件通道返回。
-//
-// 支持多轮：req.SessionID > 0 时加载历史注入上下文，追加消息到已有会话。
-// 单次 LLM 调用：用户看到的 token 与最终存入 DB 的答案完全一致。
-func (s *ChatService) StreamChat(ctx context.Context, req request.CreateChatRequest, userID int64) (<-chan StreamEvent, error) {
-	if strings.TrimSpace(req.Question) == "" {
-		return nil, errcode.AppError{Code: errcode.ErrParam, Message: "问题不能为空"}
-	}
-	if s.knowledgeRepo == nil {
-		return nil, errcode.AppError{Code: errcode.ErrAIUnavailable, Message: fallbackAIUnavailable}
-	}
-	_, err := s.knowledgeRepo.FindKBByID(req.KBID)
-	if err != nil {
-		return nil, errcode.AppError{Code: errcode.ErrNotFound, Message: "知识库不存在"}
-	}
-
-	// 多轮对话：加载历史消息
-	var history []adapter.ChatMessage
-	var session *model.ChatSession
-	isMultiTurn := req.SessionID > 0 && s.chatRepo != nil
-	if isMultiTurn {
-		session, err = s.chatRepo.FindByID(req.SessionID)
-		if err != nil {
-			return nil, errcode.AppError{Code: errcode.ErrNotFound, Message: "会话不存在"}
-		}
-		if session.UserID != userID {
-			return nil, errcode.AppError{Code: errcode.ErrForbidden, Message: "无权访问该会话"}
-		}
-		msgs, _ := s.chatRepo.FindMessagesBySession(req.SessionID)
-		for _, m := range msgs {
-			history = append(history, adapter.ChatMessage{Role: m.Role, Content: m.Content})
-		}
-	}
-
-	opts := rag.RAGOptions{
-		TopK:         s.defaultTopK,
-		QueryRewrite: true,
-		MultiRoute:   true,
-		Hybrid:       true,
-		Rerank:       true,
-	}
-
-	if s.llmService == nil {
-		return nil, errcode.AppError{Code: errcode.ErrAIUnavailable, Message: fallbackAIUnavailable}
-	}
-
-	llmEvents, err := s.llmService.StreamChat(ctx, req.Question, req.KBID, opts, history)
-	if err != nil {
-		return nil, errcode.AppError{Code: errcode.ErrRAGUnavailable, Message: err.Error()}
-	}
-
-	// 代理事件通道，done 时持久化 session + messages
-	outCh := make(chan StreamEvent, 100)
-
-	// 闭包捕获 isMultiTurn / sessionID
-	sessionID := req.SessionID
-	go func() {
-		defer close(outCh)
-		for evt := range llmEvents {
-			select {
-			case <-ctx.Done():
-				return
-			default:
-			}
-			if evt.Type == "done" && evt.Metadata != nil && s.chatRepo != nil {
-				srcJSON, _ := json.Marshal(evt.Metadata.Sources)
-				if !isMultiTurn {
-					// 新会话：创建
-					sess := &model.ChatSession{
-						UserID: userID, KBID: req.KBID, Question: req.Question,
-						Answer: evt.Metadata.Answer, Sources: srcJSON,
-						Confidence: evt.Metadata.Confidence, DurationMs: evt.Metadata.DurationMS,
-					}
-					if err := s.chatRepo.Create(sess); err == nil {
-						sessionID = sess.ID
-					}
-				} else {
-					// 已有会话：更新 answer
-					s.chatRepo.UpdateSession(&model.ChatSession{
-						ID: sessionID, Answer: evt.Metadata.Answer,
-						Sources: srcJSON, Confidence: evt.Metadata.Confidence,
-						DurationMs: evt.Metadata.DurationMS,
-					})
-				}
-
-				// 持久化消息
-				_ = s.chatRepo.CreateBatch([]model.ChatMessage{
-					{Role: "user", Content: req.Question, SessionID: sessionID},
-					{Role: "assistant", Content: evt.Metadata.Answer, SessionID: sessionID,
-						Sources: srcJSON, Confidence: evt.Metadata.Confidence},
-				})
-
-				evt.Metadata.SessionID = sessionID
-				evt.Metadata.Question = req.Question
-				evt.Metadata.Feedback = 0
-				evt.Metadata.CreatedAt = time.Now().Format("2006-01-02 15:04:05")
-			}
-			if ok := sendOrCancel(ctx, outCh, evt); !ok {
-				return
-			}
-		}
-	}()
-
-	return outCh, nil
-}
-
-// =============================================================================
-// 辅助类型
-// =============================================================================
-
-// ChatSessionResponse 问答响应（供 Handler 层 SSE 流式输出使用）。
-type ChatSessionResponse struct {
-	SessionID       int64                   `json:"session_id"`
-	Question        string                  `json:"question"`
-	Answer          string                  `json:"answer"`
-	Sources         []response.SourceItem   `json:"sources,omitempty"`
-	Confidence      float64                 `json:"confidence"`
-	CanSubmitTicket bool                    `json:"can_submit_ticket"`
-	DurationMS      int                     `json:"duration_ms"`
-	Pipeline        *ChatPipelineMeta       `json:"pipeline,omitempty"`
-}
-
-// ChatPipelineMeta 管道执行元数据。
-type ChatPipelineMeta struct {
-	Steps           []ChatPipelineStep `json:"steps"`
-	TotalDurationMS int                `json:"total_duration_ms"`
-}
-
-// ChatPipelineStep 管道单步骤耗时。
-type ChatPipelineStep struct {
-	ID         string `json:"id"`
-	Label      string `json:"label"`
-	DurationMS int    `json:"duration_ms"`
 }

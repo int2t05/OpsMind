@@ -4,7 +4,8 @@ import { useChatStore } from '../chat'
 
 // Mock API 模块
 vi.mock('../../api/chat', () => ({
-  streamChatSession: vi.fn(),
+  createSession: vi.fn(),
+  streamChatMessage: vi.fn(),
   submitFeedback: vi.fn(),
 }))
 

@@ -1,7 +1,10 @@
 /**
  * 智能问答 API 封装（门户端）
  *
- * 提供问答会话创建（普通 + SSE 流式）和反馈提交接口。
+ * 提供会话 CRUD + SSE 流式对话接口。
+ *
+ * 流式对话流程：先 createSession 创建会话容器，
+ * 再 streamChatMessage 在会话中发送消息并流式接收 AI 回复。
  *
  * SSE 流使用原生 fetch（非 axios），原因是 EventSource 仅支持 GET，
  * 无法携带 JSON 请求体。Token 注入和错误处理在此模块内自包含。
@@ -30,12 +33,6 @@ export interface RAGOptionsParams {
   rerank?: boolean
 }
 
-export interface CreateChatParams {
-  question: string
-  kb_id: number
-  rag_options?: RAGOptionsParams  //RAG 高级选项
-}
-
 export interface SourceItem {
   doc_name: string
   chunk_content: string
@@ -52,18 +49,28 @@ export interface ChatSessionResponse {
   duration_ms: number
   feedback: number
   created_at: string
-  /**RAG 管道执行指标（由 done 事件的 metadata 携带） */
+  /** RAG 管道执行指标（由 done 事件的 metadata 携带） */
   pipeline?: {
-    steps: Array<{ id: string; label: string; duration_ms: number; success: boolean }>
+    steps: Array<{ id: string; label: string; duration_ms: number }>
     total_duration_ms: number
   }
+}
+
+/** 会话列表条目 */
+export interface SessionListItem {
+  id: number
+  question: string
+  last_answer: string
+  message_count: number
+  created_at: string
+  updated_at: string
 }
 
 /** SSE 流式事件的回调签名 */
 export interface StreamCallbacks {
   /** 收到文本片段时调用 */
   onToken: (content: string) => void
-  /**  收到 RAG 管道步骤事件 */
+  /** 收到 RAG 管道步骤事件 */
   onStep?: (step: StepEvent) => void
   /** 流式传输完成，返回完整会话数据 */
   onDone: (session: ChatSessionResponse) => void
@@ -75,38 +82,40 @@ export interface StreamCallbacks {
 // API 方法
 // =============================================================================
 
-/** 创建问答会话（非流式） */
-export function createChatSession(data: CreateChatParams) {
-  return request.post<ApiResponse<ChatSessionResponse>>('/api/v1/portal/chat-sessions', data)
+/** 创建问答会话（仅创建容器，不含 AI 调用） */
+export function createSession(kbId: number, title?: string) {
+  return request.post<ApiResponse<{ session_id: number; kb_id: number; question: string; created_at: string }>>(
+    '/api/v1/portal/chat-sessions',
+    { kb_id: kbId, title }
+  )
 }
 
 /**
- * 创建问答会话（SSE 流式输出）
+ * 在已有会话中发送消息（SSE 流式输出）
  *
  * 使用 fetch + ReadableStream 消费 SSE 事件流，
  * 逐个 token 渲染答案，提升用户体验。
  *
  * 为什么使用 fetch 而非 EventSource：
- * EventSource 仅支持 GET 请求，无法传递 JSON 请求体（question + kb_id），
+ * EventSource 仅支持 GET 请求，无法传递 JSON 请求体，
  * 因此使用 fetch 发起 POST 并手动解析 SSE 流。
  */
-export async function streamChatSession(
-  data: CreateChatParams,
+export async function streamChatMessage(
+  sessionId: number,
+  question: string,
   callbacks: StreamCallbacks,
   signal?: AbortSignal
 ): Promise<void> {
-  // TODO(web/api/chat): SSE 流使用原生 fetch 绕过 Axios 拦截器，token 过期无法自动刷新。
-  // 流式请求中断后用户看到的回答不完整且无恢复机制。应在流式层实现 401 重试或 token 预刷新。
   const token = getToken()
 
   try {
-    const response = await fetch('/api/v1/portal/chat-sessions/stream', {
+    const response = await fetch(`/api/v1/portal/chat-sessions/${sessionId}/stream`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
-      body: JSON.stringify(data),
+      body: JSON.stringify({ question }),
       signal,
     })
 
@@ -172,12 +181,24 @@ export async function streamChatSession(
   }
 }
 
+/** 获取会话列表 */
+export function getSessionList(page = 1, pageSize = 10) {
+  return request.get<ApiResponse<SessionListItem[]>>('/api/v1/portal/chat-sessions', {
+    params: { page, page_size: pageSize },
+  })
+}
+
+/** 获取会话详情（含消息历史） */
+export function getChatDetail(id: number) {
+  return request.get<ApiResponse<ChatSessionResponse>>(`/api/v1/portal/chat-sessions/${id}`)
+}
+
+/** 删除会话 */
+export function deleteSession(id: number) {
+  return request.delete<ApiResponse<null>>(`/api/v1/portal/chat-sessions/${id}`)
+}
+
 /** 提交反馈 */
 export function submitFeedback(sessionID: number, feedback: number) {
   return request.post<ApiResponse<null>>(`/api/v1/portal/chat-sessions/${sessionID}/feedback`, { feedback })
-}
-
-/** 获取会话详情 */
-export function getChatDetail(id: number) {
-  return request.get<ApiResponse<ChatSessionResponse>>(`/api/v1/portal/chat-sessions/${id}`)
 }

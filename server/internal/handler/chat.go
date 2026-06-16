@@ -31,27 +31,35 @@ func NewChatHandler(svc *service.ChatService) *ChatHandler {
 }
 
 // =============================================================================
-// 门户端
+// 会话 CRUD
 // =============================================================================
 
-// CreateChatSession 创建问答会话。
+// CreateChatSession 创建问答会话（仅创建容器，不含 LLM 调用）。
 //
 // POST /api/v1/portal/chat-sessions
+//
+// 会话创建后，通过 StreamChatMessage 在会话中发送消息获取 AI 回复。
+// 这样设计的原因是：会话生命周期与 AI 调用解耦，前端可灵活控制创建时机。
 func (h *ChatHandler) CreateChatSession(c *gin.Context) {
-	var req request.CreateChatRequest
+	var req request.CreateSessionRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, errcode.ErrParam, "参数校验失败: "+err.Error())
 		return
 	}
 
 	userID, _ := getCurrentUserID(c)
-	resp, err := h.svc.CreateChatSession(req, userID)
+	session, err := h.svc.CreateSession(req, userID)
 	if err != nil {
 		handleServiceError(c, err)
 		return
 	}
 
-	response.Success(c, resp)
+	response.Success(c, gin.H{
+		"session_id": session.ID,
+		"kb_id":      session.KBID,
+		"question":   session.Question,
+		"created_at": session.CreatedAt.Format("2006-01-02 15:04:05"),
+	})
 }
 
 // ListSessions 查询当前用户的问答会话列表。
@@ -141,7 +149,7 @@ func (h *ChatHandler) GetChatDetail(c *gin.Context) {
 }
 
 // =============================================================================
-// SSE 流式输出
+// SSE 流式对话
 // =============================================================================
 
 // writeSSEEvent 将事件序列化为 JSON 并以 SSE data 帧格式写入。
@@ -157,19 +165,27 @@ func writeSSEEvent(w gin.ResponseWriter, evt any) error {
 	return err
 }
 
-// StreamChatSession 创建问答会话并以 SSE 流式返回答案。
+// StreamChatMessage 在已有会话中发送消息并以 SSE 流式返回 AI 答案。
 //
-// POST /api/v1/portal/chat-sessions/stream
+// POST /api/v1/portal/chat-sessions/:id/stream
+//
+// 与 CreateChatSession 配合使用：先创建会话获取 sessionID，
+// 再通过此端点发送消息并流式接收 AI 回复。
 //
 // 流式输出流程：
-//  1. 解析请求 → 设置 SSE 响应头
-//  2. ChatService.StreamChat 获取事件通道
-//  3. 逐事件代理到 SSE（token/step/error/done）
+//  1. 解析 session ID + 请求 → 设置 SSE 响应头
+//  2. ChatService.StreamChat 获取事件通道（含 RAG + LLM 流式）
+//  3. 逐事件代理到 SSE（step/token/error/done）
 //  4. 检测客户端断开，及时终止
-//
-// 单次 LLM 调用：Service 层统一编排 RAG→LLM 流式，Handler 仅做传输层代理。
-func (h *ChatHandler) StreamChatSession(c *gin.Context) {
-	var req request.CreateChatRequest
+func (h *ChatHandler) StreamChatMessage(c *gin.Context) {
+	idStr := c.Param("id")
+	sessionID, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		response.Error(c, errcode.ErrParam, "无效的会话 ID")
+		return
+	}
+
+	var req request.SendMessageRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, errcode.ErrParam, "参数校验失败: "+err.Error())
 		return
@@ -191,7 +207,7 @@ func (h *ChatHandler) StreamChatSession(c *gin.Context) {
 		return
 	}
 
-	eventCh, err := h.svc.StreamChat(ctx, req, userID)
+	eventCh, err := h.svc.StreamChat(ctx, sessionID, req.Question, userID)
 	if err != nil {
 		// SSE 头已发送，改用 SSE error 事件返回错误
 		writeSSEEvent(c.Writer, service.StreamEvent{Type: "error", Error: err.Error()})

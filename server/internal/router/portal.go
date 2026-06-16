@@ -19,21 +19,20 @@ func registerPortalRoutes(rg *gin.RouterGroup, h *Handlers) {
 		rg.GET("/knowledge-bases", placeholder())
 	}
 
-	// 智能问答 — 会话 CRUD
-	// chat-sessions/stream 必须在 :id 路由之前注册，避免 "stream" 被当作 :id 参数捕获
+	// 智能问答 — 会话 CRUD + 流式对话
 	if h != nil && h.Chat != nil {
-		rg.POST("/chat-sessions/stream", h.Chat.StreamChatSession)
-		rg.GET("/chat-sessions", h.Chat.ListSessions)
-		rg.POST("/chat-sessions", h.Chat.CreateChatSession)
-		rg.GET("/chat-sessions/:id", h.Chat.GetChatDetail)
-		rg.DELETE("/chat-sessions/:id", h.Chat.DeleteSession)
-		rg.POST("/chat-sessions/:id/feedback", h.Chat.SubmitFeedback)
+		rg.POST("/chat-sessions", h.Chat.CreateChatSession)          // 创建会话容器
+		rg.GET("/chat-sessions", h.Chat.ListSessions)                // 会话列表
+		rg.GET("/chat-sessions/:id", h.Chat.GetChatDetail)           // 会话详情
+		rg.DELETE("/chat-sessions/:id", h.Chat.DeleteSession)        // 删除会话
+		rg.POST("/chat-sessions/:id/stream", h.Chat.StreamChatMessage) // 发送消息（SSE 流式）
+		rg.POST("/chat-sessions/:id/feedback", h.Chat.SubmitFeedback)  // 提交反馈
 	} else {
-		rg.POST("/chat-sessions/stream", placeholder())
-		rg.GET("/chat-sessions", placeholder())
 		rg.POST("/chat-sessions", placeholder())
+		rg.GET("/chat-sessions", placeholder())
 		rg.GET("/chat-sessions/:id", placeholder())
 		rg.DELETE("/chat-sessions/:id", placeholder())
+		rg.POST("/chat-sessions/:id/stream", placeholder())
 		rg.POST("/chat-sessions/:id/feedback", placeholder())
 	}
 

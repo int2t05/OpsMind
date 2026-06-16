@@ -64,6 +64,23 @@ type StreamDoneMeta struct {
 }
 
 // =============================================================================
+// 管道元数据类型
+// =============================================================================
+
+// ChatPipelineMeta 管道执行元数据。
+type ChatPipelineMeta struct {
+	Steps           []ChatPipelineStep `json:"steps"`
+	TotalDurationMS int                `json:"total_duration_ms"`
+}
+
+// ChatPipelineStep 管道单步骤耗时。
+type ChatPipelineStep struct {
+	ID         string `json:"id"`
+	Label      string `json:"label"`
+	DurationMS int    `json:"duration_ms"`
+}
+
+// =============================================================================
 // LLMService
 // =============================================================================
 
