@@ -1,109 +1,53 @@
 # OpsMind 代码改进清单
 
-> 基于 2026-06-15 全量代码再审计（前后端 130+ 源文件 + 文档交叉校验），按业务流程重组。
+> 基于 2026-06-16 全量代码审计（前后端 130+ 源文件 + 文档交叉校验 + 56 项已修复验证）。
 > 覆盖 [diagrams/](diagrams/) 中 10 份业务流程图对应的全部模块 + [API/](API/) 9 份接口文档。
 > 优先级：🔴 P0 生产隐患 / 🟡 P1 架构债务 / 🟢 P2 优化改进
-> ⭐ 标记为 2026-06-15 审计新发现的问题。
+> ⭐ 标记为 2026-06-16 审计新发现的问题。
 > 📝 标记为文档一致性缺陷（代码实现与 API 文档/PRD/TECH.md 不一致）。
+> 📌 标记为代码中已存在 TODO 注释，本文档同步收录。
 
 ---
+
 ## 1. 认证与授权
 
 > 对应图：[auth-flow.md](diagrams/auth-flow.md) — 登录 → JWT 双令牌 → 中间件链 → RBAC 权限校验
 > 对应文档：[API/auth.md](API/auth.md)
 
-### JWT 令牌安全
-
-- ✅ [pkg/jwt/jwt.go](/server/pkg/jwt/jwt.go) — ~~alg 限制不严格~~ — 已改用 `WithValidMethods([]string{"HS256"})` 严格限制
-- ✅ [pkg/jwt/jwt.go](/server/pkg/jwt/jwt.go) — ~~secret 为空时静默~~ — `generateToken` 已增加 `secret == ""` 显式校验，与 `ParseToken` 形成纵深防御
-- ✅ [service/auth_service.go](/server/internal/service/auth_service.go) — ~~jwtSecret 硬编码默认值~~ — 已移除，改为构造注入 `config.JWT.Secret`
-- ✅ [service/auth_service.go](/server/internal/service/auth_service.go) — ~~token 有效期写死 2h/7d~~ — 已改为读取 `s.jwtCfg.AccessExpire` / `s.jwtCfg.RefreshExpire`
-- ✅ [service/auth_service.go](/server/internal/service/auth_service.go) — ~~RefreshToken 需校验 TokenType~~ — 已增加 `claims.TokenType != "refresh"` 校验
-- ✅ [service/auth_service.go](/server/internal/service/auth_service.go) — ~~增加登录失败限流~~ — 已实现内存限流器（5 次/15 分钟滑动窗口）
-- ✅ [middleware/auth.go](/server/internal/middleware/auth.go) — ~~JWT 不检查用户冻结~~ — `JWTAuth` 新增 `db` 参数，解析后查询用户状态（冻结/存在性）
-- ✅ [middleware/auth.go](/server/internal/middleware/auth.go) — ~~secret 为空时中间件静默~~ — 增加 secret 空值检查，拒绝所有请求并返回明确错误
-- ✅ [pkg/jwt/jwt.go](/server/pkg/jwt/jwt.go) — ~~缺少标准声明~~ — 已增加 Issuer/Subject/ID(jti)/IssuedAt
-- ✅ [middleware/auth.go](/server/internal/middleware/auth.go) — ~~TokenType 校验缺失~~ — 已增加 `claims.TokenType != "access"` 校验（refresh token 不能访问 API）
-- ✅ [service/auth_service.go](/server/internal/service/auth_service.go) — ~~限流器为内存实现~~ — 已存在，重启后重置为已知行为，暂保持内存实现
-
-### 中间件安全
-
-- ✅ [middleware/cors.go](/server/internal/middleware/cors.go) — ~~DNS 重绑定风险~~ — release 模式强制配置 AllowOrigins + localhost 告警
-- ✅ [middleware/request_id.go](/server/internal/middleware/request_id.go) — ~~X-Request-ID 注入~~ — 已有长度限制(128) + 字符集校验(regex)
-- ✅ [middleware/rbac.go](/server/internal/middleware/rbac.go) — ~~通配权限~~ — 已支持 `*` 全匹配 + `prefix:*` 前缀通配
-- ✅ [middleware/rbac.go](/server/internal/middleware/rbac.go) — ~~空 permissions~~ — 注册时 slog.Warn 告警 + 保持不变的安全默认值
-
 ### 密码策略
 
-- ✅ [pkg/hash/hash.go](/server/pkg/hash/hash.go) — ~~字节计数~~ — 改用 `utf8.RuneCountInString`（非 ASCII 字符各计 1 位）
-- ✅ [pkg/hash/hash.go](/server/pkg/hash/hash.go) — ~~检测不一致~~ — 大小写/数字统一使用 `unicode.IsLower/IsUpper/IsDigit`
-- ✅ [pkg/hash/hash.go](/server/pkg/hash/hash.go) — bcrypt cost=10 硬编码，应可配置以应对硬件升级
+- 🟢 [pkg/hash/hash.go](/server/pkg/hash/hash.go) — bcrypt cost=10 硬编码，应可配置以应对硬件升级
 
-### 路由一致性
+### 认证 Handler
 
-- ✅ [router/router.go](/server/internal/router/router.go) — ~~Auth 路由路径与文档不一致~~ — 已改为 `/api/v1/auth/me` 子路由组，与 [API/auth.md](API/auth.md) 文档一致。前端 [api/auth.ts](/web/src/api/auth.ts) 同步更新。
+- 📌 [handler/auth.go:33](/server/internal/handler/auth.go) — 登录接口应记录失败审计/安全日志，但不能泄露用户名是否存在
+- 📌 [handler/auth.go:106](/server/internal/handler/auth.go) — Logout 应让当前 refresh token 失效
+
+### 已修复（18 项）
+
+JWT 令牌安全（alg 限制、secret 空值校验、TokenType 校验、标准声明、登录限流）、中间件安全（用户冻结检查、DNS 重绑定防护、X-Request-ID 校验、RBAC 通配权限）、密码策略（utf8 字符计数、unicode 检测一致性）、路由一致性（Auth 路径与 API 文档对齐）。
 
 ---
+
 ## 2. 智能问答 RAG
 
 > 对应图：[chat-rag-flow.md](diagrams/chat-rag-flow.md) — SSE 流式 → Pipeline 执行 → 多路检索 → 混合融合 → 重排序 → LLM 生成
 > 对应文档：[API/chat.md](API/chat.md)
-> 深度审计日期：2026-06-16 — 覆盖 pipeline / query_rewrite / multi_route / hybrid / bm25 / rerank / chunker / embedder / processor / document_parser / retriever / embedding_client / llm_service 共 13 个文件
 
 ### SSE 流式输出（核心路径）
 
-- ✅ [handler/chat.go](/server/internal/handler/chat.go) + [service/llm_service.go](/server/internal/service/llm_service.go) — ~~**流式答案与存储答案不一致**~~ — 已通过 LLMService 重构为单次 LLM 调用。
-- ✅ [handler/chat.go](/server/internal/handler/chat.go) — ~~SSE 流中 LLM 错误被静默吞掉~~ — StreamEvent 支持 `type: "error"` 事件。
-- ✅ [handler/chat.go](/server/internal/handler/chat.go) — ~~模拟流式先完整生成再 SSE 输出~~ — 已改为真实 `ChatCompletionStream`。
-- ✅ [service/chat_service.go](/server/internal/service/chat_service.go) — ~~`FinalAnswer` 和流式各一次 LLM 调用~~ — `SyncChat`/`StreamChat` 各自一次。
-- ✅ [service/llm_service.go](/server/internal/service/llm_service.go) — ~~RAG 步骤事件未实时流式发送~~ — `executeRAG` 已接入 `onStep rag.StepCallback`，`StreamChat` 实时转换 `rag.StepEvent` 为 SSE step 事件。
-- ✅ [service/llm_service.go](/server/internal/service/llm_service.go) — ~~多轮对话历史无长度截断~~ — `buildMessages` 已实现滑动窗口截断，上限由 `maxHistoryMessages`（默认 10，环境变量 `OPSMIND_AI_MAX_HISTORY_MESSAGES`）控制。
-- ✅ [handler/chat.go](/server/internal/handler/chat.go) — ~~SSE 响应头在 Flusher 检查前发送~~ — 已调换顺序：先检查 Flusher，再写 SSE 响应头。
-- ✅ [service/chat_service.go](/server/internal/service/chat_service.go) — ~~StreamChat done 持久化静默丢错~~ — `UpdateSession`/`CreateBatch` 失败时写入 `slog.Error`。
-- ✅ [service/chat_service.go](/server/internal/service/chat_service.go) + [config/](/server/internal/config/) — ~~RAG 选项硬编码~~ — 新增 `RAGDefaults` 结构体 + env 配置（`OPSMIND_AI_RAG_QUERY_REWRITE` 等 4 项），`ChatService.StreamChat` 从 `s.ragDefaults` 读取管道开关。
-- 🟢 [service/llm_service.go](/server/internal/service/llm_service.go) — 系统 prompt 硬编码在 `buildMessages`（329 行），不支持按知识库定制 AI 角色。
-- 🟢 [service/llm_service.go](/server/internal/service/llm_service.go) — `SyncChat` 为死代码：自会话/对话分离重构后，`ChatService` 仅调用 `StreamChat`，`SyncChat` 无内部调用方。
+- 🟢 [service/llm_service.go](/server/internal/service/llm_service.go) — 系统 prompt 硬编码在 `buildMessages`，不支持按知识库定制 AI 角色
+- 🟢 [service/llm_service.go](/server/internal/service/llm_service.go) — `SyncChat` 为死代码：`ChatService` 仅调用 `StreamChat`，`SyncChat` 无内部调用方
 
 ### RAG 管道
 
-- ✅ [rag/pipeline.go](/server/internal/rag/pipeline.go) — ~~`llmClient` 为 nil 时，QueryRewrite/MultiRoute/Rerank 会 panic（nil 指针解引用）~~ — 已添加 `p.llmClient != nil` 守卫，LLM 不可用时静默跳过辅助步骤
-- ✅ [rag/rerank.go](/server/internal/rag/rerank.go) — ~~重排序 prompt 无长度截断：候选 chunk 全量拼接，可超出 LLM 上下文窗口致 400 错误~~ — 已从 LLM prompt 方案切换为 cross-encoder 子进程方案（adapter.Reranker 接口 + SubprocessReranker）
-- ✅ [rag/pipeline.go](/server/internal/rag/pipeline.go) — ~~QueryRewrite 的 history 始终为 nil，上下文消歧功能未生效~~ — RAGOptions 新增 `History` 字段，chat_service 传入会话历史
-- ✅ [rag/pipeline.go](/server/internal/rag/pipeline.go) — ~~重排序候选过多时应提前截断：Rerank 在重排**前**未按 `RerankCount` 截断候选列表；事后检查（第 207 行）为时已晚~~ — Rerank 前按 RerankCount 截断候选池；RerankCount < TopK 校验已前置至 Normalize()
-- ✅ [rag/pipeline.go](/server/internal/rag/pipeline.go) — ~~Execute 缺少入口 opts 规范化：TopK=0 → LIMIT 0，RouteCount=0 → 多路检索跳过，与「零值使用默认」注释不一致~~ — RAGOptions.Normalize() 在 Execute 入口自动填充零值默认值
-- ✅  [rag/query_rewrite.go](/server/internal/rag/query_rewrite.go) — llm 为 nil 时应降级返回原 query，而非 panic
-- ✅ [rag/multi_route.go](/server/internal/rag/multi_route.go) — ~~LLM 输出子查询的清洗逻辑脆弱（`TrimLeft` 依赖特定前缀格式）~~ — 改为 JSON 数组解析，容错 markdown 包裹
-- ✅ [rag/multi_route.go](/server/internal/rag/multi_route.go) — ~~k（子查询数量）无上限~~ — 钳位到 [2, 4]
-- ✅ [rag/hybrid.go](/server/internal/rag/hybrid.go) — ~~单路结果直接返回时未按 topK 截断~~ — 单路结果按 topK 截断后返回
-- ✅ [rag/types.go](/server/internal/rag/types.go) — ~~RAGOptions 裸 bool 零值问题~~ — 文档明确：调用方必须以 DefaultRAGOptions() 为起点，禁止裸 RAGOptions{}。chat_service 已遵循此约定
-- ✅ [rag/types.go](/server/internal/rag/types.go) — ~~`RetrievalResult.Score` 注释「归一化到 [0,1]」与 BM25/RRF 实现不一致~~ — 注释已修正
-- ✅ [rag/rerank.go](/server/internal/rag/rerank.go) — ~~`_ = i` 调试残留~~ — rerank.go 已完全重写，该文件不再存在 LLM prompt 相关代码
-- ✅ [rag/pipeline.go](/server/internal/rag/pipeline.go) + [retriever.go](/server/internal/rag/retriever.go) + [API/chat.md](/docs/API/chat.md) — ~~步骤 ID 拼写不一致~~ — 统一为 `vector_retrieve` / `bm25_retrieve`
-- ✅ [service/chat_service.go](/server/internal/service/chat_service.go) — ~~`pipeline` 字段为死存储~~ — 已移除，ChatService 仅通过 LLMService 使用 Pipeline
-
-### BM25 检索
-
-- ✅ [rag/bm25.go](/server/internal/rag/bm25.go) — ~~超 10 万篇内存压力~~ — 超阈值时 recordLargeIndex 打 warn；追加 TODO 指向分片/持久化方案
-- ✅ [rag/bm25.go](/server/internal/rag/bm25.go) — ~~BuildIndex 同步分词造成长尾延迟~~ — 添加 building 守卫防并发重复构建；调用方（Processor）在自己的 goroutine 中调用
-- ✅ [rag/bm25.go](/server/internal/rag/bm25.go) — ~~LoadDict 错误被丢弃~~ — 失败时 slog.Warn 记录
-- ✅ [rag/bm25.go](/server/internal/rag/bm25.go) — ~~缺少 token 过滤~~ — isValidToken：过滤空白/标点/符号/单字节 token
-- ✅ [rag/bm25.go](/server/internal/rag/bm25.go) — ~~topK <= 0 返回空结果~~ — topK <= 0 时默认 10
-
-### Embedding 与向量检索
-
-- ✅ [rag/embedder.go](/server/internal/rag/embedder.go) — 部分批次失败静默跳过，破坏 `vectors[i]` 与 `texts[i]` 的索引对应关系。调用方检测长度不匹配后全量失败，浪费之前成功的批次。
-- ✅ [rag/embedder.go](/server/internal/rag/embedder.go) — 批次失败仅计数不记错误信息，调试困难
-- ✅ [rag/embedder.go](/server/internal/rag/embedder.go) — 不校验各批次的 embedding 维度一致性，若中途模型变更可致混维向量写入 pgvector 报错
-- ✅ [rag/embedder.go](/server/internal/rag/embedder.go) — `client` 为 nil 时不校验——构造函数无防护，首次 `Embed` 调用才 panic
-- ✅ [adapter/vector_store.go](/server/internal/adapter/vector_store.go) — `BatchInsert` 无跨 chunk 维度一致性校验，维度不匹配时 pgvector 报错不友好
-- ✅ [adapter/vector_store.go](/server/internal/adapter/vector_store.go) — `CosineSearch` 无 topK 范围和空 embedding 防护
-- ✅ [adapter/vector_store.go](/server/internal/adapter/vector_store.go) — NaN/Inf 用 `> 1e30` 检测而非 `math.IsInf`；静默替换为 0.0 污染向量空间
+- 📌 [rag/pipeline.go](/server/internal/rag/pipeline.go) — StepMetric 文档注释中步骤 ID `hybrid_retrieve` 不存在于代码中（实际拆分为 `vector_retrieve` + `bm25_retrieve` + `hybrid_fuse`）
 
 ### 文档处理（chunker / parser / processor）
 
 - 🟡 [rag/chunker.go](/server/internal/rag/chunker.go) — `mergeSplits` 未实现 chunkOverlap：仅 `splitByRunes` 支持 overlap，段落/句子级切分后相邻 chunk 无重叠
 - 🟡 [rag/chunker.go](/server/internal/rag/chunker.go) — 分块前未做文本归一化（全角→半角、多余空白合并），影响 BM25 分词品质和 embedding 稳定性
-- 🟡 [rag/document_parser.go](/server/internal/rag/document_parser.go) — PDF 二进制字节被 `string(b)` 转换破坏：非 UTF-8 字节在 Go string 往返中损坏。应使用 `bytes.NewReader(b)`。
+- 🟡 [rag/document_parser.go](/server/internal/rag/document_parser.go) — PDF 二进制字节被 `string(b)` 转换破坏：非 UTF-8 字节在 Go string 往返中损坏。应使用 `bytes.NewReader(b)`
 - 🟡 [rag/document_parser.go](/server/internal/rag/document_parser.go) — DOCX 解析只读 `<w:t>` 元素，丢弃表格/超链接/页眉页脚
 - 🟡 [rag/document_parser.go](/server/internal/rag/document_parser.go) — DOCX XML 命名空间硬编码，非标准 Office 软件生成的 docx 可能返回空内容（无报错）
 - 🟡 [rag/document_parser.go](/server/internal/rag/document_parser.go) — PDF 单页解析失败静默跳过，用户收到部分内容无告警
@@ -116,16 +60,13 @@
 ### 置信度与数据完整性
 
 - 🟡 [service/chat_service.go](/server/internal/service/chat_service.go) — 置信度算法粗糙：直接取 max(chunk.Score)，但 BM25 和 RRF 分数量纲不同
-- ✅ [service/chat_service.go](/server/internal/service/chat_service.go) — ~~Sources（检索引用）未写入~~ — 已修复。
 - 🔴 [service/chat_service.go](/server/internal/service/chat_service.go) — `CreateChatSession` 用 `context.Background` 不传播请求取消
 - 🟡 [service/chat_service.go](/server/internal/service/chat_service.go) — `GetChatDetail` 未校验 `session.UserID` 归属
-- ✅ [repository/chat_repo.go](/server/internal/repository/chat_repo.go) — ~~`CreateBatch` 零调用方~~ — 已修复。
-- 🟢 [model/chat.go](/server/internal/model/chat.go) — `ChatMessage.SessionID` 缺少索引。需 `CREATE INDEX idx_chat_messages_session ON chat_messages(session_id)`。
+- 🟢 [model/chat.go](/server/internal/model/chat.go) — `ChatMessage.SessionID` 缺少索引。需 `CREATE INDEX idx_chat_messages_session ON chat_messages(session_id)`
 
 ### 文档一致性
 
-- 📝⭐ [API/chat.md](API/chat.md) — SSE `done` 事件文档记载含 `metadata.pipeline.steps[]` 及 `total_duration_ms`，但 `CreateChatSession` 未填充 `Pipeline` 字段。
-- 🟢 [rag/pipeline.go](/server/internal/rag/pipeline.go) — StepMetric 文档注释中步骤 ID `hybrid_retrieve` 不存在于代码中（实际拆分为 `vector_retrieve` + `bm25_retrieve` + `hybrid_fuse`）
+- 📝⭐ [API/chat.md](API/chat.md) — SSE `done` 事件文档记载含 `metadata.pipeline.steps[]` 及 `total_duration_ms`，但 `CreateChatSession` 未填充 `Pipeline` 字段
 
 ### 输入校验
 
@@ -139,7 +80,16 @@
 - 🟢 [cmd/main.go](/server/cmd/main.go) — BM25 索引 TTL 30 分钟，新发布的知识文章在 BM25 检索中最多延迟 30 分钟可见
 - 🟢 [cmd/main.go](/server/cmd/main.go) — Processor goroutine pool 仅 2 个 worker，大量文档上传时排队
 
+### DTO
+
+- 📌 [dto/response/chat.go:16](/server/internal/dto/response/chat.go) — Pipeline metrics field needs naming unification
+
+### 已修复（33 项）
+
+SSE 流式输出（流式存储一致、真实 token 级流式、步骤事件实时推送、多轮历史截断、SSE 响应头顺序、持久化错误日志）、RAG 管道（llmClient nil 守卫、cross-encoder 重排序、History 字段、RerankCount 预截断、opts 规范化、query_rewrite 降级、multi_route JSON 解析/k 钳位、hybrid 单路截断、步骤 ID 统一）、BM25（内存压力告警、防并发构建、LoadDict 错误、token 过滤、topK 默认值）、Embedding（fail-fast、维度校验、nil 防护）、向量存储（跨 chunk 维度校验、CosineSearch 防护、NaN/Inf 精确检测）、RAG 配置（env 配置化、RAGDefaults）、Sources 持久化、pipeline 死存储移除。
+
 ---
+
 ## 3. 知识库与文档管理
 
 > 对应图：[knowledge-publish-flow.md](diagrams/knowledge-publish-flow.md) + [document-upload-flow.md](diagrams/document-upload-flow.md) — 文章生命周期 → 分块 → Embedding → pgvector；文档上传 → 解析 → 异步处理
@@ -151,6 +101,7 @@
 - 🔴 [service/knowledge_service.go](/server/internal/service/knowledge_service.go) — Publish 使用 `context.Background` 忽略请求取消
 - 🔴 [service/knowledge_service.go](/server/internal/service/knowledge_service.go) — 管道未初始化（`pipeline == nil`）时应映射为 `ErrRAGUnavailable`，而非静默跳过
 - 🔴 [rag/processor.go](/server/internal/rag/processor.go) — embedding 模型硬编码为空字符串 `""`，应从 KB 配置读取
+- 📌 [service/knowledge_service.go:323](/server/internal/service/knowledge_service.go) — 发布失败时应设置 process_status=failed 和 process_error
 
 ### 文章状态机
 
@@ -163,8 +114,6 @@
 
 ### 文档上传与异步处理
 
-- 🔴 [rag/processor.go](/server/internal/rag/processor.go) — Stop 后 Submit 会 panic（向已关闭 channel 发送）；Stop 非幂等（两次 close 同一 channel panic）
-- 🔴 [rag/embedder.go](/server/internal/rag/embedder.go) — 批次失败静默跳过，丢失 chunk 与向量的对应关系；部分批次失败时全部重试浪费之前成功的批次
 - 🔴 [adapter/storage_client.go](/server/internal/adapter/storage_client.go) — `ensureBucket` 失败只 warn 继续启动，后续上传操作失败时错误信息令人困惑
 - 🟡 [rag/document_parser.go](/server/internal/rag/document_parser.go) — `io.LimitReader` 到 100MB 上限不报错，静默截断文档内容
 - 🟡 [service/knowledge_service.go](/server/internal/service/knowledge_service.go) — `RetryDocument` 未校验当前是否处于 failed 状态，可对已成功文档重复入队
@@ -186,15 +135,26 @@
 - 🟢 [rag/chunker.go](/server/internal/rag/chunker.go) — `mergeSplits` 未实现 chunkOverlap（仅 `splitByRunes` 硬切分支持 overlap）
 - 🟢 [rag/chunker.go](/server/internal/rag/chunker.go) — 分块前应做文本归一化（全角→半角、多余空白合并）
 - 🟢 [rag/document_parser.go](/server/internal/rag/document_parser.go) — DOCX 只读 `w:t` 元素，丢失表格和超链接内容
-- 🟢 [service/knowledge_service.go](/server/internal/service/knowledge_service.go) — tags 应 trim/去重/限制数量
+- 🟡 [service/knowledge_service.go](/server/internal/service/knowledge_service.go) — tags 应 trim/去重/限制数量
 - 🟢 [dto/response/knowledge.go](/server/internal/dto/response/knowledge.go) — 门户端不应返回 `RAGWorkspaceSlug`/`EmbeddingModel` 等内部基础设施字段
 
-### 重排序
+### 知识服务代码 TODO
 
-- ✅ [rag/rerank.go](/server/internal/rag/rerank.go) — ~~用 LLM 做重排序，每次消耗 token 且延迟高~~ — 已切换为 cross-encoder 子进程方案（adapter.Reranker + rerank_server.py）
-- ✅ [rag/rerank.go](/server/internal/rag/rerank.go) — ~~`_ = i` 调试残留~~ — 文件已重写，不再包含 LLM prompt 相关代码
+- 📌 [service/knowledge_service.go:185](/server/internal/service/knowledge_service.go) — userID 参数当前未使用
+- 📌 [service/knowledge_service.go:384](/server/internal/service/knowledge_service.go) — source_type/process_status 筛选未实现
+- 📌 [service/knowledge_service.go:427-428](/server/internal/service/knowledge_service.go) — 详情响应仍返回 sync_status/sync_error/synced_at，应改为 process_status/process_error/chunk_index
+
+### Model
+
+- 📌 [model/enums.go:98](/server/internal/model/enums.go) — 为知识文章/处理状态/紧急程度/影响范围提供统一 Text 方法
+- 📌 [dto/response/knowledge.go:70](/server/internal/dto/response/knowledge.go) — ChunkResponse 已有 kb_id/chunk_index，但缺少 created_at
+
+### 已修复（2 项）
+
+Cross-encoder 重排序切换（LLM → subprocess reranker）、`_ = i` 调试残留删除。
 
 ---
+
 ## 4. 申告管理
 
 > 对应图：[ticket-lifecycle.md](diagrams/ticket-lifecycle.md) + [ticket-state-machine.md](diagrams/ticket-state-machine.md) — 创建→处理→补充→解决→关闭 + AutoClose
@@ -225,7 +185,31 @@
 
 - 📝⭐ [PRD.md §3.3](PRD.md) vs [model/enums.go](/server/internal/model/enums.go) — **影响范围取值不一致**：PRD 文档记载 impact_scope 取值 0/1/2/3，enums.go 实际定义 ImpactPersonal=1、ImpactDept=2、ImpactCompany=3（无 0 值）。需统一定义并更新文档。
 
+### 代码 TODO（申告服务）
+
+- 📌 [handler/ticket.go:60](/server/internal/handler/ticket.go) — ListByUser should reuse parsePagination
+- 📌 [handler/ticket.go:138](/server/internal/handler/ticket.go) — 门户端和后台共用 GetDetail，但未区分权限范围
+- 📌 [handler/ticket.go:217](/server/internal/handler/ticket.go) — 跨 Handler 直接调用 KnowledgeService 创建文章，缺少事务和审计记录
+- 📌 [service/ticket_service.go:86](/server/internal/service/ticket_service.go) — 校验 ChatContext 是合法 JSON
+- 📌 [service/ticket_service.go:267](/server/internal/service/ticket_service.go) — req.Detail 应校验为合法 JSON，并限制 action 白名单
+- 📌 [dto/request/ticket.go:42](/server/internal/dto/request/ticket.go) — action 应使用 binding oneof 或自定义校验限制为 start/request_info/resolve/close
+
+### 代码 TODO（消息服务）
+
+- 📌 [service/message_service.go:42](/server/internal/service/message_service.go) — 消息文案应包含 ticket_no/title 或跳转目标摘要
+- 📌 [service/message_service.go:95](/server/internal/service/message_service.go) — 未读数适合缓存或通过 WebSocket/SSE 推送
+
+### Repository
+
+- 📌 [repository/ticket_repo.go:112](/server/internal/repository/ticket_repo.go) — ListAll 对提交人使用二次查询失败时静默忽略
+- 📌 [repository/message_repo.go:33](/server/internal/repository/message_repo.go) — 增加 is_read/type 过滤
+
+### Model
+
+- 📌 [model/ticket.go:40](/server/internal/model/ticket.go) — OperatorID=0 for system operations conflicts with FK
+
 ---
+
 ## 5. 用户与角色管理
 
 > 对应图：[user-rbac-flow.md](diagrams/user-rbac-flow.md) — 用户 CRUD + 角色权限 + 菜单树
@@ -259,9 +243,20 @@
 
 - 🟢 [service/user_service.go](/server/internal/service/user_service.go) — 缺少对 phone/email/realName 的格式/trim 校验
 - 🟢 [model/user.go](/server/internal/model/user.go) — phone 字段缺少唯一索引
-- 🟢 [model/role.go](/server/internal/model/role.go) — Role 缺少 `is_system` 不可变标记字段
+- 🟢 [model/user.go](/server/internal/model/user.go) — Role 缺少 `is_system` 不可变标记字段（注：Role struct 在 `model/user.go:32`，非独立文件）
+
+### 代码 TODO（Handler 层）
+
+- 📌 [handler/role.go:63](/server/internal/handler/role.go) — Role list should support keyword search
+- 📌 [handler/user.go:51](/server/internal/handler/user.go) — 复用 parseID，减少重复错误信息
+- 📌 [handler/user.go:71](/server/internal/handler/user.go) — 复用 parsePagination
+
+### 代码 TODO（Service 层）
+
+- 📌 [service/role_service.go:161](/server/internal/service/role_service.go) — 校验 menuIDs 是否全部存在，且按钮权限不能挂到错误父级
 
 ---
+
 ## 6. LLM 配置与适配层
 
 > 对应图：[llm-config-flow.md](diagrams/llm-config-flow.md) — CRUD + TestConnection + atomic.Value 热替换 + API Key 脱敏
@@ -293,12 +288,12 @@
 ### 适配层通用
 
 - 🔴⭐ [adapter/vector_store.go](/server/internal/adapter/vector_store.go) — **双数据库连接池**：PgvectorStore 创建独立的 `sql.DB`，与 GORM 连接池并存且指向同一 PostgreSQL，浪费连接资源
-- 🔴 [adapter/vector_store.go](/server/internal/adapter/vector_store.go) — NaN/Inf 静默替换为 0.0（应告警或拒绝写入，静默替换污染向量空间）
 - 🟡 [adapter/vector_store.go](/server/internal/adapter/vector_store.go) — 应暴露 `Close()` 方法以在优雅关闭时清理独立连接池
 - 🟡 [adapter/vector_store.go](/server/internal/adapter/vector_store.go) — `fmt.Sprintf("%.6f")` 截断 float32 精度，叠加 halfvec 量化进一步损失召回率
 - 🟡 [adapter/storage_client.go](/server/internal/adapter/storage_client.go) — 上传 key 应由上层 helper 统一生成（当前分散在调用方拼接）
 
 ---
+
 ## 7. 数据看板与审计
 
 > 对应图：[dashboard-audit-flow.md](diagrams/dashboard-audit-flow.md) — 7 项聚合统计 + 趋势图 + 审计日志查询
@@ -309,9 +304,15 @@
 - 🔴 [service/dashboard_service.go](/server/internal/service/dashboard_service.go) — `.Scan()` 错误被丢弃：聚合查询失败时静默返回零值，掩盖数据库故障
 - 🟡 [router/admin.go](/server/internal/router/admin.go) — Dashboard 路由使用 `audit:read` 权限控制，应有独立的 `dashboard:read` 权限
 
-### 审计日志
+### 看板代码 TODO
 
-#### P0 — 审计写入缺失（零调用方）
+- 📌 [service/dashboard_service.go:33](/server/internal/service/dashboard_service.go) — 统计查询串行执行，首屏看板延迟等于所有 SQL 延迟之和
+- 📌 [service/dashboard_service.go:88](/server/internal/service/dashboard_service.go) — 校验 endDate >= startDate 且范围上限（如 90 天）
+- 📌 [service/dashboard_service.go:117](/server/internal/service/dashboard_service.go) — 双重循环填充趋势数据是 O(days * rows)
+- 📌 [repository/dashboard_repo.go:23](/server/internal/repository/dashboard_repo.go) — created_at::date 会让索引失效
+- 📌 [repository/dashboard_repo.go:66](/server/internal/repository/dashboard_repo.go) — 趋势 SQL 固定按日聚合，未支持 week granularity
+
+### 审计日志 — P0 审计写入缺失（零调用方）
 
 `AuditRepo.Create` 存在但零调用方，以下敏感操作全部无审计记录：
 
@@ -326,20 +327,20 @@
 > 修复方式：各 Service 注入 `*AuditRepo`，在关键操作的事务内同步写入审计记录。
 > 为什么同步而非异步：MVP 阶段审计写入是轻量 INSERT，同步执行保证事务一致性（CLAUDE.md §4 明确要求）。
 
-#### P0 — 查询能力不足
+### 审计日志 — P0 查询能力不足
 
 - 🔴 [repository/audit_repo.go](/server/internal/repository/audit_repo.go) — `List()` 无日期范围过滤：全表扫描 `created_at` 无时间边界，大时间跨度查询可能超时
 - 🔴 [dto/request/audit.go](/server/internal/dto/request/audit.go) — 缺少 `date_from`/`date_to` 参数
 - 🟡 [repository/audit_repo.go](/server/internal/repository/audit_repo.go) — 查询维度不足：不支持 `target_type`/`target_id` 筛选，无法按资源维度检索（"谁改过这个申告？"）
 
-#### P1 — 查询性能与数据质量
+### 审计日志 — P1 查询性能与数据质量
 
 - 🟡 [service/audit_service.go](/server/internal/service/audit_service.go) — N+1 查询模式：先查 `audit_logs`，再批量查 `users`（两条 SQL），应改为单条 LEFT JOIN
 - 🟡 [service/audit_service.go](/server/internal/service/audit_service.go) — `operatorID=0`（系统操作）未映射为"系统"显示名，前端展示空字符串
 - 🟡 [dto/request/audit.go](/server/internal/dto/request/audit.go) — `action` 仅支持精确匹配，不支持前缀/模糊搜索（如 `user.*` 查看所有用户操作）
 - 🟡 [service/audit_service.go](/server/internal/service/audit_service.go) — `batchGetOperatorNames` 中 `userRepo.FindByIDs` 失败时静默返回空 map，丢失错误信息
 
-#### P2 — 测试与文档
+### 审计日志 — P2 测试与文档
 
 - 🟡 [tests/repository/audit_repo_test.go](/server/tests/repository/audit_repo_test.go) — 测试使用 `init()` 直接 panic + 硬编码数据库凭据，不符合其他测试模块的标准模式
 - 🟡 缺少 Service 层集成测试（验证各 Service 的审计写入正确性）
@@ -347,7 +348,12 @@
 - 📝 [API/audit-log.md](/docs/API/audit-log.md) — 缺少新增查询参数（`target_type`/`target_id`/`date_from`/`date_to`）
 - 📝 [diagrams/dashboard-audit-flow.md](/docs/diagrams/dashboard-audit-flow.md) — 审计查询流程图显示 JOIN 查询，但代码实际用两条 SQL + Go 层拼接
 
+### 审计 Repo 代码 TODO
+
+- 📌 [repository/audit_repo.go:33](/server/internal/repository/audit_repo.go) — 审计写入失败是否阻断主流程需要统一策略
+
 ---
+
 ## 8. 基础设施与部署
 
 > 对应图：[architecture.md](diagrams/architecture.md) + [request-lifecycle.md](diagrams/request-lifecycle.md) — 启动流程 → 中间件链 → 路由 → 数据库
@@ -369,6 +375,9 @@
 - 🟡 [config/config.go](/server/internal/config/config.go) — 日志脱敏 password/api_key/secret：`config.Dump()` 或日志输出前应掩码
 - 🟡 [config/config.go](/server/internal/config/config.go) — `BindEnv` 24 处返回值全部忽略
 - 🟢 [config/config.go](/server/internal/config/config.go) — `time.Duration` 解析：`OPSMIND_JWT_ACCESS_EXPIRE=3600`（裸数字）会导致解析失败
+- 📌 [service/config_service.go:37](/server/internal/service/config_service.go) — Config key whitelist and type definitions needed
+- 📌 [service/config_service.go:62](/server/internal/service/config_service.go) — 更新 ai 配置项未同步到运行时
+- 📌 [handler/config.go:48](/server/internal/handler/config.go) — binding:"required" 会让 false、0 等合法配置值被判定为缺失
 
 ### 数据库
 
@@ -386,17 +395,27 @@
 - 🟡 [router/portal.go](/server/internal/router/portal.go) — 门户路由无角色校验：仅需 JWT，不验证用户是否为报障人角色
 - 🟡 [middleware/logger.go](/server/internal/middleware/logger.go) — `json.Marshal` 错误被丢弃
 - 🟢 [middleware/logger.go](/server/internal/middleware/logger.go) — request-ID/userID 已记录，缺少**业务错误码**写入日志行（当前仅 HTTP status，无法关联 errcode 10001/20001 等）
+- 📌 [router/admin.go:53](/server/internal/router/admin.go) — 文档上传路由当前缩进异常，后续容易误判其是否属于 Knowledge 分支
 
 ### Repository 层
 
 - 🔴 [repository/pagination.go](/server/internal/repository/pagination.go) — 所有 Repo 方法缺 `context.Context`：HTTP 取消不传播到 DB 查询，追踪无法关联
 - 🟡 [repository/pagination.go](/server/internal/repository/pagination.go) — 分页辅助函数零调用方（死代码），各 Repo 自行实现分页
 - 🟡 [repository/knowledge_repo.go](/server/internal/repository/knowledge_repo.go) — GORM query 对象复用于 Count 和 Find，session 状态可能泄漏
+- 📌 [repository/knowledge_repo.go:34](/server/internal/repository/knowledge_repo.go) — 创建知识库应依赖数据库唯一索引兜底
+- 📌 [repository/knowledge_repo.go:117](/server/internal/repository/knowledge_repo.go) — Count 后复用同一个 query 继续 Offset/Limit 容易携带 Count 的状态
+- 📌 [repository/config_repo.go:46](/server/internal/repository/config_repo.go) — Upsert 会覆盖 description 之外的配置元信息
+- 📌 [repository/chat_repo.go:37](/server/internal/repository/chat_repo.go) — FindByID 应支持 userID 条件，用于门户端防止水平越权
 
 ### 调度器
 
 - 🟢 [service/scheduler.go](/server/internal/service/scheduler.go) — `Start` 应防重复调用（当前无幂等保护）
 - 🟢⭐ [service/scheduler.go](/server/internal/service/scheduler.go) — **调度器首次启动不立即执行 AutoClose**：必须等待首个完整 cron 周期，频繁重启时超期工单可能长时间未关闭
+
+### 事务管理器
+
+- 📌 [service/tx_manager.go:18](/server/internal/service/tx_manager.go) — 校验 db 非 nil，构造期提前暴露装配错误
+- 📌 [service/tx_manager.go:24](/server/internal/service/tx_manager.go) — Transaction 可以接收 context.Context 并使用 db.WithContext(ctx)
 
 ### 日志与错误
 
@@ -404,12 +423,23 @@
 - 🟡 [pkg/response/response.go](/server/pkg/response/response.go) — 分页响应格式不统一（顶层 `total/page/page_size` vs 部分前端类型期望 `data.items/data.total`）
 - 🟢 [middleware/logger.go](/server/internal/middleware/logger.go) — 部分 Handler 未使用 `handleServiceError` 封装（分散在 `auth.go` 而非 `common.go`）
 
+### Handler 通用工具
+
+- 📌 [handler/common.go:24](/server/internal/handler/common.go) — page_size max 应可配置
+- 📌 [handler/common.go:58](/server/internal/handler/common.go) — 应提供 `mustCurrentUserID()` helper
+
+### Model 层
+
+- 📌 [model/common.go:8](/server/internal/model/common.go) — 分页 Scope 与 repository.Paginate 重复，且没有 pageSize 上限
+- 📌 [model/system.go:14](/server/internal/model/system.go) — 配置表缺少 value_type、editable、validation_schema
+
 ### 文档一致性
 
-- 📝⭐ [TECH.md §2.1](TECH.md) — **模块文件计数偏差**：TECH.md 记载「11 handlers」（实际 12 个 .go 文件 + common.go）、「12 services」（实际 13 个 .go 文件 + tx_manager.go）、「12 model 文件」（实际 10 个 .go 文件）、「15 web API 文件」（实际 12 个 .ts 文件）、「11 RAG 文件」（实际 12 个含 retriever.go）。文件计数需更新或改为"约 N 个"。
+- 📝⭐ ~~[TECH.md §2.1](TECH.md) — **模块文件计数偏差**~~ — 经核实，TECH.md 项目结构计数准确（handler: 11 模块+common.go=12、service: 12 服务+2 基础设施=14、model: 10、rag: 12、web/api: 12），原审计读数有误，已排除。
 - 📝⭐ docs 目录引用 `docs/v2/` 和 `server/migrations/v2/`，但两个目录均不存在，迁移脚本缺失。
 
 ---
+
 ## 9. 前端架构与交互
 
 > 对应全部业务流程图的前端部分（Vue 3 + TypeScript）
@@ -421,6 +451,16 @@
 - 🔴⭐ [utils/request.ts](/web/src/utils/request.ts) — **Token 刷新竞态**：刷新失败时 `refreshSubscribers` 重置为 `[]` 但未通知已订阅者，其 Promise 永久挂起（内存泄漏）。
 - 🟡 [views/auth/Login.vue](/web/src/views/auth/Login.vue) — 错误信息提取不完整：`catch` 用 `err?.message`（Axios 通用字符串），后端真实错误在 `err.response?.data?.message`
 
+### 新发现 P0 项（2026-06-16）
+
+- 🔴⭐ [stores/chat.ts](/web/src/stores/chat.ts) — `crypto.randomUUID()` 无 fallback：HTTP/localhost 环境下 `crypto.randomUUID()` 为 undefined，调用直接抛 TypeError 崩溃整个聊天功能。已有 `generateId()` 工具函数（`utils/__tests__/id.test.ts`）但未使用。
+- 🔴⭐ [views/admin/TicketDetail.vue](/web/src/views/admin/TicketDetail.vue) — 操作按钮缺 loading 守卫：`doAction()` 和 `doAddRecord()` 未绑定 `:disabled` 到 `<template>` 按钮，用户可多次点击发送重复请求。
+- 🔴⭐ [App.vue](/web/src/App.vue) — `NMessageProvider` 死代码：全项目无组件使用 Naive UI `useMessage()`（统一使用自定义 `useToast()`），每次渲染浪费不必要的组件树开销。
+
+### 前置组件 P0（已有 TODO）
+
+- 🔴⭐ [views/admin/LLMConfig.vue](/web/src/views/admin/LLMConfig.vue) — **创建配置时测试连接崩溃**：`handleTestConnection` 调 `updateLLMConfig(editingId.value!)`，新建时 `editingId` 为 null，`!` 断言导致运行时崩溃
+
 ### 数据流与类型安全
 
 - 🟡⭐ **系统性 `as any` 类型侵蚀**（~15 个文件）：`(res as any).data || res` 模式遍布组件和 Store，TypeScript 类型检查形同虚设。根因是组件不确定响应拦截器是否已解包 `ApiResponse<T>` 包装。
@@ -430,7 +470,6 @@
 
 ### 配置管理
 
-- 🔴⭐ [views/admin/LLMConfig.vue](/web/src/views/admin/LLMConfig.vue) — **创建配置时测试连接崩溃**：`handleTestConnection` 调 `updateLLMConfig(editingId.value!)`，新建时 `editingId` 为 null，`!` 断言导致运行时崩溃
 - 🟡 [views/admin/LLMConfig.vue](/web/src/views/admin/LLMConfig.vue) — 每次编辑必须重新输入 API Key（后端返回脱敏值，前端清空表单）
 - 🟡⭐ [views/admin/ModelConfig.vue](/web/src/views/admin/ModelConfig.vue) + [views/admin/SystemConfig.vue](/web/src/views/admin/SystemConfig.vue) — **重复配置管理**：两页面独立管理 `ai.default_top_k` 和 `ai.confidence_threshold`，修改互不可见，最后写入胜出。📝 [PRD.md §3.1](PRD.md) 记载这两个参数应为统一 AI 配置，而非分散在两个独立页面。
 
@@ -439,9 +478,18 @@
 - 🟡 [views/portal/Chat.vue](/web/src/views/portal/Chat.vue) — 组件 >560 行，应拆分为 ChatInput/ChatMessage/ChatPipeline 子组件
 - 🟡 [views/admin/LLMConfig.vue](/web/src/views/admin/LLMConfig.vue) — 组件 >610 行，应拆分
 - 🟡 [views/admin/KnowledgeEdit.vue](/web/src/views/admin/KnowledgeEdit.vue) — 组件 >400 行，多文件上传只显示单个汇总结果
-- 🟡⭐ **重复 `formatDate`**：[utils/date.ts](/web/src/utils/date.ts)、[utils/format.ts](/web/src/utils/format.ts)、Messages.vue、Dashboard.vue 各有一份独立实现
+- 🟡⭐ **重复 `formatDate`**：[utils/date.ts](/web/src/utils/date.ts)、[utils/format.ts](/web/src/utils/format.ts)、Messages.vue、Dashboard.vue 各有一份独立实现。`utils/format.ts` 全文件为 `utils/date.ts` 的完整副本且零调用方——应删除。
 - 🟡 [views/admin/KnowledgeEdit.vue](/web/src/views/admin/KnowledgeEdit.vue) — `router.back()` 在直接访问页面时可能离开应用
 - 🟡 [components/common/StatusBadge.vue](/web/src/components/common/StatusBadge.vue) — `knowledge` 类型未实现：TEXT_MAP 和 TYPE_MAP 中缺少 knowledge 键，知识文章状态渲染为「未知」
+
+### 新发现 P1 项（2026-06-16）
+
+- 🟡⭐ [views/admin/KnowledgeEdit.vue](/web/src/views/admin/KnowledgeEdit.vue) — 使用原生 `alert()` 而非 `useToast()`：10 处 `alert()` 调用（`fetchKBs`、`handleSave`、`handlePublish` 等）阻塞 UI 线程且无设计系统样式集成。
+- 🟡⭐ [views/admin/KnowledgeList.vue](/web/src/views/admin/KnowledgeList.vue) — KB 编辑对话框静默清空 description：`startEditKB` 始终 `description: ''`，保存后服务端描述被覆盖为空字符串。
+- 🟡⭐ [views/admin/RoleManage.vue](/web/src/views/admin/RoleManage.vue) — 权限列表硬编码：`availablePermissions` 为静态数组，后端新增权限时前端不可见。应通过 `listMenus` API 动态获取。
+- 🟡⭐ [types/menu.ts](/web/src/types/menu.ts) vs [api/role.ts](/web/src/api/role.ts) — 两个 `MenuItem` 类型定义不一致：`types/menu.ts` 含 5 字段，`api/role.ts` 含 8 字段（`parent_id`/`sort_order`/`type` 等缺失）。登录响应使用精简版，丢失服务端字段。
+- 🟡⭐ [stores/chat.ts](/web/src/stores/chat.ts) — `clearSession()` 不重置 `selectedKBID` 和 `ragOptions`：KP 被管理员删除后，旧的 KB ID 导致下次提问报错。
+- 🟡⭐ [views/admin/ModelConfig.vue](/web/src/views/admin/ModelConfig.vue) — `Promise.all` 部分失败：两个 `setConfig` 若第一个成功第二个失败，配置处于不一致状态。应使用 `Promise.allSettled` 或顺序保存。
 
 ### 类型与边界情况
 
@@ -452,6 +500,28 @@
 - 🟡 [views/admin/KnowledgeList.vue](/web/src/views/admin/KnowledgeList.vue) — `(res.data as any).articles || (res.data as any).items || []` 三种回退提取，暴露 API 响应形状不确定
 - 🟡 [components/layout/AdminLayout.vue](/web/src/components/layout/AdminLayout.vue) — 菜单路径硬编码字符串，应引用路由名称
 
+### 前端代码 TODO（来自代码注释）
+
+- 📌 [composables/useAIConfig.ts:48](/web/src/composables/useAIConfig.ts) — loadConfig swallows errors, uses defaults silently
+- 📌 [views/admin/KnowledgeEdit.vue:151](/web/src/views/admin/KnowledgeEdit.vue) — fetchArticle/fetchKBs only console.error on failure
+- 📌 [views/admin/KnowledgeEdit.vue:279](/web/src/views/admin/KnowledgeEdit.vue) — 多文件上传时应显示每个文件的独立状态和失败原因
+- 📌 [views/portal/TicketDetail.vue:96](/web/src/views/portal/TicketDetail.vue) — API call failures silently set null
+- 📌 [views/portal/TicketSubmit.vue:117](/web/src/views/portal/TicketSubmit.vue) — 组件超过 340 行，可提取表单字段组件和验证逻辑
+- 📌 [views/portal/Chat.vue:88](/web/src/views/portal/Chat.vue) — 增加显式的输入校验（trim + max rune count）
+- 📌 [views/admin/Dashboard.vue:116](/web/src/views/admin/Dashboard.vue) — 统计卡片可增加"更新时间"和手动刷新按钮
+- 📌 [views/admin/Dashboard.vue:147](/web/src/views/admin/Dashboard.vue) — 小数值统一最小 4px 会让 0 和 1 视觉差异不明显
+- 📌 [views/admin/LLMConfig.vue:209](/web/src/views/admin/LLMConfig.vue) — getLLMConfigs 类型应直接返回 ApiResponse 解包后的 data
+
+### 新发现 P2 项（2026-06-16）
+
+- 🟢⭐ [views/admin/Dashboard.vue](/web/src/views/admin/Dashboard.vue) — `fetchTrends` 失败静默吞掉：`catch { trendPoints.value = [] }`，用户无法区分"无趋势数据"和"趋势加载失败"。
+- 🟢⭐ [views/portal/Messages.vue](/web/src/views/portal/Messages.vue) + [views/portal/TicketQuery.vue](/web/src/views/portal/TicketQuery.vue) — API 失败静默清空数据数组，无用户可见错误提示。
+- 🟢⭐ [router/index.ts](/web/src/router/index.ts) — 角色不足时重定向到 `/login` 而非 403 页面，已登录用户看到闪现的登录页。
+- 🟢⭐ [utils/knowledge.ts](/web/src/utils/knowledge.ts) — `parsing`/`chunking`/`embedding` 三种状态映射到同一 CSS class `pending`，用户无法区分文档处理阶段。
+- 🟢⭐ [stores/app.ts](/web/src/stores/app.ts) — `decrementUnread` 死代码：导出但全项目零调用方。
+- 🟢⭐ [components/layout/AdminLayout.vue](/web/src/components/layout/AdminLayout.vue) — 菜单匹配用 `path.startsWith()` 硬编码分组，URL 结构变更时静默失效。
+- 🟢⭐ [views/admin/KnowledgeEdit.vue](/web/src/views/admin/KnowledgeEdit.vue) — 无 tag 数量上限，超出服务端限制时返回不友好错误。
+
 ### 基础设施
 
 - 🟢 [utils/request.ts](/web/src/utils/request.ts) — `loadingState` 模块级全局计数器，SSR/并发测试不安全
@@ -461,90 +531,105 @@
 - 🟢 [api/dashboard.ts](/web/src/api/dashboard.ts) — `granularity` 参数定义但后端未实现（死代码）
 
 ---
+
 ## 10. 整表空数据（架构性变更）
 
 > 以下表定义了 model 和 repository，但无 Service 层代码实际写入数据：
 
 - 🔴 `audit_logs` — `AuditRepo.Create` 存在但零调用方，详细调用点清单见 §7 审计日志（共 7 个 Service 缺失审计写入）
-- ✅ `chat_messages` — ~~`ChatRepo.CreateBatch` 零调用方~~ — 多轮对话重构后已修复：每次 CreateChatSession/StreamChat 均写入 chat_messages。
 - 🔴 `chat_sessions.sources` — `CreateChatSession` 未填充 `Sources` 字段，检索引用证据永远为空
 - 🟡 `system_configs.description` — `Upsert` 未设置 `Description`，配置说明永远为空
 
----
-## 11. 代码 TODO 注释 ↔ 文档双向一致性（新增专项）
+### 已修复
 
-> ⭐ 本段为 2026-06-15 审计新增。记录代码中已有的 TODO 注释与文档的对应关系。
-
-### 11.1 代码中有 TODO 但 TODO.md 未收录
-
-以下代码注释了 TODO，但未在本文档对应章节列出。保证代码读者和文档读者看到一致的问题清单。
-
-| 代码位置 | TODO 内容 | 应归类 |
-|----------|-----------|--------|
-| [pkg/response/response.go:43](/server/pkg/response/response.go) | 错误响应应带 `request_id` | §8 日志与错误 |
-| [pkg/response/response.go:54](/server/pkg/response/response.go) | 分页响应格式不统一 | §8 日志与错误 |
-| [service/llm_service.go:139](/server/internal/service/llm_service.go) | LLM 生成失败应返回 ErrAIUnavailable，而非保存兜底答案为成功（SSE 重构后移至 LLMService） | §2 智能问答 |
-| [service/config_service.go:37](/server/internal/service/config_service.go) | Config key whitelist and type definitions needed | §8 配置管理 |
-| [service/config_service.go:62](/server/internal/service/config_service.go) | 更新 ai 配置项未同步到运行时 | §8 配置管理 |
-| [handler/ticket.go:60](/server/internal/handler/ticket.go) | ListByUser should reuse parsePagination | §4 申告管理 |
-| [handler/role.go:63](/server/internal/handler/role.go) | Role list should support keyword search | §5 角色管理 |
-| [handler/common.go:24](/server/internal/handler/common.go) | page_size max 应可配置 | §8 基础设施 |
-| [handler/common.go:58](/server/internal/handler/common.go) | 应提供 `mustCurrentUserID()` helper | §8 基础设施 |
-| [model/enums.go:94](/server/internal/model/enums.go) | 为知识文章/处理状态/紧急程度/影响范围提供统一 Text 方法 | §3 知识库 |
-| [model/ticket.go:40](/server/internal/model/ticket.go) | OperatorID=0 for system operations conflicts with FK | §4 申告管理 |
-| [dto/response/chat.go:15](/server/internal/dto/response/chat.go) | Pipeline metrics field needs naming unification | §2 智能问答 |
-| [composables/useAIConfig.ts:48](/web/src/composables/useAIConfig.ts) | loadConfig swallows errors, uses defaults silently | §9 前端 |
-| [views/admin/KnowledgeEdit.vue:151](/web/src/views/admin/KnowledgeEdit.vue) | fetchArticle/fetchKBs only console.error on failure | §9 前端 |
-| [views/portal/TicketDetail.vue:96](/web/src/views/portal/TicketDetail.vue) | API call failures silently set null | §9 前端 |
-
-### 11.2 P0/TODO 注释覆盖度验证
-
-经逐项核验，所有 18 个 P0 项在对应代码文件中**均已存在** `// TODO(...)` 注释标记 — 开发者阅读代码时可以触达已知缺陷。
-
-> 验证通过。但以下 5 个 TODOs 注释位于函数体内部深处（不在文件头/函数签名附近），可读性可提升：`migrate.go:48`（双重索引）、`llm_client.go:409`（doHTTPRequest 429/503）、`llm_config_service.go:152`（事务 DB 句柄）、`knowledge_service.go:303`（DeleteByArticle 非原子）、`knowledge_service.go:276`（status=3 语义混淆）。建议将注释提升到函数签名级或文件头。
+- `chat_messages` — `ChatRepo.CreateBatch` 已通过多轮对话重构修复。
 
 ---
+
+## 11. P0 项代码 TODO 覆盖验证
+
+> 本节仅验证 P0 项在代码中是否均有对应 TODO 注释，不再罗列非 P0 的 TODO 列表。
+> 所有代码 TODO 注释已归入上方 §1-§10 对应章节（以 📌 标记）。
+
+### 11.1 P0 代码 TODO 覆盖状态
+
+经全量扫描，22 个 P0 项对应关系：
+
+| P0 # | 文件 | 问题 | 代码 TODO |
+|------|------|------|-----------|
+| 1 | `adapter/llm_client.go` | 重试机制完全失效 | ✅ 已有 |
+| 2 | `model/llm_config.go` | API Key 明文存储 | ✅ 已有 |
+| 3 | `handler/llm_config.go` | TestConnection 测试错误端点 | ✅ 已有 |
+| 4 | `handler/llm_config.go` | UpdateConfig 清空 api_key | ✅ 已有 |
+| 5 | `service/llm_config_service.go` | 事务用错 DB 句柄 | ✅ 已有 |
+| 6 | `rag/processor.go` | Stop/Submit panic | ✅ 已有 |
+| 7 | `repository/role_repo.go` | Delete(0) 删除全部角色 | ✅ 已有 |
+| 8 | `cmd/main.go` | nil 传播到下游 panic | ✅ 已有 |
+| 9 | `config/config.go` | 配置 YAML 格式错误静默吞掉 | ✅ 2026-06-16 新增 |
+| 10 | `database/migrate.go` | ASC+DESC 双重索引 | ✅ 已有 |
+| 11 | `web/src/router/index.ts` | JWT atob base64url 不兼容 | ✅ 已有 |
+| 12 | `web/src/api/chat.ts` | SSE 流绕过 Axios 拦截器 | ✅ 2026-06-16 新增 |
+| 13 | `views/admin/LLMConfig.vue` | 创建配置时测试连接崩溃 | ✅ 已有 |
+| 14 | `repository/pagination.go` | 全层缺少 context.Context | ✅ 已有 |
+| 15 | `repository/llm_config_repo.go` | is_default 缺部分唯一索引 | ✅ 已有 |
+| 16 | `rag/processor.go` | embedding 模型硬编码 | ✅ 已有 |
+| 17 | `service/knowledge_service.go` | DeleteByArticle 非原子 | ✅ 已有 |
+| 18 | `model/enums.go` vs `API/knowledge.md` | 文章状态编号不一致 | ✅ 已有 |
+| 19 | `handler/knowledge.go` vs `API/knowledge.md` | 上传 API 字段名不一致 | ✅ 已有 |
+| 20 | `web/src/stores/chat.ts` | crypto.randomUUID() 无 fallback | ✅ 2026-06-16 新增 |
+| 21 | `views/admin/TicketDetail.vue` | 操作按钮缺 loading 守卫 | ✅ 2026-06-16 新增 |
+| 22 | `web/src/App.vue` | NMessageProvider 死代码 | ✅ 2026-06-16 新增 |
+
+**覆盖度：22/22 P0 项均有代码 TODO 注释。**
+
+---
+
 ## 统计
 
-| 业务流程 | 🔴 P0 | 🟡 P1 | 🟢 P2 | 合计 |
-|----------|-------|-------|-------|------|
-| 1. 认证与授权 | 0 | 0 | 1 | 1 |
-| 2. 智能问答 RAG | 5 | 36 | 14+1📝 | 55(+32) |
-| 3. 知识库与文档管理 | 5 | 16+2📝 | 6 | 27(+2) |
-| 4. 申告管理 | 5 | 6+1📝 | 2 | 12(+1) |
-| 5. 用户与角色管理 | 2 | 9 | 4 | 15 |
-| 6. LLM 配置与适配层 | 12+2📝 | 9 | 2 | 23(+2) |
-| 7. 数据看板与审计 | 11 | 5 | 2+2📝 | 18(+2) |
-| 8. 基础设施与部署 | 11 | 14+1📝 | 6 | 31(+3) |
-| 9. 前端架构与交互 | 4 | 18 | 6 | 28(+2) |
-| 10. 整表空数据 | 3 | 1 | 0 | 4 |
-| 11. TODO ↔ 文档双向一致性 | — | — | — | (新增) |
-| **合计** | **56** | **113** | **42+7📝** | **211** |
+| 业务流程 | 🔴 P0 | 🟡 P1 | 🟢 P2 | 📌 TODO | 合计 |
+|----------|-------|-------|-------|----------|------|
+| 1. 认证与授权 | 0 | 0 | 1 | 2 | 3 |
+| 2. 智能问答 RAG | 3 | 10+1📝 | 8 | 1 | 23 |
+| 3. 知识库与文档管理 | 4 | 12+5📝 | 5 | 7 | 33 |
+| 4. 申告管理 | 5 | 7+1📝 | 2 | 10 | 25 |
+| 5. 用户与角色管理 | 2 | 9 | 3 | 4 | 18 |
+| 6. LLM 配置与适配层 | 12+2📝 | 9 | 0 | 0 | 23 |
+| 7. 数据看板与审计 | 11 | 7 | 2+3📝 | 6 | 29 |
+| 8. 基础设施与部署 | 11 | 14+1📝 | 5 | 16 | 47 |
+| 9. 前端架构与交互 | 7⭐ | 11+5⭐ | 10+5⭐ | 9 | 47 |
+| 10. 整表空数据 | 2 | 1 | 0 | 0 | 3 |
+| 11. P0 覆盖验证 | — | — | — | — | (维护) |
+| **合计** | **57** | **80** | **36+9📝** | **55** | **~251** |
 
-> ⭐ 标记项为 2026-06-15 再审计新发现问题（共 22 项，含 5 项 P0，5 项 📝 文档一致性缺陷）。
-> 📝 标记项为代码实现与 API 文档/PRD/TECH.md 不一致的文档缺陷（共 8 项）。
+> ⭐ 标记项为 2026-06-16 审计新发现（前端 18 项 + 后端 13 项）。
+> 📝 标记项为代码与 API 文档/PRD/TECH.md 不一致的文档缺陷（共 9 项）。
+> 📌 标记项为代码中已存在的 TODO 注释，本次审计同步收录到对应业务章节（共 55 项）。
 
 ### P0 速览（生产环境最优先修复）
 
-1. LLM/Embedding 重试机制完全失效（`doHTTPRequest` 不包装 `retryableError`）
-2. API Key 明文存储（数据库泄露 = 全部密钥暴露）📝 文档声明加密但未实现
-3. TestConnection 测试错误端点（功能完全失效）📝 行为与 API 文档完全不符
-4. UpdateConfig 清空 api_key（零值覆盖数据库中的密钥）📝 文档声明不传=保留但行为相反
-5. 事务用错 DB 句柄（`ClearDefault` + `Create` 在事务外执行）
-6. Processor Stop/Submit panic（优雅关闭时崩溃）
-7. `role_repo.Delete(0)` 删除全部角色（GORM 零值陷阱）
-8. pgvector/MinIO 初始化失败后 nil 传播到下游 panic
-9. 配置 YAML 格式错误静默吞掉（应用以默认值启动）
-10. ASC+DESC 双重索引加倍存储写入开销
-11. JWT 过期检查 `atob` base64url 不兼容（前端）
-12. SSE 流绕过 Axios 拦截器（token 过期无法刷新）
-13. 前端创建 LLM 配置时测试连接崩溃
-14. Repository 全层缺少 `context.Context`（取消/追踪断裂）
-15. `is_default` 缺少部分唯一索引（并发创建多个默认配置）
-16. embedding 模型硬编码为空字符串
-17. `DeleteByArticle` + `BatchInsert` 非原子（文章向量丢失）
-18. 文章状态编号文档与代码不一致（Disabled 文档=5 / 代码=0）
-19. 上传 API 字段名与文档不一致（文档 `files` vs 代码 `file`）
+1. LLM/Embedding 重试机制完全失效
+2. API Key 明文存储 📝
+3. TestConnection 测试错误端点 📝
+4. UpdateConfig 清空 api_key 📝
+5. 事务用错 DB 句柄
+6. Processor Stop/Submit panic
+7. `role_repo.Delete(0)` 删除全部角色
+8. pgvector/MinIO nil 传播
+9. 配置 YAML 格式错误静默吞掉
+10. ASC+DESC 双重索引
+11. JWT atob base64url 不兼容（前端）
+12. SSE 流绕过 Axios 拦截器（前端）
+13. 前端创建 LLM 配置崩溃
+14. Repository 全层缺 context.Context
+15. `is_default` 缺部分唯一索引
+16. embedding 模型硬编码为空
+17. DeleteByArticle 非原子
+18. 文章状态编号文档 vs 代码不一致 📝
+19. 上传 API 字段名文档 vs 代码不一致 📝
+20. ⭐ crypto.randomUUID() 无 fallback（前端）
+21. ⭐ TicketDetail 缺 loading 守卫（前端）
+22. ⭐ NMessageProvider 死代码（前端）
 
 ---
-**最后更新**：2026-06-16（embedder.go 4 项 + vector_store.go 3 项 TODO 修复：fail-fast / nil client 守卫 / 维度一致性校验 / NaN/Inf 精确检测 / CosineSearch topK+空向量防护 / BatchInsert 跨 chunk 维度校验）
+
+**最后更新**：2026-06-16（§1-§10 整合全部 55 条代码 TODO 注释，以 📌 标记；§11 精简为 P0 覆盖验证；P0 已达 22/22 全覆盖）

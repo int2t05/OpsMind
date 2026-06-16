@@ -141,6 +141,8 @@ func Load(configPath string) (*AppConfig, error) {
 	}
 
 	// 配置文件不存在时不报错（使用默认值和环境变量）
+	// TODO(config): 非 ConfigFileNotFoundError 的 ReadInConfig 错误（如 YAML 格式错误）被静默丢弃，
+	// 应用以默认值启动而不报错——生产环境可能以错误配置运行。应区分错误类型并至少 Warn。
 	if err := v.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
 			return nil, err

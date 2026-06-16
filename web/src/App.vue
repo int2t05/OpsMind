@@ -10,6 +10,8 @@
 // 根组件 — Naive UI 全局配置提供者。
 // 通过 NConfigProvider 注入主题覆盖，所有子组件自动响应主题切换。
 // NMessageProvider 提供 useMessage() 的全局上下文。
+// TODO(app): NMessageProvider 为死代码——全项目无组件使用 Naive UI useMessage()，
+// 统一使用自定义 useToast() composable。应移除以减少不必要的组件树开销。
 // light 主题使用 Naive UI 内置 lightTheme + 自定义 themeOverrides，
 // 确保与 global.css 的自定义 CSS 变量视觉一致。
 

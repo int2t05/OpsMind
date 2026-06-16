@@ -8,6 +8,9 @@
  *
  * SSE 流使用原生 fetch（非 axios），原因是 EventSource 仅支持 GET，
  * 无法携带 JSON 请求体。Token 注入和错误处理在此模块内自包含。
+ *
+ * TODO(chat): SSE 流绕过 Axios 拦截器——Token 刷新（401 响应）对流式请求完全失效。
+ * 若 token 在流中途过期，连接断开且无恢复机制。需实现 SSE 专用的 token 刷新策略。
  */
 import request from '@/utils/request'
 import type { ApiResponse } from '@/types/api'

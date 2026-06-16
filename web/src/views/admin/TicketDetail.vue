@@ -125,6 +125,8 @@ onMounted(async () => {
 
 // toast 已通过 useToast composable 管理，自动处理定时器清理
 
+// TODO(ticket): doAction 和 doAddRecord 的 saving 状态未绑定到 <template> 按钮的 :disabled 属性。
+// 用户可多次点击发送重复的 updateTicketStatus / addTicketRecord 请求。
 async function doAction(action: string) {
   saving.value = true
   try {

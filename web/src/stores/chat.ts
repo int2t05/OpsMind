@@ -85,6 +85,8 @@ export const useChatStore = defineStore('chat', () => {
     pipelineMetrics.value = null
 
     // 添加用户消息
+    // TODO(chat): crypto.randomUUID() 在 HTTP/localhost 环境下为 undefined，调用直接抛 TypeError。
+    // 应改用已有的 generateId() 工具函数（utils/__tests__/id.test.ts）作为 fallback。
     messages.value.push({ id: crypto.randomUUID(), role: 'user', content: question })
 
     // 添加 AI 消息占位（流式填充）
