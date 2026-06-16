@@ -38,11 +38,16 @@ type loginFailRecord struct {
 //
 // jwtCfg 在构造时注入，使得令牌有效期可通过 config 控制，
 // 而非写死 2h/7d——环境变量 OPSMIND_JWT_* 调整后无需改代码。
+//
+// tokenBlacklist 为内存级已失效 refresh token 集合，key 为原始 token 字符串。
+// 为什么用内存而非 DB：MVP 阶段单实例足够；token 到期后自动从 map 清理。
 type AuthService struct {
-	userRepo    *repository.UserRepo
-	db          *gorm.DB
-	jwtCfg      config.JWTConfig
-	rateLimiter *loginRateLimiter
+	userRepo       *repository.UserRepo
+	db             *gorm.DB
+	jwtCfg         config.JWTConfig
+	rateLimiter    *loginRateLimiter
+	tokenBlacklist map[string]time.Time // 已失效 refresh token -> 到期时间
+	blMu           sync.Mutex
 }
 
 // loginRateLimiter 基于内存的登录失败限流器。
@@ -59,7 +64,7 @@ type loginRateLimiter struct {
 
 // NewAuthService 创建 AuthService 实例。
 func NewAuthService(userRepo *repository.UserRepo, db *gorm.DB, jwtCfg config.JWTConfig) *AuthService {
-	return &AuthService{
+	s := &AuthService{
 		userRepo: userRepo,
 		db:       db,
 		jwtCfg:   jwtCfg,
@@ -68,6 +73,26 @@ func NewAuthService(userRepo *repository.UserRepo, db *gorm.DB, jwtCfg config.JW
 			maxFails: 5,
 			window:   15 * time.Minute,
 		},
+		tokenBlacklist: make(map[string]time.Time),
+	}
+	// 后台定期清理已过期的黑名单条目，防止内存泄漏
+	go s.blacklistCleanupLoop()
+	return s
+}
+
+// blacklistCleanupLoop 每 10 分钟清理一次已到期的黑名单条目。
+func (s *AuthService) blacklistCleanupLoop() {
+	ticker := time.NewTicker(10 * time.Minute)
+	defer ticker.Stop()
+	for range ticker.C {
+		s.blMu.Lock()
+		now := time.Now()
+		for token, exp := range s.tokenBlacklist {
+			if now.After(exp) {
+				delete(s.tokenBlacklist, token)
+			}
+		}
+		s.blMu.Unlock()
 	}
 }
 
@@ -153,11 +178,40 @@ func (s *AuthService) Login(username, password string) (*response.LoginResponse,
 	return s.buildLoginResponse(user)
 }
 
+// Logout 使当前 refresh token 失效。
+//
+// 将 token 加入内存黑名单，阻止其被用于刷新。
+// 黑名单条目在 token 到期后由后台 goroutine 自动清理。
+func (s *AuthService) Logout(refreshToken string) error {
+	claims, err := jwt.ParseToken(refreshToken, s.jwtCfg.Secret)
+	if err != nil {
+		// token 已过期或无效——仍视为退出成功（不需要再失效）
+		slog.Info("Logout：token 已无效，跳过黑名单", "error", err)
+		return nil
+	}
+
+	s.blMu.Lock()
+	s.tokenBlacklist[refreshToken] = claims.ExpiresAt.Time
+	s.blMu.Unlock()
+
+	slog.Info("用户已退出登录，refresh token 已失效", "user_id", claims.UserID)
+	return nil
+}
+
 // RefreshToken 刷新令牌。
 //
 // 解析 refresh_token 后重新生成令牌对。
 // 为什么不直接生成新 access_token：统一走令牌对刷新，客户端逻辑更简单。
 func (s *AuthService) RefreshToken(refreshToken string) (*response.LoginResponse, error) {
+	// 检查 token 是否已被登出（黑名单）
+	s.blMu.Lock()
+	if _, blacklisted := s.tokenBlacklist[refreshToken]; blacklisted {
+		s.blMu.Unlock()
+		slog.Warn("刷新令牌已被登出失效")
+		return nil, AppError{Code: 10001, Message: "刷新令牌已失效，请重新登录"}
+	}
+	s.blMu.Unlock()
+
 	claims, err := jwt.ParseToken(refreshToken, s.jwtCfg.Secret)
 	if err != nil {
 		slog.Warn("刷新令牌无效", "error", err)

@@ -14,6 +14,11 @@ type RefreshRequest struct {
 	RefreshToken string `json:"refresh_token" binding:"required"` // 刷新令牌
 }
 
+// LogoutRequest 退出登录请求
+type LogoutRequest struct {
+	RefreshToken string `json:"refresh_token" binding:"required"` // 需失效的刷新令牌
+}
+
 // ChangePasswordRequest 修改密码请求
 type ChangePasswordRequest struct {
 	OldPassword string `json:"old_password" binding:"required"` // 旧密码
