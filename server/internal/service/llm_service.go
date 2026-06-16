@@ -353,7 +353,8 @@ func (s *LLMService) buildMessages(chunks []rag.RetrievalResult, question string
 
 // getModelConfig 从 LLMConfigManager 读取当前模型和 maxTokens。
 //
-// configMgr 为 nil 或配置为空时，回退到 defaultModel + 2048。
+// 优先级：DB 热配置 > config.yaml 默认值。configMgr 为 nil 或 DB 无配置时回退到 defaultModel。
+// defaultModel 来自 config.yaml OPSMIND_LLM_MODEL，运行时不依赖硬编码字符串。
 func (s *LLMService) getModelConfig() (model string, maxTokens int) {
 	model = s.defaultModel
 	maxTokens = 2048
@@ -366,9 +367,6 @@ func (s *LLMService) getModelConfig() (model string, maxTokens int) {
 				maxTokens = cfg.MaxTokens
 			}
 		}
-	}
-	if model == "" {
-		model = "default"
 	}
 	return
 }
@@ -426,13 +424,20 @@ func extractSources(chunks []rag.RetrievalResult) []response.SourceItem {
 	return sources
 }
 
-// maxConfidence 取检索结果中的最高相关度分数。
+// maxConfidence 取检索结果中的最高相关度分数，钳位到 [0,1]。
+//
+// 为什么需要钳位：BM25 原始分数无理论上界，RRF 融合后分数在 ~[0,1] 范围。
+// 多路检索场景下 RRF 已归一化处理；单路向量检索的 cosine 分数本就 ≤1。
+// 钳位确保不同检索路径的 confidence 在统一量纲下比较。
 func maxConfidence(chunks []rag.RetrievalResult) float64 {
 	var max float64
 	for _, c := range chunks {
 		if c.Score > max {
 			max = c.Score
 		}
+	}
+	if max > 1 {
+		max = 1
 	}
 	return max
 }

@@ -27,7 +27,28 @@ import (
 	"opsmind/internal/repository"
 	"opsmind/internal/router"
 	"opsmind/internal/service"
+	"strconv"
 )
+
+// envInt 读取整数环境变量，失败或未设置时返回默认值。
+func envInt(key string, def int) int {
+	if s := os.Getenv(key); s != "" {
+		if v, err := strconv.Atoi(s); err == nil && v > 0 {
+			return v
+		}
+	}
+	return def
+}
+
+// envDuration 读取 time.Duration 环境变量（分钟），未设置时返回默认值。
+func envDuration(key string, def time.Duration) time.Duration {
+	if s := os.Getenv(key); s != "" {
+		if v, err := strconv.Atoi(s); err == nil && v > 0 {
+			return time.Duration(v) * time.Minute
+		}
+	}
+	return def
+}
 
 func main() {
 	slog.Info("OpsMind 服务启动中...")
@@ -191,13 +212,15 @@ func main() {
 
 	// BM25 混合检索器（中文分词 + 倒排索引，懒加载 + TTL）
 	segmenter := rag.NewGseSegmenter()
-	bm25Retriever := rag.NewBM25Retriever(segmenter, 30*time.Minute)
+	bm25TTL := envDuration("OPSMIND_AI_BM25_REBUILD_MINUTES", 30*time.Minute)
+	bm25Retriever := rag.NewBM25Retriever(segmenter, bm25TTL)
 
 	// RAG 管道（查询改写 → 多路检索 → 混合检索 → 重排序）
 	pipeline := rag.NewPipeline(vectorRetriever, bm25Retriever, llmClient, embedder, reranker)
 
 	// 文档异步处理器（goroutine pool：解析→分块→embedding→pgvector 写入）
-	processor := rag.NewProcessor(docParser, chunker, embedder, vectorStore, storageClient, 2)
+	procWorkers := envInt("OPSMIND_AI_PROCESSOR_WORKERS", 2)
+	processor := rag.NewProcessor(docParser, chunker, embedder, vectorStore, storageClient, procWorkers)
 
 	// KnowledgeService（CRUD + pgvector 管道 + 文档上传）
 	knowledgeService := service.NewKnowledgeService(knowledgeRepo, chunker, embedder, vectorStore, docParser, processor, storageClient)

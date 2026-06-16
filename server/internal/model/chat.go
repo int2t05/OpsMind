@@ -27,9 +27,7 @@ func (ChatSession) TableName() string { return "chat_sessions" }
 // ChatMessage 对话消息表
 type ChatMessage struct {
 	ID         int64          `gorm:"primaryKey;autoIncrement" json:"id"`
-	SessionID  int64          `gorm:"not null;column:session_id" json:"session_id"`
-	// TODO(model/chat): session_id 应有索引和外键约束。
-	// 历史会话消息按 session 查询会是高频路径，缺少索引会拖慢详情页。
+	SessionID  int64          `gorm:"not null;column:session_id;index:idx_chat_messages_session" json:"session_id"`
 	Role       string         `gorm:"type:varchar(16);not null" json:"role"`
 	Content    string         `gorm:"type:text;not null" json:"content"`
 	Sources    datatypes.JSON `gorm:"type:jsonb" json:"sources"`
