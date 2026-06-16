@@ -20,6 +20,7 @@ type AppConfig struct {
 	MinIO     MinIOConfig     `mapstructure:"minio"`
 	LLM       LLMConfig       `mapstructure:"llm"`
 	Embedding EmbeddingConfig `mapstructure:"embedding"`
+	Rerank    RerankConfig    `mapstructure:"rerank"`
 	AI        AIConfig        `mapstructure:"ai"`
 	CORS      CORSConfig      `mapstructure:"cors"`
 }
@@ -77,6 +78,17 @@ type LLMConfig struct {
 
 // EmbeddingConfig 是文本向量化配置。
 //
+// RerankConfig 是 cross-encoder 重排序子进程配置。
+//
+// 使用 Python 子进程运行 sentence-transformers CrossEncoder，
+// 通过 stdin/stdout JSON Lines 协议通信。
+// Enabled 为 false 时 Pipeline 降级跳过重排序步骤。
+type RerankConfig struct {
+	Enabled    bool   `mapstructure:"enabled"`     // 是否启用 cross-encoder 重排序，默认 true
+	PythonPath string `mapstructure:"python_path"` // Python 解释器路径，如 "python3"
+	ScriptPath string `mapstructure:"script_path"` // rerank_server.py 绝对路径
+}
+
 // LLM 和 Embedding 可独立配置 Base URL 和 API Key，支持以下场景：
 //   - OpenAI LLM + 本地 bge-m3 Embedding（无需 Embedding API Key）
 //   - DeepSeek LLM + Moonshot Embedding（需要各自的 API Key）
@@ -207,6 +219,11 @@ func bindEnvs(v *viper.Viper) {
 
 	// CORS
 	v.BindEnv("cors.allow_origins", "OPSMIND_CORS_ALLOW_ORIGINS")
+
+	// Rerank（cross-encoder 子进程）
+	v.BindEnv("rerank.enabled", "OPSMIND_RERANK_ENABLED")
+	v.BindEnv("rerank.python_path", "OPSMIND_RERANK_PYTHON_PATH")
+	v.BindEnv("rerank.script_path", "OPSMIND_RERANK_SCRIPT_PATH")
 }
 
 // setDefaults 设置配置默认值，与 config.yaml 保持一致。
@@ -254,6 +271,11 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("ai.rag_multi_route", true)
 	v.SetDefault("ai.rag_hybrid", true)
 	v.SetDefault("ai.rag_rerank", true)
+
+	// Rerank（cross-encoder 子进程）
+	v.SetDefault("rerank.enabled", true)
+	v.SetDefault("rerank.python_path", "python3")
+	v.SetDefault("rerank.script_path", "rerank_server.py")
 
 	// CORS
 	v.SetDefault("cors.allow_origins", "http://localhost:5173")

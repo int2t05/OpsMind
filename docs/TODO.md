@@ -67,7 +67,7 @@
 ### RAG 管道
 
 - ✅ [rag/pipeline.go](/server/internal/rag/pipeline.go) — ~~`llmClient` 为 nil 时，QueryRewrite/MultiRoute/Rerank 会 panic（nil 指针解引用）~~ — 已添加 `p.llmClient != nil` 守卫，LLM 不可用时静默跳过辅助步骤
-- 🔴⭐ [rag/rerank.go](/server/internal/rag/rerank.go) — 重排序 prompt 无长度截断：候选 chunk 全量拼接，可超出 LLM 上下文窗口致 400 错误
+- ✅ [rag/rerank.go](/server/internal/rag/rerank.go) — ~~重排序 prompt 无长度截断：候选 chunk 全量拼接，可超出 LLM 上下文窗口致 400 错误~~ — 已从 LLM prompt 方案切换为 cross-encoder 子进程方案（adapter.Reranker 接口 + SubprocessReranker）
 - ✅ [rag/pipeline.go](/server/internal/rag/pipeline.go) — ~~QueryRewrite 的 history 始终为 nil，上下文消歧功能未生效~~ — RAGOptions 新增 `History` 字段，chat_service 传入会话历史
 - ✅ [rag/pipeline.go](/server/internal/rag/pipeline.go) — ~~重排序候选过多时应提前截断：Rerank 在重排**前**未按 `RerankCount` 截断候选列表；事后检查（第 207 行）为时已晚~~ — Rerank 前按 RerankCount 截断候选池；RerankCount < TopK 校验已前置至 Normalize()
 - ✅ [rag/pipeline.go](/server/internal/rag/pipeline.go) — ~~Execute 缺少入口 opts 规范化：TopK=0 → LIMIT 0，RouteCount=0 → 多路检索跳过，与「零值使用默认」注释不一致~~ — RAGOptions.Normalize() 在 Execute 入口自动填充零值默认值
@@ -77,7 +77,7 @@
 - 🟡 [rag/hybrid.go](/server/internal/rag/hybrid.go) — 单路结果直接返回时未按 topK 截断
 - 🟡 [rag/types.go](/server/internal/rag/types.go) — RAGOptions 使用裸 `bool`，零值问题致空 JSON `{}` 全部禁用，与文档默认「全部启用」矛盾
 - 🟡 [rag/types.go](/server/internal/rag/types.go) — `RetrievalResult.Score` 文档注释称「归一化到 [0,1]」，但 BM25 分数无边界，RRF 融合后可 >1。注释与实现不一致。
-- 🟢 [rag/rerank.go](/server/internal/rag/rerank.go) — `_ = i` 调试残留（第 79 行），无实际用途
+- ✅ [rag/rerank.go](/server/internal/rag/rerank.go) — ~~`_ = i` 调试残留~~ — rerank.go 已完全重写，该文件不再存在 LLM prompt 相关代码
 - 🟢 [rag/pipeline.go](/server/internal/rag/pipeline.go) — 步骤 ID 拼写不一致：`vector_retrieve`（pipeline）vs `vector_retrieval`（retriever 注释/docs）
 - 🟢 [service/chat_service.go](/server/internal/service/chat_service.go) — `pipeline` 字段为死存储：ChatService 通过 LLMService 间接使用 pipeline，自身不再直接调用 `pipeline.Execute`
 
@@ -191,8 +191,8 @@
 
 ### 重排序
 
-- 🟡 [rag/rerank.go](/server/internal/rag/rerank.go) — 用 LLM 做重排序，每次消耗 token 且延迟高；应考虑 Cross-Encoder 模型
-- 🟢⭐ [rag/rerank.go](/server/internal/rag/rerank.go) — `_ = i` 无操作语句，调试残留
+- ✅ [rag/rerank.go](/server/internal/rag/rerank.go) — ~~用 LLM 做重排序，每次消耗 token 且延迟高~~ — 已切换为 cross-encoder 子进程方案（adapter.Reranker + rerank_server.py）
+- ✅ [rag/rerank.go](/server/internal/rag/rerank.go) — ~~`_ = i` 调试残留~~ — 文件已重写，不再包含 LLM prompt 相关代码
 
 ---
 ## 4. 申告管理
@@ -547,4 +547,4 @@
 19. 上传 API 字段名与文档不一致（文档 `files` vs 代码 `file`）
 
 ---
-**最后更新**：2026-06-16（pipeline.go 全部 6 项 TODO 修复完成：Normalize 入口规范化、llmClient nil 守卫、History 上下文消歧、Rerank 原始 query、RerankCount 截断前置、RerankCount 校验前置）
+**最后更新**：2026-06-16（rerank 模块重构完成：LLM prompt → cross-encoder 子进程；pipeline.go 6 项 TODO 已修复）

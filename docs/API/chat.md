@@ -12,15 +12,14 @@
   → 多路检索 (可选)    — LLM 生成 2-4 个子查询
   → 向量检索          — pgvector cosine 相似度
   → BM25 检索 (可选)  — 稀疏检索 + RRF 融合
-  → 重排序   (可选)    — LLM 重新评分候选分块（使用原始 query，非改写查询）
+  → 重排序   (可选)    — cross-encoder 重新评分候选分块（使用原始 query，非改写查询）
   → LLM 生成          — 带上下文生成答案 (SSE 流式)
 ```
 
 **管道入口规范化：** Pipeline.Execute 入口自动调用 `RAGOptions.Normalize()`，
 将零值字段（TopK/RouteCount/RerankCount）填充为默认值，避免 LIMIT 0 等异常行为。
 
-**llmClient 守卫：** LLM 辅助步骤（查询改写/多路检索/重排序）在 llmClient 为 nil 时静默跳过，
-不再 panic。适合纯检索测试或 LLM 不可用场景。
+**reranker 守卫：** 重排序步骤在 cross-encoder 子进程（reranker）不可用时静默跳过，降级为原始排序。
 
 ## 1. 创建会话
 
@@ -114,7 +113,7 @@ data: {"type":"step","id":"llm_generate","label":"LLM 生成"}
 | `vector_retrieval` | 向量检索 | pgvector cosine 相似度检索 |
 | `bm25_retrieval` | BM25检索 | 倒排索引稀疏检索 |
 | `hybrid_fuse` | 结果融合 | RRF 融合排序 |
-| `rerank` | 重排序 | LLM 重排候选分块 |
+| `rerank` | 重排序 | cross-encoder 重排候选分块 |
 | `llm_generate` | LLM 生成 | 调用 LLM 生成答案 |
 
 > step 事件在管道执行期间**实时**发送，无需等待完整答案生成。

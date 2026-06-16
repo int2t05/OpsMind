@@ -105,6 +105,22 @@ func main() {
 		"llm_model", cfg.LLM.Model,
 		"embedding_model", cfg.Embedding.Model)
 
+	// Cross-encoder 重排序子进程（可选，配置禁用时跳过）
+	var reranker adapter.Reranker
+	if cfg.Rerank.Enabled && cfg.Rerank.PythonPath != "" && cfg.Rerank.ScriptPath != "" {
+		reranker = adapter.NewSubprocessReranker(cfg.Rerank.PythonPath, cfg.Rerank.ScriptPath)
+		if reranker != nil {
+			defer func() {
+				if r, ok := reranker.(*adapter.SubprocessReranker); ok {
+					r.Close()
+				}
+			}()
+			slog.Info("Cross-encoder 重排序已启用", "python", cfg.Rerank.PythonPath, "script", cfg.Rerank.ScriptPath)
+		}
+	} else {
+		slog.Info("Cross-encoder 重排序已禁用，将降级跳过")
+	}
+
 	// pgvector 向量存储
 	// TODO(cmd/main): VectorStore 初始化失败后仅 warn，但后续 KnowledgeService/ChatService 仍可启动。
 	// 应提供健康状态并让依赖向量核心路径的接口返回明确 20002，而不是在 nil store 处退化为未知错误。
@@ -178,7 +194,7 @@ func main() {
 	bm25Retriever := rag.NewBM25Retriever(segmenter, 30*time.Minute)
 
 	// RAG 管道（查询改写 → 多路检索 → 混合检索 → 重排序）
-	pipeline := rag.NewPipeline(vectorRetriever, bm25Retriever, llmClient, embedder)
+	pipeline := rag.NewPipeline(vectorRetriever, bm25Retriever, llmClient, embedder, reranker)
 
 	// 文档异步处理器（goroutine pool：解析→分块→embedding→pgvector 写入）
 	processor := rag.NewProcessor(docParser, chunker, embedder, vectorStore, storageClient, 2)

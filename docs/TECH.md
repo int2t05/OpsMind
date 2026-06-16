@@ -59,7 +59,7 @@ OpsMind 采用**单体分层架构（Modular Monolith）**，按 Handler → Ser
 | `multi_route.go` | LLM 多路检索（生成子查询并行执行） |
 | `hybrid.go` | RRF 融合（向量 + BM25） |
 | `bm25.go` | Okapi BM25 算法（gse 中文分词） |
-| `rerank.go` | LLM 重排序 |
+| `rerank.go` | cross-encoder 重排序（adapter.Reranker 接口） |
 | `retriever.go` | VectorRetriever（embedder + vector store 包装） |
 | `chunker.go` | RecursiveCharacterTextSplitter 分块 |
 | `embedder.go` | 批量 Embedding 生成 |
@@ -146,10 +146,12 @@ type RAGOptions struct {
 | 向量检索 | **阻塞**——核心路径，返回错误 | — |
 | BM25 检索 | 降级——仅用向量结果 | — |
 | RRF 融合 | 降级——使用单路结果 | — |
-| 重排序 | 降级——使用融合排序结果 | llmClient == nil 时静默跳过；重排前按 RerankCount 截断候选池 |
+| 重排序 | 降级——使用融合排序结果 | reranker == nil 时静默跳过；Python 子进程崩溃时降级；重排前按 RerankCount 截断候选池 |
 | LLM 生成 | **阻塞**——核心路径，返回错误 | — |
 
-重排序使用原始用户 query（而非改写后的查询），原因是多路检索生成的路由查询可能偏离用户原始意图。
+重排序使用 cross-encoder 模型（BAAI/bge-reranker-base, FP16），通过 Python 子进程（`rerank_server.py`）stdin/stdout JSON Lines 协议通信。
+模型在子进程启动时加载常驻内存（~560MB），单次推理延迟约 50ms。
+不再使用 LLM prompt 方案做重排序。
 
 ## 5. 配置与环境变量
 

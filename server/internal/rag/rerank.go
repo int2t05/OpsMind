@@ -1,82 +1,78 @@
 // Package rag 实现自建 RAG 检索引擎。
 //
-// rerank.go 实现 LLM 驱动的重排序。
+// rerank.go 实现 cross-encoder 驱动的候选文档重排序。
 //
-// 为什么需要重排序：
-// 向量检索和 BM25 都是基于词法/语义相似度的"粗排"，
-// 可能将不相关但词汇相似的文档排在高位。
-// LLM 重排序利用深层语义理解对候选池重新评分，
-// 将最相关的文档排在前面，提升最终答案质量。
+// 为什么从 LLM prompt 方案切换到 cross-encoder：
+// LLM prompt 方案通过编号排序（"仅输出 3,1,2"）做重排，
+// 存在三个根本问题：
+//   1. 依赖 LLM 输出格式——编号顺序可能错误或缺失
+//   2. 延迟高（500ms-2s），每次消耗 token
+//   3. 候选内容全部塞进 prompt，无长度裁剪
+// Cross-encoder 对每个 (query, passage) 对独立打分，
+// 速度快（~50ms）、分数稳定、不需要 token 消耗。
 //
 // 降级策略：
-// LLM 调用失败时不阻塞管道，保留原始排序返回。
+// cross-encoder 服务不可用时降级为原始排序，
+// Pipeline 在 Execute 中统一处理降级逻辑。
 package rag
 
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"opsmind/internal/adapter"
 )
 
-// Rerank 使用 LLM 对候选文档重新排序。
+// Rerank 使用 cross-encoder 对候选文档按与 query 的相关性重新排序。
 //
-// TODO: 当前用 LLM 做重排序，每次消耗 token 且延迟 500ms-2s。
-// 应改用交叉编码器 Rerank 模型（如 bge-reranker、Cohere Rerank API），
-// 通过调用 Python 推理服务或 SaaS API 实现，成本更低、速度更快。
-// candidates 为待重排序的候选文档列表，
-// 返回重新排序后的列表（保持相同数量）。
-// LLM 调用失败时降级返回原始排序。
-func Rerank(ctx context.Context, llm adapter.LLMClient, query string, candidates []RetrievalResult) ([]RetrievalResult, error) {
+// 内部逻辑：
+//  1. 单候选直接返回（无需重排）
+//  2. 构建 []RerankPassage 并调用 Reranker.Rerank
+//  3. 按返回 order 重新排列 candidates
+//
+// reranker 为 nil 时降级返回原始排序（不报错）。
+func Rerank(ctx context.Context, reranker adapter.Reranker, query string, candidates []RetrievalResult) ([]RetrievalResult, error) {
 	if len(candidates) <= 1 {
 		return candidates, nil
 	}
 
-	// 构造 prompt：告知 LLM 按相关性重新编号
-	systemMsg := "你是一个文档排序助手。根据用户查询，对以下候选文档按相关性从高到低重新排序。只输出排序后的文档编号（用逗号分隔），不要添加解释。"
+	if reranker == nil {
+		// cross-encoder 不可用时降级——保留原始排序
+		return candidates, nil
+	}
 
-	var docList strings.Builder
+	// 构建 passage 列表
+	passages := make([]adapter.RerankPassage, len(candidates))
 	for i, c := range candidates {
-		// TODO(rag/rerank): 候选内容直接拼进 prompt，没有长度裁剪。
-		// 长 chunk 或候选过多会超过模型上下文，应按 token 预算截断。
-		fmt.Fprintf(&docList, "[%d] %s\n", i+1, c.Content)
+		passages[i] = adapter.RerankPassage{ID: i, Text: c.Content}
 	}
 
-	resp, err := llm.ChatCompletion(ctx, adapter.ChatRequest{
-		Messages: []adapter.ChatMessage{
-			{Role: "system", Content: systemMsg},
-			{Role: "user", Content: fmt.Sprintf("查询：%s\n\n候选文档：\n%s\n\n请输出排序结果（编号逗号分隔）：", query, docList.String())},
-		},
-		MaxTokens:   128,
-		Temperature: 0.1,
-	})
+	result, err := reranker.Rerank(ctx, query, passages)
 	if err != nil {
-		return candidates, nil // 降级：保留原排序
+		return candidates, fmt.Errorf("重排序失败: %w", err)
 	}
 
-	// 解析 LLM 返回的编号
-	order := parseRankOrder(resp.Content, len(candidates))
-	if len(order) == 0 {
-		return candidates, nil // 解析失败，降级
+	if result == nil || len(result.Order) == 0 {
+		// 子进程不可用时返回 nil result
+		return candidates, nil
 	}
 
-	// 重新排列
+	// 按 cross-encoder 分数重排
 	reranked := make([]RetrievalResult, 0, len(candidates))
-	seen := make(map[int64]bool)
-	for _, idx := range order {
-		if idx >= 0 && idx < len(candidates) && !seen[candidates[idx].ChunkID] {
+	for _, idx := range result.Order {
+		if idx >= 0 && idx < len(candidates) {
 			reranked = append(reranked, candidates[idx])
-			seen[candidates[idx].ChunkID] = true
 		}
 	}
 
-	// 补充未被 LLM 提到的候选
+	// 补充未被返回的候选（兜底）
+	seen := make(map[int]bool)
+	for _, idx := range result.Order {
+		seen[idx] = true
+	}
 	for i, c := range candidates {
-		if !seen[c.ChunkID] {
+		if !seen[i] {
 			reranked = append(reranked, c)
-			// 标记已添加以避免重复（虽然不应该出现）
-			_ = i
 		}
 	}
 
@@ -84,28 +80,4 @@ func Rerank(ctx context.Context, llm adapter.LLMClient, query string, candidates
 		return candidates, nil
 	}
 	return reranked, nil
-}
-
-// parseRankOrder 从 LLM 响应中解析排序编号。
-//
-// 支持格式："3,1,2"、"[3,1,2]"、"3 1 2" 等。
-func parseRankOrder(response string, maxIdx int) []int {
-	// TODO(rag/rerank): parseRankOrder 未去重，LLM 输出重复编号会让后续补齐逻辑处理更多异常。
-	// 可在解析阶段去重并保留首次出现顺序。
-	// 清理响应
-	s := strings.TrimSpace(response)
-	s = strings.Trim(s, "[]")
-
-	parts := strings.FieldsFunc(s, func(r rune) bool {
-		return r == ',' || r == ' ' || r == '\n'
-	})
-
-	var order []int
-	for _, p := range parts {
-		var idx int
-		if _, err := fmt.Sscanf(p, "%d", &idx); err == nil && idx >= 1 && idx <= maxIdx {
-			order = append(order, idx-1) // 转为 0-based
-		}
-	}
-	return order
 }

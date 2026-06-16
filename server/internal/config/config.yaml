@@ -48,3 +48,8 @@ ai:
   rag_multi_route: true       # 多路检索开关
   rag_hybrid: true            # BM25 混合检索开关
   rag_rerank: true            # 重排序开关
+
+rerank:
+  enabled: true              # 是否启用 cross-encoder 重排序子进程
+  python_path: "python3"     # Python 解释器路径
+  script_path: "rerank_server.py"  # rerank_server.py 路径（相对或绝对）

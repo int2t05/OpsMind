@@ -11,6 +11,23 @@ import (
 )
 
 // =============================================================================
+// mockReranker 模拟 cross-encoder 重排序器
+// =============================================================================
+
+type mockReranker struct {
+	order  []int
+	scores []float64
+	err    error
+}
+
+func (m *mockReranker) Rerank(ctx context.Context, query string, passages []adapter.RerankPassage) (*adapter.RerankResult, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	return &adapter.RerankResult{Order: m.order, Scores: m.scores}, nil
+}
+
+// =============================================================================
 // 查询改写测试
 // =============================================================================
 
@@ -119,13 +136,11 @@ func TestMultiRoute_LLMFail(t *testing.T) {
 // 重排序测试
 // =============================================================================
 
-// TestRerank_Success 验证重排序基本功能。
+// TestRerank_Success 验证 cross-encoder 重排序基本功能。
 func TestRerank_Success(t *testing.T) {
-	llm := &mockLLMClient{
-		chatResponse: &adapter.ChatResponse{
-			Content: "排序结果: [3, 1, 2]",
-			FinishReason: "stop",
-		},
+	reranker := &mockReranker{
+		order:  []int{2, 0, 1}, // 按相关度：chunk 3 → 1 → 2
+		scores: []float64{0.95, 0.72, 0.31},
 	}
 
 	candidates := []rag.RetrievalResult{
@@ -135,29 +150,30 @@ func TestRerank_Success(t *testing.T) {
 	}
 
 	query := "VPN无法连接"
-	reranked, err := rag.Rerank(context.Background(), llm, query, candidates)
+	reranked, err := rag.Rerank(context.Background(), reranker, query, candidates)
 	if err != nil {
 		t.Fatalf("Rerank 失败: %v", err)
 	}
 	if len(reranked) != 3 {
 		t.Errorf("重排序后应保持 3 条结果, 实际 %d", len(reranked))
 	}
+	// cross-encoder 重排后 chunk 3（最相关）应排第一
+	if reranked[0].ChunkID != 3 {
+		t.Errorf("cross-encoder 重排后应把最相关 chunk 排第一, 实际 chunk_id=%d", reranked[0].ChunkID)
+	}
 }
 
-// TestRerank_LLMFail 验证重排序 LLM 失败时降级返回原排序。
-func TestRerank_LLMFail(t *testing.T) {
-	llm := &mockLLMClient{
-		chatError: fmt.Errorf("LLM 服务不可用"),
-	}
-
+// TestRerank_NilReranker 验证 reranker 为 nil 时降级返回原排序。
+func TestRerank_NilReranker(t *testing.T) {
 	candidates := []rag.RetrievalResult{
 		{ChunkID: 10, Content: "最重要内容", Score: 0.90},
 		{ChunkID: 20, Content: "次重要内容", Score: 0.70},
 	}
 
-	reranked, err := rag.Rerank(context.Background(), llm, "查询", candidates)
+	// reranker=nil 模拟 cross-encoder 未启用
+	reranked, err := rag.Rerank(context.Background(), nil, "查询", candidates)
 	if err != nil {
-		t.Fatalf("LLM 失败不应报错（应降级）: %v", err)
+		t.Fatalf("reranker 为 nil 不应报错（应降级）: %v", err)
 	}
 	if len(reranked) != 2 {
 		t.Errorf("降级应保留原始结果数, 期望 2, 实际 %d", len(reranked))
