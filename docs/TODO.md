@@ -56,8 +56,8 @@
 - ✅ [handler/chat.go](/server/internal/handler/chat.go) — ~~SSE 流中 LLM 错误被静默吞掉~~ — StreamEvent 支持 `type: "error"` 事件。
 - ✅ [handler/chat.go](/server/internal/handler/chat.go) — ~~模拟流式先完整生成再 SSE 输出~~ — 已改为真实 `ChatCompletionStream`。
 - ✅ [service/chat_service.go](/server/internal/service/chat_service.go) — ~~`FinalAnswer` 和流式各一次 LLM 调用~~ — `SyncChat`/`StreamChat` 各自一次。
-- 🟡⭐ [service/llm_service.go](/server/internal/service/llm_service.go) — RAG 步骤事件未实时流式发送：`executeRAG` 传 `nil` StepCallback，前端看不到 query_rewrite/multi_route/vector_retrieve/bm25_retrieve/hybrid_fuse/rerank 进度，仅看到最终的 `llm_generate` 步骤。
-- 🟡⭐ [service/llm_service.go](/server/internal/service/llm_service.go) — 多轮对话历史无长度截断：`buildMessages` 直接注入全部 history，20+ 轮对话时 history + RAG context + question 可超出 LLM 上下文窗口。
+- ✅ [service/llm_service.go](/server/internal/service/llm_service.go) — ~~RAG 步骤事件未实时流式发送~~ — `executeRAG` 已接入 `onStep rag.StepCallback`，`StreamChat` 实时转换 `rag.StepEvent` 为 SSE step 事件。
+- ✅ [service/llm_service.go](/server/internal/service/llm_service.go) — ~~多轮对话历史无长度截断~~ — `buildMessages` 已实现滑动窗口截断，上限由 `maxHistoryMessages`（默认 10，环境变量 `OPSMIND_AI_MAX_HISTORY_MESSAGES`）控制。
 
 ### RAG 管道
 

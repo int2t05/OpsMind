@@ -98,6 +98,7 @@ type EmbeddingConfig struct {
 type AIConfig struct {
 	DefaultTopK          int     `mapstructure:"default_top_k"`
 	ConfidenceThreshold  float64 `mapstructure:"confidence_threshold"`
+	MaxHistoryMessages   int     `mapstructure:"max_history_messages"` // 多轮对话历史消息数上限（默认 10，即最近 5 轮 Q&A）
 }
 
 // Load 加载配置文件并应用环境变量覆盖。
@@ -194,6 +195,7 @@ func bindEnvs(v *viper.Viper) {
 	// AI
 	v.BindEnv("ai.default_top_k", "OPSMIND_AI_DEFAULT_TOP_K")
 	v.BindEnv("ai.confidence_threshold", "OPSMIND_AI_CONFIDENCE_THRESHOLD")
+	v.BindEnv("ai.max_history_messages", "OPSMIND_AI_MAX_HISTORY_MESSAGES")
 
 	// CORS
 	v.BindEnv("cors.allow_origins", "OPSMIND_CORS_ALLOW_ORIGINS")

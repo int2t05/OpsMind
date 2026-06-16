@@ -43,4 +43,5 @@ embedding:
 ai:
   default_top_k: 5
   confidence_threshold: 0.6  # 低于此阈值引导用户提交申告
+  max_history_messages: 10     # 多轮对话历史消息数上限（滑动窗口，0=不限制）
   # TODO(config): 增加 query_rewrite/multi_route/hybrid/rerank 默认开关，避免 ChatService 中硬编码 RAG 策略。

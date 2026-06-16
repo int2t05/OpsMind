@@ -72,22 +72,27 @@ type StreamDoneMeta struct {
 // StreamChat 用于 SSE 流式路径，SyncChat 用于非流式 JSON 路径。
 // 两次调用共享相同的 RAG→prompt→LLM 内核，保证答案一致性。
 type LLMService struct {
-	llmClient    adapter.LLMClient
-	configMgr    *LLMConfigManager
-	defaultModel string
-	pipeline     ragPipeline
+	llmClient          adapter.LLMClient
+	configMgr          *LLMConfigManager
+	defaultModel       string
+	pipeline           ragPipeline
+	maxHistoryMessages int // 多轮对话历史消息数上限（滑动窗口，默认 10）
 }
 
 // NewLLMService 创建 LLMService 实例。
 //
-// llmClient 和 pipeline 可以为 nil（测试或降级场景），
-// configMgr 为 nil 时使用 defaultModel + maxTokens=2048。
-func NewLLMService(llmClient adapter.LLMClient, configMgr *LLMConfigManager, defaultModel string, pipeline ragPipeline) *LLMService {
+// maxHistoryMessages 控制注入 LLM prompt 的历史消息数上限（0=不限制）。
+// llmClient 和 pipeline 可以为 nil（测试或降级场景）。
+func NewLLMService(llmClient adapter.LLMClient, configMgr *LLMConfigManager, defaultModel string, pipeline ragPipeline, maxHistoryMessages int) *LLMService {
+	if maxHistoryMessages <= 0 {
+		maxHistoryMessages = 10 // 默认最近 10 条消息（约 5 轮 Q&A）
+	}
 	return &LLMService{
-		llmClient:    llmClient,
-		configMgr:    configMgr,
-		defaultModel: defaultModel,
-		pipeline:     pipeline,
+		llmClient:          llmClient,
+		configMgr:          configMgr,
+		defaultModel:       defaultModel,
+		pipeline:           pipeline,
+		maxHistoryMessages: maxHistoryMessages,
 	}
 }
 
@@ -111,7 +116,7 @@ func (s *LLMService) SyncChat(ctx context.Context, question string, kbID int64, 
 	start := time.Now()
 
 	// Step 1: RAG 管道检索
-	chunks, pipeMeta, err := s.executeRAG(ctx, question, kbID, opts)
+	chunks, pipeMeta, err := s.executeRAG(ctx, question, kbID, opts, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -183,8 +188,11 @@ func (s *LLMService) StreamChat(ctx context.Context, question string, kbID int64
 		defer close(eventCh)
 		start := time.Now()
 
-		// Step 1: RAG 管道检索（实时发送 step 事件）
-		chunks, pipeMeta, err := s.executeRAG(ctx, question, kbID, opts)
+		// Step 1: RAG 管道检索（实时发送 step 事件到前端）
+		onStep := func(evt rag.StepEvent) {
+			sendOrCancel(ctx, eventCh, StreamEvent{Type: "step", ID: evt.ID, Label: evt.Label})
+		}
+		chunks, pipeMeta, err := s.executeRAG(ctx, question, kbID, opts, onStep)
 		if err != nil {
 			eventCh <- StreamEvent{Type: "error", Error: err.Error()}
 			return
@@ -285,7 +293,7 @@ func (s *LLMService) StreamChat(ctx context.Context, question string, kbID int64
 // executeRAG 执行 RAG 管道检索，返回 chunk 列表和管道指标。
 //
 // 第二个返回值 pipelineMeta 可能为 nil（pipeline 不可用时）。
-func (s *LLMService) executeRAG(ctx context.Context, question string, kbID int64, opts rag.RAGOptions) ([]rag.RetrievalResult, *ChatPipelineMeta, error) {
+func (s *LLMService) executeRAG(ctx context.Context, question string, kbID int64, opts rag.RAGOptions, onStep rag.StepCallback) ([]rag.RetrievalResult, *ChatPipelineMeta, error) {
 	if s.pipeline == nil {
 		return nil, nil, nil
 	}
@@ -293,12 +301,7 @@ func (s *LLMService) executeRAG(ctx context.Context, question string, kbID int64
 	var steps []ChatPipelineStep
 	start := time.Now()
 
-	// TODO(llm_service): 当前 executeRAG 传 nil StepCallback，RAG 步骤事件（query_rewrite/multi_route/
-	// vector_retrieve/bm25_retrieve/hybrid_fuse/rerank）从未发送给前端。应在 StreamChat 中接入回调，
-	// 将 rag.StepEvent 转为 StreamEvent{Type:"step"} 实时推送。
-	// TODO(llm_service): buildMessages 注入历史消息无长度截断。多轮对话 20+ 轮时，
-	// history + RAG context + question 可能超出 LLM 上下文窗口。应实现滑动窗口或 token 计数截断。
-	result, err := s.pipeline.Execute(ctx, question, kbID, opts, nil)
+	result, err := s.pipeline.Execute(ctx, question, kbID, opts, onStep)
 	if err != nil {
 		return nil, nil, fmt.Errorf("知识检索失败: %w", err)
 	}
@@ -323,8 +326,8 @@ func (s *LLMService) executeRAG(ctx context.Context, question string, kbID int64
 
 // buildMessages 将 RAG chunk 和历史对话注入系统提示词，构建 LLM 请求消息。
 //
-// history 为多轮对话历史（按时间正序），插入在 system prompt 与当前 RAG 问题之间，
-// 使 LLM 理解之前的对话上下文。
+// history 为多轮对话历史（按时间正序）。使用滑动窗口截断最近 N 条消息
+//（由 maxHistoryMessages 控制），避免长对话撑爆 LLM 上下文窗口。
 func (s *LLMService) buildMessages(chunks []rag.RetrievalResult, question string, history []adapter.ChatMessage) []adapter.ChatMessage {
 	systemPrompt := "你是一个运维知识助手。根据以下知识库内容回答用户问题。如果知识库中没有相关信息，请如实说明。"
 	var ctxBuilder strings.Builder
@@ -336,7 +339,10 @@ func (s *LLMService) buildMessages(chunks []rag.RetrievalResult, question string
 		{Role: "system", Content: systemPrompt},
 	}
 
-	// 注入多轮对话历史
+	// 滑动窗口截断历史消息：只保留最近 N 条
+	if s.maxHistoryMessages > 0 && len(history) > s.maxHistoryMessages {
+		history = history[len(history)-s.maxHistoryMessages:]
+	}
 	for _, h := range history {
 		msgs = append(msgs, h)
 	}

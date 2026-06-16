@@ -188,7 +188,7 @@ func main() {
 	slog.Info("KnowledgeService 已初始化（含 Chunker + Processor）")
 
 	// LLMService（RAG + prompt + LLM 统一编排，供 ChatService 使用）
-	llmService := service.NewLLMService(llmClient, llmConfigSvc.GetManager(), cfg.LLM.Model, pipeline)
+	llmService := service.NewLLMService(llmClient, llmConfigSvc.GetManager(), cfg.LLM.Model, pipeline, cfg.AI.MaxHistoryMessages)
 	slog.Info("LLMService 已初始化（RAG + prompt + LLM 统一调用）")
 
 	// ChatService（会话生命周期管理）
