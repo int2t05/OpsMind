@@ -76,13 +76,17 @@ Content-Type: application/json
 
 ```json
 {
-  "question": "如何重置 VPN 密码？"
+  "question": "如何重置 VPN 密码？",
+  "route_count": 3,
+  "rerank_count": 5
 }
 ```
 
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
-| question | string | ✓ | 用户问题 |
+| question | string | ✓ | 用户问题（max 2000 字符） |
+| route_count | int | | 多路检索子查询数（0=使用默认值 3） |
+| rerank_count | int | | 重排序截断数（0=使用默认值 5） |
 
 **SSE 事件流：**
 
@@ -260,7 +264,9 @@ GET /api/v1/portal/chat-sessions/:id
 Authorization: Bearer <token>
 ```
 
-**响应：** 含 `messages` 字段（多轮对话历史）：
+> 含归属校验：仅允许查看自己的会话，非属主返回 `code=10002`（无权查看该会话）。
+
+**响应：** 含 `messages` 字段（多轮对话历史）及 `pipeline` 步骤指标：
 
 ```json
 {
@@ -275,6 +281,10 @@ Authorization: Bearer <token>
     "duration_ms": 3200,
     "feedback": 0,
     "created_at": "2026-06-16 10:30:00",
+    "pipeline": [
+      {"step_id": "query_rewrite", "label": "查询改写", "duration_ms": 120, "success": true},
+      {"step_id": "vector_retrieve", "label": "向量检索", "duration_ms": 45, "success": true}
+    ],
     "messages": [
       {"id": 1, "role": "user", "content": "如何重置 VPN 密码？", "confidence": 0, "created_at": "2026-06-16 10:30:00"},
       {"id": 2, "role": "assistant", "content": "VPN 密码重置步骤：...", "sources": [...], "confidence": 0.85, "created_at": "2026-06-16 10:30:05"},
@@ -294,6 +304,7 @@ Authorization: Bearer <token>
 | messages[].sources | array | 知识来源（仅 assistant 消息） |
 | messages[].confidence | float64 | 置信度（仅 assistant 消息） |
 | messages[].created_at | string | 消息创建时间 |
+| pipeline | array | RAG 管道步骤指标（可选，含 step_id/label/duration_ms/success） |
 
 ---
 
@@ -303,6 +314,8 @@ Authorization: Bearer <token>
 POST /api/v1/portal/chat-sessions/:id/feedback
 Authorization: Bearer <token>
 ```
+
+> 含归属校验：仅允许反馈自己的会话。校验规则在 Service 层集中管理。
 
 **请求体：**
 
@@ -317,6 +330,13 @@ Authorization: Bearer <token>
 | 0 | 未评价（默认） |
 | 1 | 已解决 |
 | 2 | 未解决 |
+
+**错误响应：**
+
+| code | 说明 |
+|------|------|
+| 10003 | 反馈值无效（非 0/1/2） |
+| 10002 | 无权操作该会话（非属主） |
 
 ---
 
