@@ -51,11 +51,10 @@
 
 ### SSE 流式输出（核心路径）
 
-- 🔴⭐ [handler/chat.go](/server/internal/handler/chat.go) — **流式答案与存储答案不一致**：`StreamChatSession` 先调 `CreateChatSession`（RAG 增强 LLM 生成 → 存库），再调 `streamWithLLM`（裸问题再次调 LLM → 流式输出）。两次 LLM 调用独立，用户看到的内容与数据库存储的内容不同，且推理成本翻倍。
-- 🔴 [handler/chat.go](/server/internal/handler/chat.go) — SSE 流中 LLM 错误被静默吞掉（`continue`），前端不知道生成中断
-- 🟡 [handler/chat.go](/server/internal/handler/chat.go) — SSE JSON 未用 `json.Marshal`，控制字符可致 SSE 帧畸形（`writeSSEEvent` 已改用 `json.Marshal`，该问题仅存在于旧模拟流式路径）
-- 🟡 [handler/chat.go](/server/internal/handler/chat.go) — 模拟流式先完整生成再 SSE 输出（`streamSimulated`），浪费首字节延迟
-- 🟡 [service/chat_service.go](/server/internal/service/chat_service.go) — `FinalAnswer`（非流式）和 `streamWithLLM`（流式）各调用一次 LLM，非流式路径多一次调用
+- ✅ [handler/chat.go](/server/internal/handler/chat.go) + [service/llm_service.go](/server/internal/service/llm_service.go) — ~~**流式答案与存储答案不一致**~~ — 已通过 LLMService 重构为单次 LLM 调用：RAG 检索 → prompt 构建 → `ChatCompletionStream` 流式输出，用户看到的 token 与存入 DB 的答案完全一致。
+- ✅ [handler/chat.go](/server/internal/handler/chat.go) — ~~SSE 流中 LLM 错误被静默吞掉~~ — StreamEvent 支持 `type: "error"` 事件，LLM 中断时前端可感知。
+- ✅ [handler/chat.go](/server/internal/handler/chat.go) — ~~模拟流式先完整生成再 SSE 输出~~ — 已改为真实的 `ChatCompletionStream` token 级流式，LLMService 统一编排。
+- ✅ [service/chat_service.go](/server/internal/service/chat_service.go) — ~~`FinalAnswer` 和流式各一次 LLM 调用~~ — `CreateChatSession` 走 `SyncChat`，`StreamChat` 走 `StreamChat`，各自一次调用。
 
 ### RAG 管道
 
@@ -79,7 +78,7 @@
 ### 置信度与数据完整性
 
 - 🟡 [service/chat_service.go](/server/internal/service/chat_service.go) — 置信度算法粗糙：直接取 max(chunk.Score)，但 BM25 和 RRF 分数量纲不同
-- 🟡 [service/chat_service.go](/server/internal/service/chat_service.go) — Sources（检索引用）在 `CreateChatSession` 中未写入 `session.Sources` 字段
+- ✅ [service/chat_service.go](/server/internal/service/chat_service.go) — ~~Sources（检索引用）未写入~~ — `CreateChatSession` 和 `StreamChat` 均已通过 `json.Marshal(sources)` 写入 `session.Sources` 字段。
 - 🔴 [service/chat_service.go](/server/internal/service/chat_service.go) — `CreateChatSession` 用 `context.Background` 不传播请求取消
 - 🟡 [service/chat_service.go](/server/internal/service/chat_service.go) — `GetChatDetail` 未校验 `session.UserID` 归属，任意用户可通过猜测 ID 查看他人对话
 - 🟡 [repository/chat_repo.go](/server/internal/repository/chat_repo.go) — `CreateBatch` 和 Session 创建不在同一事务
@@ -454,7 +453,7 @@
 | 业务流程 | 🔴 P0 | 🟡 P1 | 🟢 P2 | 合计 |
 |----------|-------|-------|-------|------|
 | 1. 认证与授权 | 0 | 0 | 1 | 1 |
-| 2. 智能问答 RAG | 5 | 17 | 5+1📝 | 27(+3) |
+| 2. 智能问答 RAG | 3 | 15 | 5+1📝 | 23(-4) |
 | 3. 知识库与文档管理 | 5 | 16+2📝 | 6 | 27(+2) |
 | 4. 申告管理 | 5 | 6+1📝 | 2 | 12(+1) |
 | 5. 用户与角色管理 | 2 | 9 | 4 | 15 |
@@ -464,7 +463,7 @@
 | 9. 前端架构与交互 | 4 | 18 | 6 | 28(+2) |
 | 10. 整表空数据 | 3 | 1 | 0 | 4 |
 | 11. TODO ↔ 文档双向一致性 | — | — | — | (新增) |
-| **合计** | **58** | **95** | **34+7📝** | **186** |
+| **合计** | **56** | **92** | **34+7📝** | **182** |
 
 > ⭐ 标记项为 2026-06-15 再审计新发现问题（共 22 项，含 5 项 P0，5 项 📝 文档一致性缺陷）。
 > 📝 标记项为代码实现与 API 文档/PRD/TECH.md 不一致的文档缺陷（共 8 项）。
@@ -472,25 +471,24 @@
 ### P0 速览（生产环境最优先修复）
 
 1. LLM/Embedding 重试机制完全失效（`doHTTPRequest` 不包装 `retryableError`）
-2. 流式答案与存储答案不一致（两次独立 LLM 调用）
-3. API Key 明文存储（数据库泄露 = 全部密钥暴露）📝 文档声明加密但未实现
-4. TestConnection 测试错误端点（功能完全失效）📝 行为与 API 文档完全不符
-5. UpdateConfig 清空 api_key（零值覆盖数据库中的密钥）📝 文档声明不传=保留但行为相反
-6. 事务用错 DB 句柄（`ClearDefault` + `Create` 在事务外执行）
-7. Processor Stop/Submit panic（优雅关闭时崩溃）
-8. `role_repo.Delete(0)` 删除全部角色（GORM 零值陷阱）
-9. pgvector/MinIO 初始化失败后 nil 传播到下游 panic
-10. 配置 YAML 格式错误静默吞掉（应用以默认值启动）
-11. ASC+DESC 双重索引加倍存储写入开销
-12. JWT 过期检查 `atob` base64url 不兼容（前端）
-13. SSE 流绕过 Axios 拦截器（token 过期无法刷新）
-14. 前端创建 LLM 配置时测试连接崩溃
-15. Repository 全层缺少 `context.Context`（取消/追踪断裂）
-16. `is_default` 缺少部分唯一索引（并发创建多个默认配置）
-17. embedding 模型硬编码为空字符串
-18. `DeleteByArticle` + `BatchInsert` 非原子（文章向量丢失）
-19. (新增) 文章状态编号文档与代码不一致（Disabled 文档=5 / 代码=0）
-20. (新增) 上传 API 字段名与文档不一致（文档 `files` vs 代码 `file`）
+2. API Key 明文存储（数据库泄露 = 全部密钥暴露）📝 文档声明加密但未实现
+3. TestConnection 测试错误端点（功能完全失效）📝 行为与 API 文档完全不符
+4. UpdateConfig 清空 api_key（零值覆盖数据库中的密钥）📝 文档声明不传=保留但行为相反
+5. 事务用错 DB 句柄（`ClearDefault` + `Create` 在事务外执行）
+6. Processor Stop/Submit panic（优雅关闭时崩溃）
+7. `role_repo.Delete(0)` 删除全部角色（GORM 零值陷阱）
+8. pgvector/MinIO 初始化失败后 nil 传播到下游 panic
+9. 配置 YAML 格式错误静默吞掉（应用以默认值启动）
+10. ASC+DESC 双重索引加倍存储写入开销
+11. JWT 过期检查 `atob` base64url 不兼容（前端）
+12. SSE 流绕过 Axios 拦截器（token 过期无法刷新）
+13. 前端创建 LLM 配置时测试连接崩溃
+14. Repository 全层缺少 `context.Context`（取消/追踪断裂）
+15. `is_default` 缺少部分唯一索引（并发创建多个默认配置）
+16. embedding 模型硬编码为空字符串
+17. `DeleteByArticle` + `BatchInsert` 非原子（文章向量丢失）
+18. 文章状态编号文档与代码不一致（Disabled 文档=5 / 代码=0）
+19. 上传 API 字段名与文档不一致（文档 `files` vs 代码 `file`）
 
 ---
-**最后更新**：2026-06-15（全量前后端 + 文档交叉校验审计。本次修复：auth 路由路径与 API 文档对齐 — `/api/v1/auth/me/*`）
+**最后更新**：2026-06-16（SSE 流式输出重构：新增 LLMService 统一编排 RAG+LLM，修复流式/存储答案不一致 P0。5 项 ✅ 已修复。）

@@ -7,11 +7,9 @@ package service
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"strings"
 	"time"
 
-	"opsmind/internal/adapter"
 	"opsmind/internal/dto/request"
 	"opsmind/internal/dto/response"
 	"opsmind/internal/model"
@@ -45,22 +43,19 @@ type chatPipeline interface {
 // ChatService 智能问答服务。
 //
 // knowledgeRepo/chatRepo/pipeline 使用接口类型，便于测试 mock。
-// llmClient 使用 adapter.LLMClient 接口，configMgr 可以为 nil。
+// llmService 统一管理 RAG+LLM 调用编排（流式/非流式）。
 type ChatService struct {
-	defaultTopK   int    // 默认检索 TopK（从配置读取）
-	defaultModel  string // configMgr 不可用时回退到此模型
+	defaultTopK   int
 	knowledgeRepo chatKnowledgeRepo
 	chatRepo      chatSessionRepo
 	pipeline      chatPipeline
-	llmClient     adapter.LLMClient
-	configMgr     *LLMConfigManager
+	llmService    *LLMService
 }
 
 // NewChatService 创建 ChatService 实例。
 //
-// pipeline/llmClient/configMgr 可以为 nil（测试或降级场景）。
-// knowledgeRepo/chatRepo/pipeline 直接使用具体接口类型，编译期校验传入类型。
-func NewChatService(knowledgeRepo chatKnowledgeRepo, chatRepo chatSessionRepo, pipeline chatPipeline, llmClient adapter.LLMClient, configMgr *LLMConfigManager, defaultTopK int, defaultModel string) *ChatService {
+// llmService 可以为 nil（测试或降级场景）。
+func NewChatService(knowledgeRepo chatKnowledgeRepo, chatRepo chatSessionRepo, pipeline chatPipeline, llmService *LLMService, defaultTopK int) *ChatService {
 	if defaultTopK <= 0 {
 		defaultTopK = 5
 	}
@@ -68,10 +63,8 @@ func NewChatService(knowledgeRepo chatKnowledgeRepo, chatRepo chatSessionRepo, p
 		knowledgeRepo: knowledgeRepo,
 		chatRepo:      chatRepo,
 		pipeline:      pipeline,
-		llmClient:     llmClient,
-		configMgr:     configMgr,
+		llmService:    llmService,
 		defaultTopK:   defaultTopK,
-		defaultModel:  defaultModel,
 	}
 }
 
@@ -79,16 +72,13 @@ func NewChatService(knowledgeRepo chatKnowledgeRepo, chatRepo chatSessionRepo, p
 // CreateChatSession
 // =============================================================================
 
-// CreateChatSession 使用 Pipeline 创建问答会话。
+// CreateChatSession 使用 RAG 管道 + LLM 创建问答会话。
 //
 // 流程：
-//  1. Pipeline.Execute（查询改写→多路检索→混合检索→重排序）
-//  2. 构造带上下文的 LLM prompt
-//  3. LLMClient.ChatCompletion 生成答案
-//  4. 保存会话
+//  1. 校验参数
+//  2. LLMService.SyncChat（RAG 检索 + prompt 构建 + LLM 同步生成）
+//  3. 保存会话到 DB
 func (s *ChatService) CreateChatSession(req request.CreateChatRequest, userID int64) (*ChatSessionResponse, error) {
-	// TODO(service/chat): 接收 context.Context 参数，避免 context.Background 让请求取消无法传播到 RAG/LLM/DB。
-	// SSE 和非流式问答都应使用 c.Request.Context() 作为根上下文。
 	if strings.TrimSpace(req.Question) == "" {
 		return nil, errcode.AppError{Code: errcode.ErrParam, Message: "问题不能为空"}
 	}
@@ -101,133 +91,73 @@ func (s *ChatService) CreateChatSession(req request.CreateChatRequest, userID in
 		return nil, errcode.AppError{Code: errcode.ErrNotFound, Message: "知识库不存在"}
 	}
 
-	start := time.Now()
-	// TODO(service/chat): 60s 超时应配置化，并按 RAG 检索和 LLM 生成拆分预算。
-	// 当前一个 timeout 覆盖全部步骤，长生成可能挤占检索时间，短查询也无法快速失败。
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
-	defer cancel()
-
-	// Step 1: Pipeline 检索（如果 pipeline 可用）
-	var pipelineChunks []rag.RetrievalResult
-	if s.pipeline != nil {
-		// RAG 选项从 ChatService.defaultTopK 读取（源自配置 AI_DEFAULT_TOP_K）。
-		// 各步骤开关当前默认开启，后续可按知识库粒度或请求级覆盖。
-		// TODO(service/chat): req.RAGOptions 被忽略，前端高级设置不会真正影响后端管道。
-		// 应将 request.RAGOptions 映射到 rag.RAGOptions，并对 TopK/RouteCount/RerankCount 做范围校验。
-		result, pipeErr := s.pipeline.Execute(ctx, req.Question, req.KBID, rag.RAGOptions{
-			TopK:         s.defaultTopK,
-			QueryRewrite: true,
-			MultiRoute:   true,
-			Hybrid:       true,
-			Rerank:       true,
-		}, nil)
-		if pipeErr != nil {
-			return nil, errcode.AppError{Code: errcode.ErrRAGUnavailable, Message: "知识检索失败: " + pipeErr.Error()}
-		}
-		if result != nil {
-			pipelineChunks = result.Chunks
-		}
+	// 构建 RAGOptions（当前使用默认值，后续可从 req.RAGOptions 映射）
+	// TODO(service/chat): req.RAGOptions 被忽略，前端高级设置不会真正影响后端管道。
+	opts := rag.RAGOptions{
+		TopK:         s.defaultTopK,
+		QueryRewrite: true,
+		MultiRoute:   true,
+		Hybrid:       true,
+		Rerank:       true,
 	}
 
-	var llmAnswer string
-	canSubmit := false
-
-	if len(pipelineChunks) == 0 {
-		llmAnswer = "暂未找到足够匹配的知识，建议提交申告由运维人员人工处理。"
-		canSubmit = true
-	} else if s.llmClient != nil {
-		// TODO(service/chat): 最终答案生成和 Handler.streamWithLLM 会各调用一次 LLM。
-		// 应让 Service 暴露一个流式生成入口，避免先完整生成再重复流式生成导致答案不一致和成本翻倍。
-		// Step 2: 构造带上下文的 prompt
-		// 注意：system prompt 当前为全局默认值。后续可在知识库或 LLM 配置中
-		// 增加 prompt_template 字段，支持按知识库定制角色设定。
-		systemPrompt := "你是一个运维知识助手。根据以下知识库内容回答用户问题。如果知识库中没有相关信息，请如实说明。"
-		var contextBuilder strings.Builder
-		for i, chunk := range pipelineChunks {
-			contextBuilder.WriteString(fmt.Sprintf("【参考资料 %d】%s\n", i+1, chunk.Content))
-		}
-
-		messages := []adapter.ChatMessage{
-			{Role: "system", Content: systemPrompt},
-			{Role: "user", Content: fmt.Sprintf("知识库内容：\n%s\n\n用户问题：%s", contextBuilder.String(), req.Question)},
-		}
-
-		// Step 3: LLM 生成
-		model := s.defaultModel
-		maxTokens := 2048
-		if s.configMgr != nil {
-			if cfg := s.configMgr.GetConfig(); cfg != nil {
-				model = cfg.LLMModel
-				maxTokens = cfg.MaxTokens
-			}
-		}
-		if model == "" {
-			model = "default"
-		}
-
-		llmResp, llmErr := s.llmClient.ChatCompletion(ctx, adapter.ChatRequest{
-			Messages:    messages,
-			Model:       model,
-			MaxTokens:   maxTokens,
-			Temperature: 0.3,
-		})
-		if llmErr != nil {
-			// TODO(service/chat): LLM 生成失败应返回 ErrAIUnavailable，而不是保存兜底答案为成功会话。
-			// 需要区分“低置信度兜底”和“核心路径失败”两类场景。
-			llmAnswer = "AI 服务不可用，请稍后重试或提交申告。"
-			canSubmit = true
-		} else {
-			llmAnswer = llmResp.Content
-		}
-	} else {
-		// 无 LLM 客户端：直接返回检索内容摘要
-		var summary strings.Builder
-		for i, chunk := range pipelineChunks {
-			summary.WriteString(fmt.Sprintf("%d. %s\n", i+1, chunk.Content))
-		}
-		llmAnswer = "以下是与您问题相关的知识条目：\n\n" + summary.String()
-	}
-
-	durationMS := int(time.Since(start).Milliseconds())
-
-	// Step 4: 保存会话
-	//
-	// 置信度取 RAG 检索结果中的最高分（RRF 融合后分数），无结果时默认 0。
-	// 为什么用最高分而非平均分：多 chunk 场景中最高分反映最佳匹配质量，
-	// 避免大量低相关 chunk 拉高或拉低均值。
+	var answer string
+	var sources []response.SourceItem
 	var confidence float64
-	if len(pipelineChunks) > 0 {
-		for _, c := range pipelineChunks {
-			if c.Score > confidence {
-				confidence = c.Score
-			}
+	var pipeMeta *ChatPipelineMeta
+	durationMS := 0
+
+	if s.llmService != nil {
+		// TODO(service/chat): 接收 context.Context 参数，避免 context.Background。
+		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+		defer cancel()
+
+		start := time.Now()
+		result, syncErr := s.llmService.SyncChat(ctx, req.Question, req.KBID, opts)
+		durationMS = int(time.Since(start).Milliseconds())
+		if syncErr != nil {
+			return nil, errcode.AppError{Code: errcode.ErrRAGUnavailable, Message: syncErr.Error()}
 		}
+		answer = result.Answer
+		sources = result.Sources
+		confidence = result.Confidence
+		pipeMeta = result.Pipeline
+	} else {
+		// 无 LLMService：降级提示
+		answer = "当前 AI 服务暂不可用，请提交申告由人工处理"
 	}
-	// TODO(service/chat): 使用 RRF/BM25 原始分数直接和 0.6 阈值比较不可靠。
-	// 应对不同检索来源做分数归一化或引入独立 confidence 估计，否则 can_submit_ticket 判断会漂移。
-	session := &model.ChatSession{
+
+	canSubmit := len(sources) == 0 || confidence < defaultConfidenceThreshold
+
+	// 保存会话
+	sess := &model.ChatSession{
 		UserID:     userID,
 		KBID:       req.KBID,
 		Question:   req.Question,
-		Answer:     llmAnswer,
+		Answer:     answer,
 		Confidence: confidence,
 		DurationMs: durationMS,
 	}
+	if len(sources) > 0 {
+		if srcJSON, err := json.Marshal(sources); err == nil {
+			sess.Sources = srcJSON
+		}
+	}
 	if s.chatRepo != nil {
-		// TODO(service/chat): sources 和 chat_messages 没有持久化。
-		// GetChatDetail 读取 session.Sources，但创建会话时未写入来源，历史详情会缺少引用证据。
-		if err := s.chatRepo.Create(session); err != nil {
+		if err := s.chatRepo.Create(sess); err != nil {
 			return nil, errcode.AppError{Code: errcode.ErrUnknown, Message: "保存会话失败"}
 		}
 	}
 
 	return &ChatSessionResponse{
-		SessionID:       session.ID,
+		SessionID:       sess.ID,
 		Question:        req.Question,
-		Answer:          llmAnswer,
-		Confidence:      session.Confidence,
+		Answer:          answer,
+		Sources:         sources,
+		Confidence:      confidence,
 		CanSubmitTicket: canSubmit,
 		DurationMS:      durationMS,
+		Pipeline:        pipeMeta,
 	}, nil
 }
 
@@ -280,6 +210,85 @@ func (s *ChatService) GetChatDetail(sessionID int64) (*response.ChatSessionRespo
 		Feedback:        session.Feedback,
 		CreatedAt:       session.CreatedAt.Format("2006-01-02 15:04:05"),
 	}, nil
+}
+
+// =============================================================================
+// StreamChat — SSE 流式问答
+// =============================================================================
+
+// StreamChat 创建问答会话并以流式事件通道返回。
+//
+// 流程：
+//  1. 校验参数
+//  2. LLMService.StreamChat 获取事件通道
+//  3. goroutine 代理事件，done 时创建 session 填入 session_id
+//
+// 单次 LLM 调用：用户看到的 token 与最终存入 DB 的答案完全一致。
+func (s *ChatService) StreamChat(ctx context.Context, req request.CreateChatRequest, userID int64) (<-chan StreamEvent, error) {
+	if strings.TrimSpace(req.Question) == "" {
+		return nil, errcode.AppError{Code: errcode.ErrParam, Message: "问题不能为空"}
+	}
+	if s.knowledgeRepo == nil {
+		return nil, errcode.AppError{Code: errcode.ErrAIUnavailable, Message: fallbackAIUnavailable}
+	}
+	_, err := s.knowledgeRepo.FindKBByID(req.KBID)
+	if err != nil {
+		return nil, errcode.AppError{Code: errcode.ErrNotFound, Message: "知识库不存在"}
+	}
+
+	opts := rag.RAGOptions{
+		TopK:         s.defaultTopK,
+		QueryRewrite: true,
+		MultiRoute:   true,
+		Hybrid:       true,
+		Rerank:       true,
+	}
+
+	if s.llmService == nil {
+		return nil, errcode.AppError{Code: errcode.ErrAIUnavailable, Message: fallbackAIUnavailable}
+	}
+
+	llmEvents, err := s.llmService.StreamChat(ctx, req.Question, req.KBID, opts)
+	if err != nil {
+		return nil, errcode.AppError{Code: errcode.ErrRAGUnavailable, Message: err.Error()}
+	}
+
+	// 代理事件通道，done 时持久化 session
+	outCh := make(chan StreamEvent, 100)
+	go func() {
+		defer close(outCh)
+		for evt := range llmEvents {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
+			// done 事件到达：创建 session 并回填 session_id
+			if evt.Type == "done" && evt.Metadata != nil && s.chatRepo != nil {
+				srcJSON, _ := json.Marshal(evt.Metadata.Sources)
+				sess := &model.ChatSession{
+					UserID:     userID,
+					KBID:       req.KBID,
+					Question:   req.Question,
+					Answer:     evt.Metadata.Answer,
+					Sources:    srcJSON,
+					Confidence: evt.Metadata.Confidence,
+					DurationMs: evt.Metadata.DurationMS,
+				}
+				if err := s.chatRepo.Create(sess); err == nil {
+					evt.Metadata.SessionID = sess.ID
+					evt.Metadata.Question = req.Question
+					evt.Metadata.Feedback = 0
+					evt.Metadata.CreatedAt = time.Now().Format("2006-01-02 15:04:05")
+				}
+			}
+			if ok := sendOrCancel(ctx, outCh, evt); !ok {
+				return
+			}
+		}
+	}()
+
+	return outCh, nil
 }
 
 // =============================================================================

@@ -187,9 +187,13 @@ func main() {
 	knowledgeService := service.NewKnowledgeService(knowledgeRepo, chunker, embedder, vectorStore, docParser, processor, storageClient)
 	slog.Info("KnowledgeService 已初始化（含 Chunker + Processor）")
 
-	// ChatService（自建 Pipeline + LLMClient）
-	chatService := service.NewChatService(knowledgeRepo, chatRepo, pipeline, llmClient, llmConfigSvc.GetManager(), cfg.AI.DefaultTopK, cfg.LLM.Model)
-	slog.Info("ChatService 已初始化（含 RAG Pipeline）")
+	// LLMService（RAG + prompt + LLM 统一编排，供 ChatService 使用）
+	llmService := service.NewLLMService(llmClient, llmConfigSvc.GetManager(), cfg.LLM.Model, pipeline)
+	slog.Info("LLMService 已初始化（RAG + prompt + LLM 统一调用）")
+
+	// ChatService（会话生命周期管理）
+	chatService := service.NewChatService(knowledgeRepo, chatRepo, pipeline, llmService, cfg.AI.DefaultTopK)
+	slog.Info("ChatService 已初始化（含 RAG Pipeline + LLMService）")
 
 	// AuditService
 	auditService := service.NewAuditService(auditRepo, userRepo)
@@ -200,7 +204,7 @@ func main() {
 	roleHandler := handler.NewRoleHandler(roleService)
 	ticketHandler := handler.NewTicketHandler(ticketService, knowledgeService)
 	knowledgeHandler := handler.NewKnowledgeHandler(knowledgeService)
-	chatHandler := handler.NewChatHandler(chatService, llmClient, cfg.LLM.Model)
+	chatHandler := handler.NewChatHandler(chatService)
 	messageHandler := handler.NewMessageHandler(messageService)
 	dashboardHandler := handler.NewDashboardHandler(dashboardService)
 	auditHandler := handler.NewAuditHandler(auditService)

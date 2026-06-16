@@ -84,6 +84,15 @@ data: {"type":"step","id":"llm_generate","label":"LLM 生成"}
 | `llm_generate` | LLM 生成 | 调用 LLM 生成答案 |
 
 > 管道步骤可能因 `rag_options` 开关而跳过（如 `query_rewrite=false` 时跳过查询改写步骤）。
+> step 事件在管道执行期间**实时**发送，无需等待完整答案生成。
+
+### error 事件 — 流式过程错误
+
+```
+data: {"type":"error","error":"LLM 生成中断: context deadline exceeded"}
+```
+
+> 当 RAG 检索或 LLM 流式生成中途失败时发送此事件。前端应在接收到 error 事件后停止流式渲染并提示用户。
 
 ### token 事件 — 逐 token 流式发送
 
@@ -131,9 +140,9 @@ await streamChatSession(
     rag_options: { top_k: 5, hybrid: true, rerank: true }
   },
   {
-    onStep(id: string, label: string) {
-      // 展示管道步骤进度
-      currentStep.value = label
+    onStep(step: { id: string; label: string }) {
+      // 展示管道步骤进度（实时事件）
+      currentStep.value = step.label
     },
     onToken(content: string) {
       // 逐 token 追加到 UI（真实流式）
