@@ -92,9 +92,7 @@ const handleLogin = async () => {
       router.push('/portal')
     }
   } catch (err: any) {
-    // TODO(web/auth): 错误信息提取不完整 — err?.message 返回 Axios 通用错误字符串。
-    // 应优先读取 err.response?.data?.message 获取后端真实错误（如"账号已被冻结"）。
-    error.value = err?.message || '登录失败，请检查网络连接'
+    error.value = err?.response?.data?.message || err?.message || '登录失败，请检查网络连接'
   } finally {
     loading.value = false
   }

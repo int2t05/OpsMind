@@ -13,14 +13,22 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { getToken, removeToken } from '@/utils/auth'
 import { useAuthStore } from '@/stores/auth'
 
+/** 将 base64url 编码转换为标准 base64 编码 */
+function base64UrlToBase64(str: string): string {
+  str = str.replace(/-/g, '+').replace(/_/g, '/')
+  while (str.length % 4) {
+    str += '='
+  }
+  return str
+}
+
 /** 解码 JWT payload（不验证签名，仅提取过期时间） */
 function decodeJWTPayload(token: string): { exp?: number } | null {
   try {
     const parts = token.split('.')
     if (parts.length !== 3) return null
-    // TODO(web/router): atob 不支持 base64url 的 '-' '_' 和缺省 padding。
-    // 应先做 base64url normalize，避免部分 JWT payload 解码失败。
-    return JSON.parse(atob(parts[1]))
+    const base64 = base64UrlToBase64(parts[1])
+    return JSON.parse(atob(base64))
   } catch {
     return null
   }

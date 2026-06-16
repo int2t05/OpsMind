@@ -60,14 +60,19 @@ raw.interceptors.request.use(
 
 // Token 刷新状态管理
 let isRefreshing = false
-let refreshSubscribers: Array<(token: string) => void> = []
+let refreshSubscribers: Array<{ resolve: (token: string) => void; reject: (error: any) => void }> = []
 
-function subscribeTokenRefresh(cb: (token: string) => void) {
-  refreshSubscribers.push(cb)
+function subscribeTokenRefresh(resolve: (token: string) => void, reject: (error: any) => void) {
+  refreshSubscribers.push({ resolve, reject })
 }
 
 function onTokenRefreshed(newToken: string) {
-  refreshSubscribers.forEach(cb => cb(newToken))
+  refreshSubscribers.forEach(({ resolve }) => resolve(newToken))
+  refreshSubscribers = []
+}
+
+function onTokenRefreshFailed(error: any) {
+  refreshSubscribers.forEach(({ reject }) => reject(error))
   refreshSubscribers = []
 }
 
@@ -98,11 +103,9 @@ raw.interceptors.response.use(
             onTokenRefreshed(newToken)
             isRefreshing = false
             return raw(config)
-          } catch {
-            // TODO(web/request): 刷新失败时 refreshSubscribers 被清空但已订阅的 Promise 未 resolve/reject，
-            // 导致订阅者永久挂起（内存泄漏）。应在清空前遍历通知所有订阅者刷新失败。
+          } catch (refreshErr) {
             isRefreshing = false
-            refreshSubscribers = []
+            onTokenRefreshFailed(refreshErr)
             removeToken()
             removeRefreshToken()
             if (router.currentRoute.value.path !== '/login') {
@@ -112,11 +115,14 @@ raw.interceptors.response.use(
           }
         } else if (isRefreshing) {
           // 其他请求等待刷新完成
-          return new Promise((resolve) => {
-            subscribeTokenRefresh((token: string) => {
-              config.headers.Authorization = `Bearer ${token}`
-              resolve(raw(config))
-            })
+          return new Promise((resolve, reject) => {
+            subscribeTokenRefresh(
+              (token: string) => {
+                config.headers.Authorization = `Bearer ${token}`
+                resolve(raw(config))
+              },
+              (err) => reject(err)
+            )
           })
         } else {
           removeToken()
