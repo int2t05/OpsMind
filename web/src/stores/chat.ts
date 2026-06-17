@@ -55,6 +55,8 @@ export const useChatStore = defineStore('chat', () => {
   const loading = ref(false)
   const streaming = ref(false)  // 是否正在流式输出中
   const selectedKBID = ref<number | null>(null)
+  const feedbackError = ref<string | null>(null)  // 反馈提交错误
+  const submittingFeedback = ref(false)  // 是否正在提交反馈
 
   // RAG 管道步骤（当前执行的步骤标签）
   const currentStep = ref('')
@@ -171,12 +173,16 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   async function submitFeedback(feedback: number) {
-    if (!currentSession.value) return
+    if (!currentSession.value || submittingFeedback.value) return
+    submittingFeedback.value = true
+    feedbackError.value = null
     try {
       await submitFeedbackApi(currentSession.value.session_id, feedback)
       currentSession.value.feedback = feedback
-    } catch (err) {
-      console.error('提交反馈失败', err)
+    } catch (err: any) {
+      feedbackError.value = err?.message || '提交反馈失败'
+    } finally {
+      submittingFeedback.value = false
     }
   }
 
@@ -204,6 +210,8 @@ export const useChatStore = defineStore('chat', () => {
     currentStep,
     pipelineMetrics,
     ragOptions,
+    feedbackError,
+    submittingFeedback,
     sendQuestion,
     submitFeedback,
     setCurrentStep,

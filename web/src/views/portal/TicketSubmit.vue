@@ -142,9 +142,25 @@ const form = reactive({
   affected_systems: [] as string[],
   contact_phone: '',
   contact_email: '',
-  // TODO(portal/TicketSubmit): chat_context 来自 URL query 参数直接拼接，无 JSON 解析校验。
-  // 攻击者可通过 ?chat_context={"malicious":true} 注入任意值。应先 JSON.parse 并校验结构再使用。
-  chat_context: (route.query.chat_context as string) || '',
+  // 安全处理 chat_context：解析并验证，防止 JSON 注入
+  chat_context: (() => {
+    try {
+      const raw = route.query.chat_context as string
+      if (!raw) return ''
+      // 尝试解析验证 JSON
+      const parsed = JSON.parse(raw)
+      // 只保留我们需要的字段，防止注入任意数据
+      if (typeof parsed === 'object' && parsed !== null) {
+        return JSON.stringify({
+          question: typeof parsed.question === 'string' ? parsed.question : undefined,
+          answer: typeof parsed.answer === 'string' ? parsed.answer : undefined,
+        })
+      }
+    } catch {
+      // 解析失败时返回空
+    }
+    return ''
+  })(),
 })
 
 const tagInput = ref('')
