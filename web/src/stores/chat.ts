@@ -18,6 +18,7 @@ import {
   submitFeedback as submitFeedbackApi,
   type ChatSessionResponse,
 } from '@/api/chat'
+import { generateId } from '@/utils/id'
 
 /** RAG 管道执行指标 */
 export interface PipelineMetrics {
@@ -85,12 +86,10 @@ export const useChatStore = defineStore('chat', () => {
     pipelineMetrics.value = null
 
     // 添加用户消息
-    // TODO(chat): crypto.randomUUID() 在 HTTP/localhost 环境下为 undefined，调用直接抛 TypeError。
-    // 应改用已有的 generateId() 工具函数（utils/__tests__/id.test.ts）作为 fallback。
-    messages.value.push({ id: crypto.randomUUID(), role: 'user', content: question })
+    messages.value.push({ id: generateId(), role: 'user', content: question })
 
     // 添加 AI 消息占位（流式填充）
-    const aiMsgId = crypto.randomUUID()
+    const aiMsgId = generateId()
     messages.value.push({
       id: aiMsgId,
       role: 'assistant',
@@ -141,7 +140,7 @@ export const useChatStore = defineStore('chat', () => {
             const idx = messages.value.findIndex(m => m.id === aiMsgId)
             if (idx >= 0) messages.value.splice(idx, 1)
             messages.value.push({
-              id: crypto.randomUUID(),
+              id: generateId(),
               role: 'assistant',
               content: `抱歉，${error || 'AI 服务暂时不可用，请稍后重试或提交申告。'}`,
             })
@@ -160,7 +159,7 @@ export const useChatStore = defineStore('chat', () => {
       if (idx >= 0) messages.value.splice(idx, 1)
       const message = err instanceof Error ? err.message : '网络连接失败'
       messages.value.push({
-        id: crypto.randomUUID(),
+        id: generateId(),
         role: 'assistant',
         content: `抱歉，${message}`,
       })

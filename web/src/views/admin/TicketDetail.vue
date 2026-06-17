@@ -36,14 +36,22 @@
         <h3>状态操作</h3>
         <div class="action-bar">
           <template v-if="ticket.status === 1">
-            <button class="btn-primary" @click="doAction('start')">接单</button>
+            <button class="btn-primary" :disabled="saving" @click="doAction('start')">
+              {{ saving ? '处理中...' : '接单' }}
+            </button>
           </template>
           <template v-if="ticket.status === 2">
-            <button class="btn-primary" @click="doAction('resolve')">已解决</button>
-            <button class="btn-warn" @click="doAction('request_info')">需补充信息</button>
+            <button class="btn-primary" :disabled="saving" @click="doAction('resolve')">
+              {{ saving ? '处理中...' : '已解决' }}
+            </button>
+            <button class="btn-warn" :disabled="saving" @click="doAction('request_info')">
+              {{ saving ? '处理中...' : '需补充信息' }}
+            </button>
           </template>
           <template v-if="ticket.status === 3">
-            <button class="btn-primary" @click="doAction('resolve')">已解决</button>
+            <button class="btn-primary" :disabled="saving" @click="doAction('resolve')">
+              {{ saving ? '处理中...' : '已解决' }}
+            </button>
           </template>
           <textarea v-model="actionContent" class="action-textarea" placeholder="处理备注..." rows="2" />
         </div>
