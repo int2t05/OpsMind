@@ -1,0 +1,309 @@
+// Package adapter 提供外部服务的适配层。
+//
+// vector_store.go 定义 VectorStore 接口和 pgvector 实现。
+// 使用 pgvector halfvec 类型 + HNSW 索引存储和检索向量。
+//
+// 设计决策（ADR-V2-003）：
+// 接口明确暴露 pgvector 概念（halfvec、cosine），不追求数据库无关抽象。
+// pgvector 的 halfvec/HNSW/<=> 算子是不可替代的核心能力，
+// 过度抽象反而限制性能优化空间。
+package adapter
+
+import (
+	"context"
+	"database/sql"
+	"fmt"
+	"log/slog"
+	"math"
+	"strings"
+
+	_ "github.com/jackc/pgx/v5/stdlib"
+)
+
+// =============================================================================
+// 接口定义
+// =============================================================================
+
+// VectorStore 定义 pgvector 向量存储接口。
+type VectorStore interface {
+	// BatchInsert 批量写入分块向量（使用 halfvec 半精度）。
+	BatchInsert(ctx context.Context, chunks []VectorChunk) error
+
+	// CosineSearch 余弦相似度检索（使用 pgvector <=> 算子）。
+	CosineSearch(ctx context.Context, kbID int64, embedding []float32, topK int) ([]SearchResult, error)
+
+	// DeleteByArticle 删除指定文章的所有向量分块。
+	DeleteByArticle(ctx context.Context, articleID int64) error
+
+	// DeleteByKB 删除指定知识库的所有向量分块。
+	DeleteByKB(ctx context.Context, kbID int64) error
+
+	// CountByKB 统计知识库的分块总数。
+	CountByKB(ctx context.Context, kbID int64) (int64, error)
+
+	// GetChunksByArticle 获取指定文章的所有分块内容（不含向量）。
+	GetChunksByArticle(ctx context.Context, articleID int64) ([]ChunkContent, error)
+}
+
+// =============================================================================
+// 类型定义
+// =============================================================================
+
+// VectorChunk 待写入的向量分块。
+type VectorChunk struct {
+	ArticleID       int64     `json:"article_id"`
+	KBID            int64     `json:"kb_id"`
+	Content         string    `json:"content"`
+	ChunkIndex      int       `json:"chunk_index"`
+	Embedding       []float32 `json:"embedding"`
+	EmbeddingModel  string    `json:"embedding_model"`
+	VectorDimension int       `json:"vector_dimension"`
+}
+
+// SearchResult 向量检索结果。
+type SearchResult struct {
+	ChunkID    int64   `json:"chunk_id"`
+	ArticleID  int64   `json:"article_id"`
+	Content    string  `json:"content"`
+	ChunkIndex int     `json:"chunk_index"`
+	Score      float64 `json:"score"`
+}
+
+// ChunkContent 分块内容（不含向量，用于重索引）。
+type ChunkContent struct {
+	ID         int64  `json:"id"`
+	Content    string `json:"content"`
+	ChunkIndex int    `json:"chunk_index"`
+}
+
+// =============================================================================
+// pgvector 实现
+// =============================================================================
+
+// PgvectorStore 实现 VectorStore，使用 pgvector 扩展。
+//
+// 为什么使用 database/sql + pgx stdlib 而非 GORM：
+// GORM 的 pgvector 支持有限（特别是 halfvec 类型），
+// 原生 SQL 对向量操作的控制更精细，且性能更优（避免 ORM 反射开销）。
+type PgvectorStore struct {
+	db *sql.DB
+}
+
+// NewPgvectorStore 创建 PgvectorStore 实例。
+//
+// dsn 格式：postgres://user:password@host:port/dbname?sslmode=disable
+func NewPgvectorStore(dsn string) (*PgvectorStore, error) {
+	// TODO(adapter/vector): PgvectorStore 应配置连接池并暴露 Close()。
+	// 当前单独 sql.DB 不会在 main 优雅关闭时关闭，连接池参数也和 GORM DB 不一致。
+	db, err := sql.Open("pgx", dsn)
+	if err != nil {
+		return nil, fmt.Errorf("连接 pgvector 失败: %w", err)
+	}
+	if err := db.Ping(); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("pgvector Ping 失败: %w", err)
+	}
+	return &PgvectorStore{db: db}, nil
+}
+
+// =============================================================================
+// BatchInsert — 批量写入向量
+// =============================================================================
+
+// BatchInsert 批量写入分块向量。
+//
+// SQL: INSERT INTO knowledge_chunks (article_id, kb_id, content, chunk_index,
+//
+//	embedding, embedding_model, vector_dimension, created_at)
+//	VALUES ($1, $2, $3, $4, $5::halfvec, $6, $7, NOW())
+func (s *PgvectorStore) BatchInsert(ctx context.Context, chunks []VectorChunk) error {
+	if len(chunks) == 0 {
+		return nil
+	}
+
+	// 校验所有 chunk 的 embedding 维度一致，维度不匹配时在应用层提前报错，
+	// 避免到 pgvector 层才失败（错误信息不友好且难以定位是哪个 chunk 的问题）。
+	var expectedDim int
+	for i, c := range chunks {
+		if len(c.Embedding) == 0 {
+			continue
+		}
+		if expectedDim == 0 {
+			expectedDim = len(c.Embedding)
+		} else if len(c.Embedding) != expectedDim {
+			return fmt.Errorf("chunk %d embedding 维度不一致: 预期 %d, 实际 %d (article_id=%d, chunk_index=%d)",
+				i, expectedDim, len(c.Embedding), c.ArticleID, c.ChunkIndex)
+		}
+		// VectorDimension 字段应与实际 embedding 长度一致
+		if c.VectorDimension != 0 && c.VectorDimension != len(c.Embedding) {
+			return fmt.Errorf("chunk %d VectorDimension 与实际 embedding 长度不匹配: VectorDimension=%d, len(embedding)=%d (article_id=%d)",
+				i, c.VectorDimension, len(c.Embedding), c.ArticleID)
+		}
+	}
+
+	// 构建批量 INSERT
+	query := `INSERT INTO knowledge_chunks
+		(article_id, kb_id, content, chunk_index, embedding, embedding_model, vector_dimension, created_at)
+		VALUES `
+
+	var placeholders []string
+	var args []interface{}
+	for i, c := range chunks {
+		base := i * 7
+		placeholders = append(placeholders,
+			fmt.Sprintf("($%d, $%d, $%d, $%d, $%d::halfvec, $%d, $%d, NOW())",
+				base+1, base+2, base+3, base+4, base+5, base+6, base+7))
+		args = append(args, c.ArticleID, c.KBID, c.Content, c.ChunkIndex,
+			float32ToPgVector(c.Embedding), c.EmbeddingModel, c.VectorDimension)
+	}
+
+	query += strings.Join(placeholders, ", ")
+	_, err := s.db.ExecContext(ctx, query, args...)
+	if err != nil {
+		return fmt.Errorf("批量写入向量失败 (count=%d): %w", len(chunks), err)
+	}
+	return nil
+}
+
+// =============================================================================
+// CosineSearch — 余弦相似度检索
+// =============================================================================
+
+// CosineSearch 使用 cosine 距离算子 (<=>) 检索最相似的 topK 个向量。
+//
+// SQL: SELECT id, article_id, content, chunk_index,
+//
+//	1 - (embedding <=> $1::halfvec) AS score
+//	FROM knowledge_chunks
+//	WHERE kb_id = $2
+//	ORDER BY embedding <=> $1::halfvec
+//	LIMIT $3
+//
+// <=> 算子返回余弦距离（越小越相似），1 - distance 转换为相似度分数。
+func (s *PgvectorStore) CosineSearch(ctx context.Context, kbID int64, embedding []float32, topK int) ([]SearchResult, error) {
+	// 空 embedding 防护：空向量检索无意义，提前报错避免数据库报错
+	if len(embedding) == 0 {
+		return nil, fmt.Errorf("embedding 为空，无法执行向量检索 (kb_id=%d)", kbID)
+	}
+	// topK 范围钳位：过小无意义，过大会拖慢检索且超出业务需求
+	if topK <= 0 {
+		topK = 10
+	} else if topK > 100 {
+		topK = 100
+	}
+
+	query := `SELECT id, article_id, content, chunk_index,
+		1 - (embedding <=> $1::halfvec) AS score
+		FROM knowledge_chunks
+		WHERE kb_id = $2
+		ORDER BY embedding <=> $1::halfvec
+		LIMIT $3`
+
+	rows, err := s.db.QueryContext(ctx, query, float32ToPgVector(embedding), kbID, topK)
+	if err != nil {
+		return nil, fmt.Errorf("向量检索失败 (kb_id=%d): %w", kbID, err)
+	}
+	defer rows.Close()
+
+	var results []SearchResult
+	for rows.Next() {
+		var r SearchResult
+		if err := rows.Scan(&r.ChunkID, &r.ArticleID, &r.Content, &r.ChunkIndex, &r.Score); err != nil {
+			return nil, fmt.Errorf("扫描检索结果失败: %w", err)
+		}
+		results = append(results, r)
+	}
+	return results, rows.Err()
+}
+
+// =============================================================================
+// Delete / Count / Get
+// =============================================================================
+
+// DeleteByArticle 按文章 ID 删除所有向量分块。
+func (s *PgvectorStore) DeleteByArticle(ctx context.Context, articleID int64) error {
+	_, err := s.db.ExecContext(ctx,
+		"DELETE FROM knowledge_chunks WHERE article_id = $1", articleID)
+	if err != nil {
+		return fmt.Errorf("删除文章向量失败 (article_id=%d): %w", articleID, err)
+	}
+	return nil
+}
+
+// DeleteByKB 按知识库 ID 删除所有向量分块。
+func (s *PgvectorStore) DeleteByKB(ctx context.Context, kbID int64) error {
+	_, err := s.db.ExecContext(ctx,
+		"DELETE FROM knowledge_chunks WHERE kb_id = $1", kbID)
+	if err != nil {
+		return fmt.Errorf("删除知识库向量失败 (kb_id=%d): %w", kbID, err)
+	}
+	return nil
+}
+
+// CountByKB 统计知识库的分块总数。
+func (s *PgvectorStore) CountByKB(ctx context.Context, kbID int64) (int64, error) {
+	var count int64
+	err := s.db.QueryRowContext(ctx,
+		"SELECT COUNT(*) FROM knowledge_chunks WHERE kb_id = $1", kbID).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("统计分块数失败 (kb_id=%d): %w", kbID, err)
+	}
+	return count, nil
+}
+
+// GetChunksByArticle 获取指定文章的所有分块内容（不含向量，用于重索引）。
+func (s *PgvectorStore) GetChunksByArticle(ctx context.Context, articleID int64) ([]ChunkContent, error) {
+	rows, err := s.db.QueryContext(ctx,
+		"SELECT id, content, chunk_index FROM knowledge_chunks WHERE article_id = $1 ORDER BY chunk_index",
+		articleID)
+	if err != nil {
+		return nil, fmt.Errorf("查询分块失败 (article_id=%d): %w", articleID, err)
+	}
+	defer rows.Close()
+
+	var chunks []ChunkContent
+	for rows.Next() {
+		var c ChunkContent
+		if err := rows.Scan(&c.ID, &c.Content, &c.ChunkIndex); err != nil {
+			return nil, fmt.Errorf("扫描分块失败: %w", err)
+		}
+		chunks = append(chunks, c)
+	}
+	return chunks, rows.Err()
+}
+
+// =============================================================================
+// 辅助函数
+// =============================================================================
+
+// float32ToPgVector 将 []float32 转换为 pgvector 兼容的数组字面量字符串。
+//
+// pgvector 接受 ARRAY[...] 或 [val1,val2,...] 格式。
+// 使用 [val1,val2,...] 格式配合 ::halfvec 显式类型转换。
+//
+// 对 NaN 和 ±Inf 使用 0.0 替代——pgvector 不接受非有限浮点数，
+// 而 NaN/Inf 在 normalized embedding 中不应出现（出现意味着上游 bug），
+// 0.0 替代是最小伤害的降级策略（不影响向量维度），同时记录 Warn 便于排查上游问题。
+func float32ToPgVector(v []float32) string {
+	if len(v) == 0 {
+		return "[]"
+	}
+	// TODO(adapter/vector): 使用 fmt.Sprintf("%.6f") 会损失 embedding 精度。
+	// halfvec 已经会量化，字符串阶段再截断可能进一步影响召回质量。
+	var b strings.Builder
+	b.WriteByte('[')
+	for i, f := range v {
+		if i > 0 {
+			b.WriteByte(',')
+		}
+		// 使用 math.IsNaN 和 math.IsInf 精确检测非有限浮点数
+		// pgvector 不接受 NaN/Inf，0.0 替代是最小伤害的降级策略
+		if math.IsNaN(float64(f)) || math.IsInf(float64(f), 0) {
+			f = 0.0
+			slog.Warn("向量含 NaN/Inf，已替换为 0.0", "index", i)
+		}
+		b.WriteString(fmt.Sprintf("%.6f", f))
+	}
+	b.WriteByte(']')
+	return b.String()
+}

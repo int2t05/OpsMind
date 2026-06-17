@@ -1,0 +1,19 @@
+# Dependencies — installed inside Docker
+node_modules/
+
+# Build output
+dist/
+
+# Dev files
+.vscode/
+.idea/
+*.md
+!README.md
+
+# Git
+.git/
+.gitignore
+
+# Misc
+.DS_Store
+*.log

@@ -1,0 +1,55 @@
+# OpsMind 后端配置文件
+#
+# 本地开发使用默认值，Docker 环境通过环境变量覆盖。
+# 环境变量前缀：OPSMIND_，例如 OPSMIND_DATABASE_HOST 覆盖 database.host。
+
+server:
+  port: 8080
+  mode: debug  # debug / release
+  # TODO(config): 增加 read_timeout/write_timeout/idle_timeout 配置，避免 HTTP 超时只能通过代码调整。
+
+database:
+  host: localhost        # Docker 内: postgres
+  port: 5432
+  user: opsmind
+  password: "opsmind_dev"  # 通过环境变量 OPSMIND_DATABASE_PASSWORD 覆盖
+  dbname: opsmind
+  sslmode: disable
+  # TODO(config): 增加 max_open_conns/max_idle_conns/conn_max_lifetime，生产环境需要按数据库规格调优。
+
+jwt:
+  secret: ""             # 通过环境变量 OPSMIND_JWT_SECRET 设置
+  access_expire: 2h
+  refresh_expire: 168h   # 7 天
+
+minio:
+  endpoint: localhost:9000  # Docker 内: minio:9000
+  access_key: minioadmin
+  secret_key: minioadmin
+  use_ssl: false
+
+llm:
+  base_url: http://llama-cpp:8080/v1  # Docker 内部地址；OpenAI: https://api.openai.com/v1
+  api_key: ""                          # 通过环境变量 OPSMIND_LLM_API_KEY 设置
+  model: qwen3-4b                      # LLM 模型名称
+  max_tokens: 8192                     # 最大生成 Token 数
+
+embedding:
+  base_url: ""                         # Embedding 独立地址，空则回退到 llm.base_url
+  api_key: ""                          # Embedding 独立 API Key，空则回退到 llm.api_key
+  model: bge-m3                        # Embedding 模型名称
+  dimension: 1024                      # 向量维度
+
+ai:
+  default_top_k: 5
+  confidence_threshold: 0.6  # 低于此阈值引导用户提交申告
+  max_history_messages: 10     # 多轮对话历史消息数上限（滑动窗口，0=不限制）
+  rag_query_rewrite: true     # 查询改写开关
+  rag_multi_route: true       # 多路检索开关
+  rag_hybrid: true            # BM25 混合检索开关
+  rag_rerank: true            # 重排序开关
+
+rerank:
+  enabled: true              # 是否启用 cross-encoder 重排序子进程
+  python_path: "python3"     # Python 解释器路径
+  script_path: "rerank_server.py"  # rerank_server.py 路径（相对或绝对）

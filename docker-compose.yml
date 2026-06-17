@@ -1,0 +1,135 @@
+# OpsMind v2 — 运维数字员工系统 Docker Compose 编排
+#
+# v2 架构：自建 Go RAG 引擎 + pgvector 向量存储。
+# 4 个必须服务：opsmind-server, opsmind-web, postgres(pgvector), minio
+# 1 个可选服务：llama-cpp (profile: ai-local)
+#
+# opsmind-server 镜像内置 Python 3.11 + cross-encoder 重排序模型，
+# 通过子进程 stdin/stdout JSON Lines 协议通信，无需额外 rerank 容器。
+#
+# 使用方式：
+#   docker compose up -d --build              # 一键启动 4 个必须服务
+#   docker compose --profile ai-local up -d --build  # 含 llama.cpp 完整环境
+#   docker compose down                       # 停止
+#   docker compose down -v                    # 停止并清除数据卷
+
+services:
+  # ===== OpsMind Go 后端 =====
+  opsmind-server:
+    build:
+      context: ./server
+    container_name: opsmind-server
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    environment:
+      # .env 中所有 OPSMIND_* 变量通过 env_file 自动注入容器。
+      # 以下仅覆盖 Docker 环境与本地开发有差异的配置项。
+      OPSMIND_DATABASE_HOST: postgres
+      OPSMIND_MINIO_ENDPOINT: minio:9000
+      OPSMIND_LOG_DIR: ./logs
+      OPSMIND_RERANK_PYTHON_PATH: python3
+      OPSMIND_RERANK_SCRIPT_PATH: /app/rerank_server.py
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_started
+    networks:
+      - opsmind
+
+  # ===== OpsMind Vue 前端 =====
+  opsmind-web:
+    build:
+      context: ./web
+    container_name: opsmind-web
+    restart: unless-stopped
+    ports:
+      - "5173:80"
+    depends_on:
+      - opsmind-server
+    networks:
+      - opsmind
+
+  # ===== PostgreSQL + pgvector =====
+  postgres:
+    image: pgvector/pgvector:pg18
+    container_name: opsmind-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-opsmind}
+      POSTGRES_USER: ${POSTGRES_USER:-opsmind}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-opsmind_dev}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U opsmind"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - opsmind
+
+  # ===== MinIO 对象存储 =====
+  minio:
+    image: minio/minio:latest
+    container_name: opsmind-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    networks:
+      - opsmind
+
+  # ===== llama.cpp Server（可选，profile: ai-local）=====
+  # 使用官方镜像，模型文件通过 volume 挂载。
+  # 模型准备：下载 .gguf 模型文件到 ./models 目录。
+  # llama.cpp server 同时提供 /v1/chat/completions 和 /v1/embeddings 端点，
+  # 一个实例即可同时作为本地 LLM 和本地 Embedding 服务。
+  # Embedding 端点为 OpenAI-compatible，Base URL 留空时自动复用此实例。
+  llama-cpp:
+    image: ghcr.io/ggml-org/llama.cpp:server
+    container_name: opsmind-llama-cpp
+    restart: unless-stopped
+    ports:
+      - "8081:8080"
+    volumes:
+      - ${LLAMA_MODELS_DIR:-./models}:/models:ro
+    environment:
+      # 注入 Embedding 模型名（仅供参考，llama.cpp server 以实际加载的 .gguf 为准）
+      OPSMIND_EMBEDDING_MODEL: ${OPSMIND_EMBEDDING_MODEL:-bge-m3}
+    command:
+      - "--model"
+      # llama.cpp server 一次只加载一个 .gguf，该模型同时提供服务：
+      #   /v1/chat/completions → LLM 推理
+      #   /v1/embeddings       → Embedding 向量生成
+      - "/models/${OPSMIND_LLM_MODEL:-qwen3-4b}.gguf"
+      - "--host"
+      - "0.0.0.0"
+      - "--port"
+      - "8080"
+    networks:
+      - opsmind
+    profiles:
+      - ai-local
+
+# ===== 数据卷 =====
+volumes:
+  postgres_data:
+  minio_data:
+
+# ===== 网络 =====
+networks:
+  opsmind:
+    driver: bridge
