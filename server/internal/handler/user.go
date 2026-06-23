@@ -36,7 +36,8 @@ func (h *UserHandler) Create(c *gin.Context) {
 		return
 	}
 
-	if svcErr := h.svc.Create(req); svcErr != nil {
+	operatorID, _ := getCurrentUserID(c)
+	if svcErr := h.svc.Create(req, operatorID); svcErr != nil {
 		handleServiceError(c, svcErr)
 		return
 	}
@@ -105,7 +106,8 @@ func (h *UserHandler) Update(c *gin.Context) {
 		return
 	}
 
-	if svcErr := h.svc.Update(id, req); svcErr != nil {
+	operatorID, _ := getCurrentUserID(c)
+	if svcErr := h.svc.Update(id, req, operatorID); svcErr != nil {
 		handleServiceError(c, svcErr)
 		return
 	}
@@ -123,7 +125,8 @@ func (h *UserHandler) Freeze(c *gin.Context) {
 		return
 	}
 
-	if svcErr := h.svc.Freeze(id); svcErr != nil {
+	operatorID, _ := getCurrentUserID(c)
+	if svcErr := h.svc.Freeze(id, operatorID); svcErr != nil {
 		handleServiceError(c, svcErr)
 		return
 	}
@@ -141,7 +144,8 @@ func (h *UserHandler) Restore(c *gin.Context) {
 		return
 	}
 
-	if svcErr := h.svc.Restore(id); svcErr != nil {
+	operatorID, _ := getCurrentUserID(c)
+	if svcErr := h.svc.Restore(id, operatorID); svcErr != nil {
 		handleServiceError(c, svcErr)
 		return
 	}

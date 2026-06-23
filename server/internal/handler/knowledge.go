@@ -283,7 +283,7 @@ func (h *KnowledgeHandler) ListArticles(c *gin.Context) {
 	}
 
 	page, pageSize := parsePagination(c)
-	status, _ := strconv.Atoi(c.DefaultQuery("status", "0"))
+	status, _ := strconv.Atoi(c.DefaultQuery("status", "-1"))
 
 	result, svcErr := h.svc.ListArticles(kbID, status, page, pageSize)
 	if svcErr != nil {

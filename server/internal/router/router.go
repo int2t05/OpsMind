@@ -92,9 +92,11 @@ func registerPublicRoutes(rg *gin.RouterGroup, h *Handlers) {
 	if h != nil && h.Auth != nil {
 		rg.POST("/login", h.Auth.Login)
 		rg.POST("/refresh", h.Auth.Refresh)
+		rg.POST("/reset-password", h.Auth.ResetPassword)
 	} else {
 		rg.POST("/login", placeholder())
 		rg.POST("/refresh", placeholder())
+		rg.POST("/reset-password", placeholder())
 	}
 }
 

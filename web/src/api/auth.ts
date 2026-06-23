@@ -43,3 +43,12 @@ export function changePassword(data: ChangePasswordParams) {
 export function logout() {
   return request.post<ApiResponse<null>>('/api/v1/auth/me/logout')
 }
+
+interface ResetPasswordParams {
+  username: string
+  new_password: string
+}
+
+export function resetPassword(data: ResetPasswordParams) {
+  return request.post<ApiResponse<null>>('/api/v1/auth/reset-password', data)
+}

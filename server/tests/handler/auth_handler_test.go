@@ -195,10 +195,37 @@ func TestAuthHandler_Login_WrongPassword(t *testing.T) {
 func TestAuthHandler_Logout(t *testing.T) {
 	db := setupHandlerTestDB(t)
 	authHandler := setupAuthHandler(t, db)
+	seedHandlerUser(t, db, "test_handler_logout", "Test@1234", "13800002004", 1)
 
 	r := setupTestRouter(authHandler)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/logout", nil)
+	// 先登录获取 refresh_token
+	loginBody, _ := json.Marshal(map[string]string{
+		"username": "test_handler_logout",
+		"password": "Test@1234",
+	})
+	loginReq := httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", bytes.NewReader(loginBody))
+	loginReq.Header.Set("Content-Type", "application/json")
+	loginW := httptest.NewRecorder()
+	r.ServeHTTP(loginW, loginReq)
+
+	if loginW.Code != 200 {
+		t.Fatalf("登录失败（预处理步骤）: %s", loginW.Body.String())
+	}
+
+	var loginResp struct {
+		Data struct {
+			RefreshToken string `json:"refresh_token"`
+		} `json:"data"`
+	}
+	json.Unmarshal(loginW.Body.Bytes(), &loginResp)
+
+	// 用获取到的 refresh_token 执行 logout
+	logoutBody, _ := json.Marshal(map[string]string{
+		"refresh_token": loginResp.Data.RefreshToken,
+	})
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/logout", bytes.NewReader(logoutBody))
+	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 
 	r.ServeHTTP(w, req)

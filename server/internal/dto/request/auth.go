@@ -24,3 +24,12 @@ type ChangePasswordRequest struct {
 	OldPassword string `json:"old_password" binding:"required"` // 旧密码
 	NewPassword string `json:"new_password" binding:"required"` // 新密码
 }
+
+// ResetPasswordRequest 忘记密码重置请求。
+//
+// 无需旧密码，仅需用户名和新密码即可重置。
+// 适用于登录页"忘记密码"流程。
+type ResetPasswordRequest struct {
+	Username    string `json:"username" binding:"required"`    // 用户名
+	NewPassword string `json:"new_password" binding:"required"` // 新密码
+}

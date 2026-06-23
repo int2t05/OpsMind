@@ -154,7 +154,7 @@ func TestUserRepo_GetByPhone_Existing(t *testing.T) {
 		Username:     "test_getbyphone",
 		PasswordHash: "$2a$10$hash",
 		RealName:     "手机查询",
-		Phone:        "13800000003",
+		Phone:        "13800000099",
 		Status:       1,
 		FirstLogin:   true,
 		CreatedAt:    now,
@@ -162,10 +162,10 @@ func TestUserRepo_GetByPhone_Existing(t *testing.T) {
 	}
 	require.NoError(t, db.Create(user).Error)
 
-	got, err := repo.GetByPhone("13800000003")
+	got, err := repo.GetByPhone("13800000099")
 	require.NoError(t, err)
 	assert.Equal(t, user.ID, got.ID)
-	assert.Equal(t, "13800000003", got.Phone)
+	assert.Equal(t, "13800000099", got.Phone)
 }
 
 // TestUserRepo_GetByPhone_NotFound 按手机号查询不存在的用户

@@ -37,21 +37,41 @@ func setupChatTestDB(t *testing.T) *gorm.DB {
 		status SMALLINT NOT NULL DEFAULT 1, first_login BOOLEAN NOT NULL DEFAULT TRUE,
 		created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 	)`)
-	// 创建 knowledge_bases 表（FK 依赖）
-	db.Exec(`CREATE TABLE IF NOT EXISTS knowledge_bases (
+	// 重建 knowledge_bases 及其依赖表（CASCADE 级联删除旧表，确保与模型一致）
+	db.Exec(`DROP TABLE IF EXISTS knowledge_chunks CASCADE`)
+	db.Exec(`DROP TABLE IF EXISTS knowledge_articles CASCADE`)
+	db.Exec(`DROP TABLE IF EXISTS chat_messages CASCADE`)
+	db.Exec(`DROP TABLE IF EXISTS chat_sessions CASCADE`)
+	db.Exec(`DROP TABLE IF EXISTS knowledge_bases CASCADE`)
+	db.Exec(`CREATE TABLE knowledge_bases (
 		id BIGSERIAL PRIMARY KEY, name VARCHAR(128) NOT NULL, description TEXT,
 		rag_workspace_slug VARCHAR(128), embedding_model VARCHAR(128) NOT NULL DEFAULT '',
 		vector_dimension INT NOT NULL DEFAULT 0, created_by BIGINT NOT NULL,
 		created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 	)`)
-	// 创建 chat_sessions 表
+	db.Exec(`CREATE TABLE IF NOT EXISTS knowledge_articles (
+		id BIGSERIAL PRIMARY KEY, kb_id BIGINT NOT NULL,
+		title VARCHAR(255) NOT NULL, content TEXT NOT NULL,
+		category VARCHAR(64), tags JSONB, status SMALLINT NOT NULL DEFAULT 1,
+		source_type SMALLINT NOT NULL DEFAULT 1, word_count INTEGER NOT NULL DEFAULT 0,
+		chunk_count INTEGER NOT NULL DEFAULT 0, file_type VARCHAR(16) DEFAULT '',
+		minio_path VARCHAR(512) DEFAULT '', process_status VARCHAR(16) NOT NULL DEFAULT 'completed',
+		process_error TEXT DEFAULT '', created_by BIGINT NOT NULL DEFAULT 0,
+		reviewed_by BIGINT, published_by BIGINT, review_comment TEXT DEFAULT '',
+		created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+	)`)
+	db.Exec(`CREATE TABLE IF NOT EXISTS knowledge_chunks (
+		id BIGSERIAL PRIMARY KEY, article_id BIGINT NOT NULL, kb_id BIGINT NOT NULL DEFAULT 0,
+		content TEXT NOT NULL, chunk_index INTEGER NOT NULL DEFAULT 0,
+		embedding_model VARCHAR(128) NOT NULL DEFAULT '', vector_dimension INTEGER NOT NULL DEFAULT 0,
+		created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+	)`)
 	db.Exec(`CREATE TABLE IF NOT EXISTS chat_sessions (
 		id BIGSERIAL PRIMARY KEY, user_id BIGINT NOT NULL, kb_id BIGINT NOT NULL,
 		question TEXT NOT NULL, answer TEXT, sources JSONB,
 		confidence DOUBLE PRECISION DEFAULT 0, feedback SMALLINT DEFAULT 0,
 		duration_ms INT DEFAULT 0, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 	)`)
-	// 创建 chat_messages 表
 	db.Exec(`CREATE TABLE IF NOT EXISTS chat_messages (
 		id BIGSERIAL PRIMARY KEY, session_id BIGINT NOT NULL,
 		role VARCHAR(16) NOT NULL, content TEXT NOT NULL, sources JSONB,

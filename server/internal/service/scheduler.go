@@ -57,24 +57,32 @@ func (s *Scheduler) Stop() {
 // =============================================================================
 
 // runAutoCloseLoop 每小时执行一次自动关闭检查。
+//
+// 启动时立即执行一次，避免进程重启导致超期申告长期不被清理。
 func (s *Scheduler) runAutoCloseLoop(ctx context.Context) {
+	// 启动后立即执行一次，防止重启频繁时超期申告被无限推迟
+	s.doAutoClose(time.Now().Add(-7 * 24 * time.Hour))
+
 	ticker := time.NewTicker(1 * time.Hour)
 	defer ticker.Stop()
-	// TODO(service/scheduler): 启动后是否立即执行一次 AutoClose 需要明确。
-	// 当前必须等 1 小时才执行，重启频繁时可能长期不清理超期申告。
 
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			closed, err := s.RunAutoClose(time.Now().Add(-7 * 24 * time.Hour))
-			if err != nil {
-				slog.Error("自动关闭申告失败", "error", err)
-			} else if closed > 0 {
-				slog.Info("自动关闭申告完成", "count", closed)
-			}
+			s.doAutoClose(time.Now().Add(-7 * 24 * time.Hour))
 		}
+	}
+}
+
+// doAutoClose 执行一次自动关闭并记录日志。
+func (s *Scheduler) doAutoClose(olderThan time.Time) {
+	closed, err := s.RunAutoClose(olderThan)
+	if err != nil {
+		slog.Error("自动关闭申告失败", "error", err)
+	} else if closed > 0 {
+		slog.Info("自动关闭申告完成", "count", closed)
 	}
 }
 

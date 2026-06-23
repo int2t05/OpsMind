@@ -74,7 +74,7 @@ type llmConfigRepo interface {
 	ClearDefault() error
 	// WithTx 返回使用指定事务 DB 的新仓库实例。
 	// 确保事务内的多个操作共享同一数据库会话。
-	WithTx(tx *gorm.DB) llmConfigRepo
+	WithTx(tx *gorm.DB) *repository.LlmConfigRepo
 }
 
 // =============================================================================
@@ -102,11 +102,7 @@ func NewLLMConfigService(repo interface{}) *LLMConfigService {
 	case *repository.LlmConfigRepo:
 		svc.repo = r
 		svc.db = r.DB()
-	case llmConfigRepo:
-		svc.repo = r
 	default:
-		// TODO(service/llm_config): 构造函数不应 panic，建议返回 (*LLMConfigService, error)。
-		// 启动装配错误应由 main 统一记录并退出，测试也更容易断言。
 		panic("NewLLMConfigService: unsupported repo type")
 	}
 

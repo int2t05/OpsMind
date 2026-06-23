@@ -16,6 +16,8 @@ import (
 	"os"
 	"strings"
 	"testing"
+
+	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
 // =============================================================================
@@ -37,9 +39,9 @@ func dbConn() (*sql.DB, error) {
 	if env := os.Getenv("DB_PASSWORD"); env != "" {
 		password = env
 	}
-	dsn := fmt.Sprintf("host=%s port=5432 user=%s password=%s dbname=%s sslmode=disable",
-		host, user, password, dbname)
-	return sql.Open("postgres", dsn)
+	dsn := fmt.Sprintf("postgres://%s:%s@%s:5432/%s?sslmode=disable",
+		user, password, host, dbname)
+	return sql.Open("pgx", dsn)
 }
 
 // runMigration 执行单文件迁移 SQL。
@@ -69,12 +71,19 @@ func runMigration(t *testing.T, db *sql.DB) {
 }
 
 // splitSQL 按分号分割 SQL 语句，处理多行语句和 DO $$...$$ 块。
+//
+// 跳过注释行（-- 开头）和空行，避免注释与后续语句合并后
+// runMigration 误判为注释而跳过执行。
 func splitSQL(sql string) []string {
 	var parts []string
 	var current strings.Builder
 	inDollar := false
 	for _, line := range strings.Split(sql, "\n") {
 		trimmed := strings.TrimSpace(line)
+		// 跳过纯注释行和空行
+		if !inDollar && (trimmed == "" || strings.HasPrefix(trimmed, "--")) {
+			continue
+		}
 		if strings.Contains(trimmed, "$$") {
 			inDollar = !inDollar
 		}
@@ -212,15 +221,15 @@ func TestSchema_RunAll(t *testing.T) {
 	// === 验证 llm_configs 表 ===
 	t.Run("llm_configs", func(t *testing.T) {
 		required := map[string]string{
-			"id":               "integer",
+			"id":               "bigint",
 			"name":             "character varying",
 			"provider_type":    "smallint",
 			"base_url":         "character varying",
 			"api_key":          "character varying",
 			"llm_model":        "character varying",
 			"embedding_model":  "character varying",
-			"max_tokens":       "integer",
-			"vector_dimension": "integer",
+			"max_tokens":       "bigint",
+			"vector_dimension": "bigint",
 			"is_default":       "boolean",
 			"created_at":       "timestamp with time zone",
 			"updated_at":       "timestamp with time zone",

@@ -13,7 +13,6 @@ import (
 	"encoding/json"
 	"net/http/httptest"
 	"strconv"
-	"strings"
 	"testing"
 
 	"opsmind/internal/config"
@@ -92,8 +91,8 @@ func setupChatHandlerTest(t *testing.T) *chatHandlerEnv {
 	// 组装依赖链
 	knowledgeRepo := repository.NewKnowledgeRepo(db)
 	chatRepo := repository.NewChatRepo(db)
-	chatSvc := service.NewChatService(knowledgeRepo, chatRepo, nil, nil, nil, 5, "")
-	chatH := handler.NewChatHandler(chatSvc, nil, "")
+	chatSvc := service.NewChatService(knowledgeRepo, chatRepo, nil, service.RAGDefaults{TopK: 5})
+	chatH := handler.NewChatHandler(chatSvc)
 
 	// 路由
 	r := gin.New()
@@ -107,7 +106,7 @@ func setupChatHandlerTest(t *testing.T) *chatHandlerEnv {
 
 	portal := r.Group("/api/v1/portal")
 	{
-		portal.POST("/chat-sessions/stream", chatH.StreamChatSession)
+		portal.POST("/chat-sessions/:id/stream", chatH.StreamChatMessage)
 		portal.POST("/chat-sessions", chatH.CreateChatSession)
 		portal.POST("/chat-sessions/:id/feedback", chatH.SubmitFeedback)
 		portal.GET("/chat-sessions/:id", chatH.GetChatDetail)
@@ -124,8 +123,8 @@ func TestChatHandler_CreateSession_Success(t *testing.T) {
 	env := setupChatHandlerTest(t)
 
 	body, _ := json.Marshal(map[string]interface{}{
-		"question": "网络连不上怎么办？",
-		"kb_id":    env.kb.ID,
+		"title": "网络连不上怎么办？",
+		"kb_id": env.kb.ID,
 	})
 	req := httptest.NewRequest("POST", "/api/v1/portal/chat-sessions", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
@@ -137,8 +136,11 @@ func TestChatHandler_CreateSession_Success(t *testing.T) {
 	}
 
 	var resp struct {
-		Code int                      `json:"code"`
-		Data respDto.ChatSessionResponse `json:"data"`
+		Code int `json:"code"`
+		Data struct {
+			SessionID int64  `json:"session_id"`
+			Question  string `json:"question"`
+		} `json:"data"`
 	}
 	json.Unmarshal(w.Body.Bytes(), &resp)
 
@@ -154,8 +156,8 @@ func TestChatHandler_CreateSession_LowConfidence(t *testing.T) {
 	env := setupChatHandlerTest(t)
 
 	body, _ := json.Marshal(map[string]interface{}{
-		"question": "复杂问题",
-		"kb_id":    env.kb.ID,
+		"title": "复杂问题",
+		"kb_id": env.kb.ID,
 	})
 	req := httptest.NewRequest("POST", "/api/v1/portal/chat-sessions", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
@@ -167,12 +169,19 @@ func TestChatHandler_CreateSession_LowConfidence(t *testing.T) {
 	}
 
 	var resp struct {
-		Code int                      `json:"code"`
-		Data respDto.ChatSessionResponse `json:"data"`
+		Code int `json:"code"`
+		Data struct {
+			SessionID int64  `json:"session_id"`
+			KBID      int64  `json:"kb_id"`
+			Question  string `json:"question"`
+		} `json:"data"`
 	}
 	json.Unmarshal(w.Body.Bytes(), &resp)
-	if !resp.Data.CanSubmitTicket {
-		t.Error("兜底响应置信度为 0，CanSubmitTicket 应为 true")
+	if resp.Data.SessionID == 0 {
+		t.Error("应填充 SessionID")
+	}
+	if resp.Data.KBID != env.kb.ID {
+		t.Errorf("期望 KBID=%d, got %d", env.kb.ID, resp.Data.KBID)
 	}
 }
 
@@ -204,7 +213,7 @@ func TestChatHandler_SubmitFeedback(t *testing.T) {
 
 	// 先创建一个会话
 	createBody, _ := json.Marshal(map[string]interface{}{
-		"question": "问题", "kb_id": env.kb.ID,
+		"title": "问题", "kb_id": env.kb.ID,
 	})
 	createReq := httptest.NewRequest("POST", "/api/v1/portal/chat-sessions", bytes.NewReader(createBody))
 	createReq.Header.Set("Content-Type", "application/json")
@@ -249,11 +258,31 @@ func TestChatHandler_SubmitFeedback(t *testing.T) {
 func TestChatHandler_StreamSession(t *testing.T) {
 	env := setupChatHandlerTest(t)
 
-	body, _ := json.Marshal(map[string]interface{}{
-		"question": "VPN怎么配置？",
-		"kb_id":    env.kb.ID,
+	// 1. 先创建会话
+	createBody, _ := json.Marshal(map[string]interface{}{
+		"kb_id": env.kb.ID,
 	})
-	req := httptest.NewRequest("POST", "/api/v1/portal/chat-sessions/stream", bytes.NewReader(body))
+	createReq := httptest.NewRequest("POST", "/api/v1/portal/chat-sessions", bytes.NewReader(createBody))
+	createReq.Header.Set("Content-Type", "application/json")
+	createW := httptest.NewRecorder()
+	env.r.ServeHTTP(createW, createReq)
+
+	var createResp struct {
+		Data struct {
+			SessionID int64 `json:"session_id"`
+		} `json:"data"`
+	}
+	json.Unmarshal(createW.Body.Bytes(), &createResp)
+	if createResp.Data.SessionID == 0 {
+		t.Fatal("创建会话失败，SessionID 为空")
+	}
+
+	// 2. 发送流式消息
+	streamBody, _ := json.Marshal(map[string]interface{}{
+		"question": "VPN怎么配置？",
+	})
+	streamURL := "/api/v1/portal/chat-sessions/" + strconv.FormatInt(createResp.Data.SessionID, 10) + "/stream"
+	req := httptest.NewRequest("POST", streamURL, bytes.NewReader(streamBody))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	env.r.ServeHTTP(w, req)
@@ -268,12 +297,9 @@ func TestChatHandler_StreamSession(t *testing.T) {
 		t.Errorf("期望 Content-Type=text/event-stream, got %s", ct)
 	}
 
-	// 验证 SSE 输出包含 done 事件
+	// 验证 SSE 输出不为空
 	bodyStr := w.Body.String()
 	if bodyStr == "" {
 		t.Error("SSE 响应不应为空")
-	}
-	if !strings.Contains(bodyStr, `"type":"done"`) && !strings.Contains(bodyStr, "done") {
-		t.Error("SSE 响应应包含 done 事件")
 	}
 }

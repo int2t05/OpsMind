@@ -7,10 +7,13 @@ package service
 import (
 	"errors"
 	"encoding/json"
+	"log/slog"
 
 	"opsmind/internal/model"
 	"opsmind/internal/repository"
 	"opsmind/pkg/errcode"
+
+	"time"
 
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
@@ -18,20 +21,21 @@ import (
 
 // RoleService 角色管理服务。
 type RoleService struct {
-	repo     *repository.RoleRepo
-	userRepo *repository.UserRepo
-	db       *gorm.DB
+	repo      *repository.RoleRepo
+	userRepo  *repository.UserRepo
+	db        *gorm.DB
+	auditRepo *repository.AuditRepo
 }
 
 // NewRoleService 创建 RoleService 实例。
-func NewRoleService(repo *repository.RoleRepo, userRepo *repository.UserRepo, db *gorm.DB) *RoleService {
-	return &RoleService{repo: repo, userRepo: userRepo, db: db}
+func NewRoleService(repo *repository.RoleRepo, userRepo *repository.UserRepo, db *gorm.DB, auditRepo *repository.AuditRepo) *RoleService {
+	return &RoleService{repo: repo, userRepo: userRepo, db: db, auditRepo: auditRepo}
 }
 
 // Create 创建角色。
 //
 // 校验角色名唯一性，重复返回 10005。
-func (s *RoleService) Create(name, description string, permissions []string) error {
+func (s *RoleService) Create(name, description string, permissions []string, operatorID int64) error {
 	// TODO(service/role): 对 permissions 做白名单校验。
 	// 当前任意字符串都能写入角色权限，拼写错误会导致菜单/接口权限悄悄失效。
 	// 校验角色名唯一（通过 Repository 层，保证三层架构一致）
@@ -54,7 +58,11 @@ func (s *RoleService) Create(name, description string, permissions []string) err
 		Permissions: datatypes.JSON(permsJSON),
 	}
 
-	return s.repo.Create(role)
+	if err := s.repo.Create(role); err != nil {
+		return err
+	}
+	s.writeAudit(operatorID, "role:create", role.ID, name)
+	return nil
 }
 
 // GetByID 根据 ID 获取角色。
@@ -78,7 +86,7 @@ func (s *RoleService) List(page, pageSize int) ([]model.Role, int64, error) {
 //
 // 校验新名称是否与其他角色冲突（排除自身），
 // 与 Create 保持一致的唯一性约束。
-func (s *RoleService) Update(id int64, name, description string, permissions []string) error {
+func (s *RoleService) Update(id int64, name, description string, permissions []string, operatorID int64) error {
 	role, err := s.repo.GetByID(id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -105,11 +113,15 @@ func (s *RoleService) Update(id int64, name, description string, permissions []s
 	role.Description = description
 	role.Permissions = datatypes.JSON(permsJSON)
 
-	return s.repo.Update(role)
+	if err := s.repo.Update(role); err != nil {
+		return err
+	}
+	s.writeAudit(operatorID, "role:update", id, name)
+	return nil
 }
 
 // Delete 删除角色。
-func (s *RoleService) Delete(id int64) error {
+func (s *RoleService) Delete(id int64, operatorID int64) error {
 	// TODO(service/role): 禁止删除系统内置角色或最后一个系统管理员角色。
 	// 这些角色是权限体系的根，删除后可能导致系统无法管理。
 	_, err := s.repo.GetByID(id)
@@ -129,7 +141,11 @@ func (s *RoleService) Delete(id int64) error {
 		return AppError{Code: errcode.ErrConflict, Message: "角色下存在关联用户，无法删除"}
 	}
 
-	return s.repo.Delete(id)
+	if err := s.repo.Delete(id); err != nil {
+		return err
+	}
+	s.writeAudit(operatorID, "role:delete", id, "")
+	return nil
 }
 
 // ListMenus 获取全部菜单列表（树形结构）。
@@ -169,3 +185,28 @@ func (s *RoleService) UpdateRoleMenus(roleID int64, menuIDs []int64) error {
 	}
 	return s.userRepo.UpdateRoleMenus(roleID, menuIDs)
 }
+
+// writeAudit 写入一条角色审计日志，失败仅 warn 不阻断主流程。
+func (s *RoleService) writeAudit(operatorID int64, action string, targetID int64, detail string) {
+	if s.auditRepo == nil {
+		return
+	}
+	detailJSON := datatypes.JSON("{}")
+	if detail != "" {
+		if d, err := json.Marshal(map[string]string{"content": detail}); err == nil {
+			detailJSON = datatypes.JSON(d)
+		}
+	}
+	audit := &model.AuditLog{
+		OperatorID: operatorID,
+		Action:     action,
+		TargetType: "role",
+		TargetID:   targetID,
+		Detail:     detailJSON,
+		CreatedAt:  time.Now(),
+	}
+	if err := s.auditRepo.Create(audit); err != nil {
+		slog.Warn("审计日志写入失败", "action", action, "role_id", targetID, "error", err)
+	}
+}
+

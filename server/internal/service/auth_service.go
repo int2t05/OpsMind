@@ -273,6 +273,48 @@ func (s *AuthService) ChangePassword(userID int64, oldPwd, newPwd string) error 
 	return nil
 }
 
+// ResetPassword 忘记密码重置。
+//
+// 不需要旧密码，仅凭用户名即可重置密码。
+// 适用于登录页"忘记密码"流程。
+// 只允许重置启用状态（status=1）的用户密码，冻结用户不可重置。
+func (s *AuthService) ResetPassword(username, newPassword string) error {
+	user, err := s.userRepo.GetByUsername(username)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			// 不暴露用户是否存在，返回统一提示
+			slog.Warn("密码重置失败：用户不存在", "username", username)
+			return AppError{Code: 10003, Message: "用户名不存在"}
+		}
+		return fmt.Errorf("查询用户失败: %w", err)
+	}
+
+	if user.Status != 1 {
+		slog.Warn("密码重置被拒：账号已冻结", "username", username, "user_id", user.ID)
+		return AppError{Code: 10002, Message: "账号已被冻结，无法重置密码"}
+	}
+
+	if err := hash.ValidatePassword(newPassword); err != nil {
+		return AppError{Code: 10003, Message: err.Error()}
+	}
+
+	newHash, err := hash.HashPassword(newPassword)
+	if err != nil {
+		return fmt.Errorf("密码哈希失败: %w", err)
+	}
+
+	user.PasswordHash = newHash
+	user.FirstLogin = true
+	user.UpdatedAt = time.Now()
+
+	if err := s.userRepo.Update(user); err != nil {
+		return fmt.Errorf("更新密码失败: %w", err)
+	}
+
+	slog.Info("密码重置成功", "user_id", user.ID, "username", username)
+	return nil
+}
+
 // buildLoginResponse 根据用户信息组装登录响应。
 //
 // 查询用户角色、权限、菜单树，组装完整的 LoginResponse。

@@ -32,7 +32,7 @@
       </div>
 
       <!-- 状态操作 -->
-      <div class="card" v-if="ticket.status !== 4 && ticket.status !== 5">
+      <div class="card">
         <h3>状态操作</h3>
         <div class="action-bar">
           <template v-if="ticket.status === 1">
@@ -51,6 +51,11 @@
           <template v-if="ticket.status === 3">
             <button class="btn-primary" :disabled="saving" @click="doAction('resolve')">
               {{ saving ? '处理中...' : '已解决' }}
+            </button>
+          </template>
+          <template v-if="ticket.status === 4 || ticket.status === 5">
+            <button class="btn-reopen" :disabled="saving" @click="doAction('reopen')">
+              {{ saving ? '处理中...' : '重新处理' }}
             </button>
           </template>
           <textarea v-model="actionContent" class="action-textarea" placeholder="处理备注..." rows="2" />
@@ -204,6 +209,8 @@ async function handleCreateCandidate() {
 .btn-primary { padding: 8px 20px; background: var(--accent); color: #fff; border: none; border-radius: 8px; font-size: 13px; cursor: pointer; font-family: inherit; }
 .btn-primary:hover { background: var(--accent-hover); }
 .btn-warn { padding: 8px 20px; background: var(--btn-warning-bg); color: var(--btn-warning-text); border: 1px solid var(--border-default); border-radius: 8px; font-size: 13px; cursor: pointer; font-family: inherit; }
+.btn-reopen { padding: 8px 20px; background: var(--accent); color: #fff; border: none; border-radius: 8px; font-size: 13px; cursor: pointer; font-family: inherit; }
+.btn-reopen:hover { background: var(--accent-hover); }
 .action-textarea { flex-basis: 100%; padding: 10px; background: var(--bg-base); border: 1px solid var(--border-default); border-radius: 6px; color: var(--text-primary); font-size: 13px; font-family: inherit; resize: vertical; }
 .action-textarea:focus { outline: none; border-color: var(--accent); }
 .records { border-top: 1px solid var(--border-default); padding-top: 8px; }
@@ -216,6 +223,9 @@ async function handleCreateCandidate() {
 .record-action.request_info { background: var(--tag-supplement-bg); color: var(--tag-supplement-text); }
 .record-action.remark { background: var(--tag-disabled-bg); color: var(--tag-disabled-text); }
 .record-action.supplement { background: var(--tag-pending-bg); color: var(--tag-pending-text); }
+.record-action.reopen { background: var(--tag-processing-bg); color: var(--tag-processing-text); }
+.record-action.close { background: var(--tag-disabled-bg); color: var(--tag-disabled-text); }
+.record-action.auto_close { background: var(--tag-disabled-bg); color: var(--tag-disabled-text); }
 .record-time { font-size: 11px; color: var(--text-secondary); }
 .record-content { font-size: 14px; color: var(--text-primary); margin: 4px 0 0; line-height: 1.5; }
 .empty-hint { text-align: center; padding: 20px; color: var(--text-secondary); font-size: 13px; }

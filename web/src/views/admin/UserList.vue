@@ -94,7 +94,7 @@ async function fetchUsers() {
   loading.value = true
   try {
     const res = await getUserList({ page: 1, page_size: 100 }) as any
-    users.value = res?.items || res?.data?.items || res || []
+    users.value = res?.data || []
   } catch (err) { console.error('加载用户列表失败', err); toast.showToast('加载用户失败', 'error') } finally { loading.value = false }
 }
 

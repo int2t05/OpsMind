@@ -156,36 +156,23 @@ func (r *TicketRepo) ListAll(status int, urgency int, page, pageSize int) ([]mod
 
 // AutoCloseTickets 批量关闭超期申告并返回被关闭的 ticket ID 列表。
 //
-// 纯数据操作：查询待关闭的 ticket → 批量 UPDATE status=5。
+// 使用 PostgreSQL UPDATE ... RETURNING id 在单条 SQL 中原子完成关闭和 ID 收集，
+// 避免 SELECT + UPDATE 之间的竞态窗口。
 // 事务编排和 TicketRecord 创建已上移到 TicketService.AutoClose。
 func (r *TicketRepo) AutoCloseTickets(olderThan time.Time) ([]int64, error) {
-	// TODO(repository/ticket): SELECT ids + UPDATE ids 之间不是原子操作。
-	// 可使用 UPDATE ... RETURNING id 在单条 SQL 中拿到关闭的工单列表。
-	var tickets []model.Ticket
-	if err := r.db.Model(&model.Ticket{}).
-		Where("status IN ? AND created_at < ?",
-			[]int16{model.TicketStatusPending, model.TicketStatusProcessing, model.TicketStatusNeedSupplement},
-			olderThan).
-		Select("id").
-		Find(&tickets).Error; err != nil {
+	var ids []int64
+	// UPDATE ... RETURNING id：单条 SQL 原子关闭并返回被影响的工单 ID
+	err := r.db.Raw(
+		`UPDATE tickets SET status = ?, updated_at = NOW()
+		 WHERE status IN (?, ?, ?) AND created_at < ?
+		 RETURNING id`,
+		model.TicketStatusClosed,
+		model.TicketStatusPending, model.TicketStatusProcessing, model.TicketStatusNeedSupplement,
+		olderThan,
+	).Pluck("id", &ids).Error
+	if err != nil {
 		return nil, err
 	}
-
-	if len(tickets) == 0 {
-		return nil, nil
-	}
-
-	ids := make([]int64, len(tickets))
-	for i, t := range tickets {
-		ids[i] = t.ID
-	}
-
-	if err := r.db.Model(&model.Ticket{}).
-		Where("id IN ?", ids).
-		Update("status", model.TicketStatusClosed).Error; err != nil {
-		return nil, err
-	}
-
 	return ids, nil
 }
 

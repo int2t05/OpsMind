@@ -58,6 +58,12 @@ const router = createRouter({
       meta: { requiresAuth: false }
     },
     {
+      path: '/reset-password',
+      name: 'ResetPassword',
+      component: () => import('@/views/auth/ResetPassword.vue'),
+      meta: { requiresAuth: false }
+    },
+    {
       path: '/change-password',
       name: 'ChangePassword',
       component: () => import('@/views/auth/ChangePassword.vue'),
@@ -68,7 +74,7 @@ const router = createRouter({
     {
       path: '/portal',
       component: () => import('@/components/layout/PortalLayout.vue'),
-      meta: { requiresAuth: true, roles: ['reporter'] },
+      meta: { requiresAuth: true, roles: ['报障人'] },
       children: [
         {
           path: '',
@@ -106,7 +112,7 @@ const router = createRouter({
     {
       path: '/admin',
       component: () => import('@/components/layout/AdminLayout.vue'),
-      meta: { requiresAuth: true, roles: ['admin', 'operator', 'knowledge_manager'] },
+      meta: { requiresAuth: true, roles: ['系统管理员', '运维人员', '知识库管理员'] },
       children: [
         {
           path: '',

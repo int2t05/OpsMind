@@ -42,6 +42,8 @@ export function actionText(action: string): string {
     supplement: '补充信息',
     resolve: '已解决',
     close: '关闭',
+    reopen: '重新处理',
+    auto_close: '系统自动关闭',
     remark: '备注',
   }
   return map[action] || action

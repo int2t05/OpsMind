@@ -318,7 +318,7 @@ func TestKnowledgeIntegration_ListAndDetail(t *testing.T) {
 		})
 
 	req2 := httptest.NewRequest("GET",
-		fmt.Sprintf("/api/v1/admin/knowledge-bases/%d/articles?page=1&page_size=10", kbID), nil)
+		fmt.Sprintf("/api/v1/admin/knowledge-bases/%d/articles?page=1&page_size=10&status=1", kbID), nil)
 	w2 := httptest.NewRecorder()
 	env.r.ServeHTTP(w2, req2)
 

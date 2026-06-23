@@ -188,9 +188,9 @@ func main() {
 	// 6. 初始化 Service 层
 	txManager := service.NewGormTxManager(db)
 	authService := service.NewAuthService(userRepo, db, cfg.JWT)
-	userService := service.NewUserService(userRepo, db)
-	roleService := service.NewRoleService(roleRepo, userRepo, db)
-	ticketService := service.NewTicketService(ticketRepo, txManager)
+	userService := service.NewUserService(userRepo, db, auditRepo)
+	roleService := service.NewRoleService(roleRepo, userRepo, db, auditRepo)
+	ticketService := service.NewTicketService(ticketRepo, txManager, auditRepo)
 	messageService := service.NewMessageService(messageRepo)
 	dashboardService := service.NewDashboardService(dashboardRepo)
 	configService := service.NewConfigService(configRepo)

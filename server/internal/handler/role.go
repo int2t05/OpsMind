@@ -33,7 +33,8 @@ func (h *RoleHandler) Create(c *gin.Context) {
 		return
 	}
 
-	if err := h.svc.Create(req.Name, req.Description, req.Permissions); err != nil {
+	operatorID, _ := getCurrentUserID(c)
+	if err := h.svc.Create(req.Name, req.Description, req.Permissions, operatorID); err != nil {
 		handleServiceError(c, err)
 		return
 	}
@@ -95,7 +96,8 @@ func (h *RoleHandler) Update(c *gin.Context) {
 		return
 	}
 
-	if err := h.svc.Update(id, req.Name, req.Description, req.Permissions); err != nil {
+	operatorID, _ := getCurrentUserID(c)
+	if err := h.svc.Update(id, req.Name, req.Description, req.Permissions, operatorID); err != nil {
 		handleServiceError(c, err)
 		return
 	}
@@ -111,7 +113,8 @@ func (h *RoleHandler) Delete(c *gin.Context) {
 		return
 	}
 
-	if err := h.svc.Delete(id); err != nil {
+	operatorID, _ := getCurrentUserID(c)
+	if err := h.svc.Delete(id, operatorID); err != nil {
 		handleServiceError(c, err)
 		return
 	}

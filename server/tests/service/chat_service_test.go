@@ -8,6 +8,7 @@
 package service_test
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -78,7 +79,7 @@ func setupChatServiceTest(t *testing.T) (*service.ChatService, *model.KnowledgeB
 
 	knowledgeRepo := repository.NewKnowledgeRepo(chatSvcDB)
 	chatRepo := repository.NewChatRepo(chatSvcDB)
-	svc := service.NewChatService(knowledgeRepo, chatRepo, nil, nil, nil, 5, "")
+	svc := service.NewChatService(knowledgeRepo, chatRepo, nil, service.RAGDefaults{TopK: 5})
 
 	// 创建测试知识库（使用唯一 slug 避免冲突）
 	kb := &model.KnowledgeBase{
@@ -100,66 +101,62 @@ func setupChatServiceTest(t *testing.T) (*service.ChatService, *model.KnowledgeB
 // CreateChatSession
 // =============================================================================
 
-// TestChatService_CreateChatSession_Success 验证问答会话创建成功。
-func TestChatService_CreateChatSession_Success(t *testing.T) {
+// TestChatService_CreateSession_Success 验证问答会话创建成功。
+func TestChatService_CreateSession_Success(t *testing.T) {
 	svc, kb := setupChatServiceTest(t)
 
-	req := request.CreateChatRequest{
-		Question: "如何重置密码？",
-		KBID:     kb.ID,
+	req := request.CreateSessionRequest{
+		KBID: kb.ID,
 	}
 
-	resp, err := svc.CreateChatSession(req, 1)
+	session, err := svc.CreateSession(context.Background(), req, 1)
 	if err != nil {
 		t.Fatalf("期望无错误, got %v", err)
 	}
-	if resp.Answer == "" {
-		t.Error("期望非空 Answer")
+	if session.ID == 0 {
+		t.Error("应填充 Session ID")
 	}
-	if resp.Question != "如何重置密码？" {
-		t.Errorf("期望 Question 保持原值, got '%s'", resp.Question)
-	}
-	if !resp.CanSubmitTicket {
-		t.Error("CanSubmitTicket 应为 true")
-	}
-	if resp.SessionID == 0 {
-		t.Error("应填充 SessionID")
+	if session.KBID != kb.ID {
+		t.Errorf("期望 KBID=%d, got %d", kb.ID, session.KBID)
 	}
 }
 
-// TestChatService_CreateChatSession_LowConfidence 验证兜底回答场景。
-func TestChatService_CreateChatSession_LowConfidence(t *testing.T) {
+// TestChatService_CreateSession_LowConfidence 验证低置信度场景。
+func TestChatService_CreateSession_LowConfidence(t *testing.T) {
 	svc, kb := setupChatServiceTest(t)
 
-	req := request.CreateChatRequest{Question: "复杂问题", KBID: kb.ID}
-	resp, err := svc.CreateChatSession(req, 1)
+	req := request.CreateSessionRequest{KBID: kb.ID}
+	session, err := svc.CreateSession(context.Background(), req, 1)
 	if err != nil {
 		t.Fatalf("期望无错误, got %v", err)
 	}
-	if !resp.CanSubmitTicket {
-		t.Error("CanSubmitTicket 应为 true")
+	if session.ID == 0 {
+		t.Error("应填充 Session ID")
 	}
 }
 
-// TestChatService_CreateChatSession_InvalidKB 不存在的知识库应返回错误。
-func TestChatService_CreateChatSession_InvalidKB(t *testing.T) {
+// TestChatService_CreateSession_InvalidKB 不存在的知识库应返回错误。
+func TestChatService_CreateSession_InvalidKB(t *testing.T) {
 	svc, _ := setupChatServiceTest(t)
 
-	req := request.CreateChatRequest{Question: "问题", KBID: 999999}
-	_, err := svc.CreateChatSession(req, 1)
+	req := request.CreateSessionRequest{KBID: 999999}
+	_, err := svc.CreateSession(context.Background(), req, 1)
 	if err == nil {
 		t.Fatal("期望错误, got nil")
 	}
 }
 
-// TestChatService_CreateChatSession_EmptyQuestion 空问题应返回参数校验错误。
-func TestChatService_CreateChatSession_EmptyQuestion(t *testing.T) {
+// TestChatService_CreateSession_DefaultTitle 不传 Title 时使用默认标题。
+func TestChatService_CreateSession_DefaultTitle(t *testing.T) {
 	svc, kb := setupChatServiceTest(t)
 
-	req := request.CreateChatRequest{Question: "", KBID: kb.ID}
-	_, err := svc.CreateChatSession(req, 1)
-	if err == nil {
-		t.Fatal("期望错误, got nil")
+	req := request.CreateSessionRequest{KBID: kb.ID}
+	session, err := svc.CreateSession(context.Background(), req, 1)
+	if err != nil {
+		t.Fatalf("期望无错误, got %v", err)
+	}
+	if session.Question == "" {
+		t.Error("Question 不应为空（应使用默认标题）")
 	}
 }
 
@@ -172,19 +169,19 @@ func TestChatService_SubmitFeedback(t *testing.T) {
 	svc, kb := setupChatServiceTest(t)
 
 	// 先创建会话
-	resp, err := svc.CreateChatSession(request.CreateChatRequest{Question: "问题", KBID: kb.ID}, 1)
+	session, err := svc.CreateSession(context.Background(), request.CreateSessionRequest{KBID: kb.ID}, 1)
 	if err != nil {
 		t.Fatalf("创建会话失败: %v", err)
 	}
 
-	// 提交反馈
-	err = svc.SubmitFeedback(resp.SessionID, 1) // 1 = 已解决
+	// 提交反馈（1 = 已解决）
+	err = svc.SubmitFeedback(session.ID, 1, 1)
 	if err != nil {
 		t.Fatalf("期望无错误, got %v", err)
 	}
 
 	// 验证反馈已更新
-	detail, err := svc.GetChatDetail(resp.SessionID)
+	detail, err := svc.GetChatDetail(session.ID, 1)
 	if err != nil {
 		t.Fatalf("查询详情失败: %v", err)
 	}
@@ -201,7 +198,7 @@ func TestChatService_SubmitFeedback(t *testing.T) {
 func TestChatService_GetChatDetail_NotFound(t *testing.T) {
 	svc, _ := setupChatServiceTest(t)
 
-	_, err := svc.GetChatDetail(999999)
+	_, err := svc.GetChatDetail(999999, 1)
 	if err == nil {
 		t.Fatal("期望错误, got nil")
 	}

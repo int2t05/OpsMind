@@ -130,8 +130,8 @@ func setupChatIntegration(t *testing.T) *chatIntEnv {
 	// 组装依赖链（v1：RagClient 已移除，ChatService 使用占位实现）
 	knowledgeRepo := repository.NewKnowledgeRepo(db)
 	chatRepo := repository.NewChatRepo(db)
-	chatSvc := service.NewChatService(knowledgeRepo, chatRepo, nil, nil, nil, 5, "")
-	chatH := handler.NewChatHandler(chatSvc, nil, "")
+	chatSvc := service.NewChatService(knowledgeRepo, chatRepo, nil, service.RAGDefaults{TopK: 5})
+	chatH := handler.NewChatHandler(chatSvc)
 
 	// 路由（模拟认证中间件注入 user_id=1）
 	r := gin.New()
@@ -162,12 +162,12 @@ func setupChatIntegration(t *testing.T) *chatIntEnv {
 func TestChatIntegration_FullFlow(t *testing.T) {
 	env := setupChatIntegration(t)
 
-	// AI 不可用时返回兜底回答。完整的 RAG 流式问答由 SSE 端点提供。
+	// v2: CreateSession 仅创建会话容器，LLM 交互通过 SSE 流式端点完成。
 
 	// 1. 创建问答会话
 	askBody, _ := json.Marshal(map[string]interface{}{
-		"question": "网络连不上怎么办？",
-		"kb_id":    env.kb.ID,
+		"title": "网络连不上怎么办？",
+		"kb_id": env.kb.ID,
 	})
 	askReq := httptest.NewRequest("POST", "/api/v1/portal/chat-sessions",
 		bytes.NewReader(askBody))
@@ -175,24 +175,24 @@ func TestChatIntegration_FullFlow(t *testing.T) {
 	askW := httptest.NewRecorder()
 	env.r.ServeHTTP(askW, askReq)
 
-	assert.Equal(t, 200, askW.Code, "创建问答应返回 200")
+	assert.Equal(t, 200, askW.Code, "创建会话应返回 200")
 
 	var createResp struct {
-		Code int                          `json:"code"`
-		Data response.ChatSessionResponse `json:"data"`
+		Code int `json:"code"`
+		Data struct {
+			SessionID int64  `json:"session_id"`
+			KBID      int64  `json:"kb_id"`
+			Question  string `json:"question"`
+		} `json:"data"`
 	}
 	require.NoError(t, json.Unmarshal(askW.Body.Bytes(), &createResp))
 	assert.Equal(t, 0, createResp.Code)
 
 	sessionID := createResp.Data.SessionID
 	assert.NotZero(t, sessionID, "应返回 SessionID")
-	// 降级场景：统一返回兜底文本
-	assert.NotEmpty(t, createResp.Data.Answer, "应返回兜底回答")
-	assert.True(t, createResp.Data.CanSubmitTicket, "降级场景中 CanSubmitTicket 应为 true")
-	assert.Nil(t, createResp.Data.Sources, "降级场景不返回知识来源")
-	assert.GreaterOrEqual(t, createResp.Data.DurationMS, 0, "DurationMS 应 >= 0")
-	t.Logf("✅ 步骤1: 问答创建成功，answer='%s'，conf=%.2f",
-		createResp.Data.Answer, createResp.Data.Confidence)
+	assert.Equal(t, env.kb.ID, createResp.Data.KBID, "KBID 应与请求一致")
+	assert.NotEmpty(t, createResp.Data.Question, "Question 应非空")
+	t.Logf("✅ 步骤1: 会话创建成功，session_id=%d", sessionID)
 
 	// 2. 提交反馈（已解决）
 	feedbackBody, _ := json.Marshal(map[string]interface{}{"feedback": 1}) // 1=resolved
@@ -239,9 +239,10 @@ func TestChatIntegration_FullFlow(t *testing.T) {
 func TestChatIntegration_LowConfidenceToTicket(t *testing.T) {
 	env := setupChatIntegration(t)
 
+	// v2: CreateSession 仅创建容器，CanSubmitTicket 由 SSE 流式端点返回
 	body, _ := json.Marshal(map[string]interface{}{
-		"question": "非常专业的运维问题",
-		"kb_id":    env.kb.ID,
+		"title": "非常专业的运维问题",
+		"kb_id": env.kb.ID,
 	})
 	req := httptest.NewRequest("POST", "/api/v1/portal/chat-sessions", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
@@ -251,12 +252,15 @@ func TestChatIntegration_LowConfidenceToTicket(t *testing.T) {
 	assert.Equal(t, 200, w.Code)
 
 	var resp struct {
-		Data response.ChatSessionResponse `json:"data"`
+		Code int `json:"code"`
+		Data struct {
+			SessionID int64 `json:"session_id"`
+		} `json:"data"`
 	}
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
-	assert.True(t, resp.Data.CanSubmitTicket, "降级场景中 CanSubmitTicket 应为 true")
-	assert.NotEmpty(t, resp.Data.Answer, "应有兜底回答")
-	t.Logf("✅ 低置信度（confidence=0）→ CanSubmitTicket=true, 兜底回答='%s'", resp.Data.Answer)
+	assert.Equal(t, 0, resp.Code)
+	assert.NotZero(t, resp.Data.SessionID, "应返回 SessionID")
+	t.Logf("✅ 会话创建成功，session_id=%d", resp.Data.SessionID)
 }
 
 // =============================================================================
@@ -270,21 +274,20 @@ func TestChatIntegration_AIServiceUnavailable(t *testing.T) {
 	env := setupChatIntegration(t)
 
 	body, _ := json.Marshal(map[string]interface{}{
-		"question": "任何问题",
-		"kb_id":    env.kb.ID,
+		"kb_id": env.kb.ID,
 	})
 	req := httptest.NewRequest("POST", "/api/v1/portal/chat-sessions", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	env.r.ServeHTTP(w, req)
 
-	// 不调用 AI，直接返回兜底回答
+	// 会话创建不依赖 AI 服务
 	var resp struct {
 		Code int `json:"code"`
 	}
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
-	assert.Equal(t, 0, resp.Code, "降级场景应正常返回 code=0")
-	t.Logf("✅ AI 不可用降级 → code=0（不依赖外部 AI 服务）")
+	assert.Equal(t, 0, resp.Code, "会话创建应正常返回 code=0")
+	t.Logf("✅ 会话创建不依赖外部 AI 服务 → code=0")
 }
 
 // =============================================================================
@@ -295,11 +298,8 @@ func TestChatIntegration_AIServiceUnavailable(t *testing.T) {
 func TestChatIntegration_Validation(t *testing.T) {
 	env := setupChatIntegration(t)
 
-	// 场景1: 空问题
-	body, _ := json.Marshal(map[string]interface{}{
-		"question": "",
-		"kb_id":    env.kb.ID,
-	})
+	// 场景1: kb_id 缺失
+	body, _ := json.Marshal(map[string]interface{}{})
 	req := httptest.NewRequest("POST", "/api/v1/portal/chat-sessions", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
@@ -307,13 +307,12 @@ func TestChatIntegration_Validation(t *testing.T) {
 
 	var resp struct{ Code int }
 	json.Unmarshal(w.Body.Bytes(), &resp)
-	assert.NotEqual(t, 0, resp.Code, "空问题应返回错误码")
-	t.Logf("✅ 空问题被拒绝 (code=%d)", resp.Code)
+	assert.NotEqual(t, 0, resp.Code, "缺失 kb_id 应返回错误码")
+	t.Logf("✅ 缺失 kb_id 被拒绝 (code=%d)", resp.Code)
 
 	// 场景2: kb_id 不存在
 	body2, _ := json.Marshal(map[string]interface{}{
-		"question": "有效问题",
-		"kb_id":    99999,
+		"kb_id": 99999,
 	})
 	req2 := httptest.NewRequest("POST", "/api/v1/portal/chat-sessions", bytes.NewReader(body2))
 	req2.Header.Set("Content-Type", "application/json")

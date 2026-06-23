@@ -97,6 +97,26 @@ func (h *AuthHandler) ChangePassword(c *gin.Context) {
 	response.Success(c, nil)
 }
 
+// ResetPassword 处理忘记密码重置请求。
+//
+// POST /api/v1/auth/reset-password
+// 无需登录态，仅需用户名和新密码。
+func (h *AuthHandler) ResetPassword(c *gin.Context) {
+	var req request.ResetPasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, errcode.ErrParam, "参数校验失败: "+err.Error())
+		return
+	}
+
+	err := h.authService.ResetPassword(req.Username, req.NewPassword)
+	if err != nil {
+		handleServiceError(c, err)
+		return
+	}
+
+	response.Success(c, nil)
+}
+
 // Logout 处理退出登录请求。
 //
 // POST /api/v1/auth/me/logout

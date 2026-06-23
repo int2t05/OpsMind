@@ -6,7 +6,9 @@
 package service
 
 import (
+	"encoding/json"
 	"errors"
+	"log/slog"
 	"opsmind/internal/dto/request"
 	"opsmind/internal/dto/response"
 	"opsmind/internal/model"
@@ -14,18 +16,22 @@ import (
 	"opsmind/pkg/errcode"
 	"opsmind/pkg/hash"
 
+	"time"
+
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
 // UserService 用户管理服务。
 type UserService struct {
-	repo *repository.UserRepo
-	db   *gorm.DB
+	repo      *repository.UserRepo
+	db        *gorm.DB
+	auditRepo *repository.AuditRepo
 }
 
 // NewUserService 创建 UserService 实例。
-func NewUserService(repo *repository.UserRepo, db *gorm.DB) *UserService {
-	return &UserService{repo: repo, db: db}
+func NewUserService(repo *repository.UserRepo, db *gorm.DB, auditRepo *repository.AuditRepo) *UserService {
+	return &UserService{repo: repo, db: db, auditRepo: auditRepo}
 }
 
 // GetByID 根据 ID 获取用户详情（含角色列表）。
@@ -69,7 +75,7 @@ func (s *UserService) List(page, pageSize int, keyword string) (*response.UserLi
 //
 // 流程：校验用户名唯一 → 校验密码策略 → bcrypt 哈希 → 事务(创建用户 + 分配角色)。
 // 为什么包裹在事务中：若用户创建成功但角色分配失败，事务回滚保证数据一致性。
-func (s *UserService) Create(req request.CreateUserRequest) error {
+func (s *UserService) Create(req request.CreateUserRequest, operatorID int64) error {
 	// TODO(service/user): 增加 username/phone/email 的格式和空白裁剪校验。
 	// 当前只校验用户名唯一和密码强度，可能写入空格用户名或非法手机号。
 	// 校验用户名唯一
@@ -105,7 +111,7 @@ func (s *UserService) Create(req request.CreateUserRequest) error {
 	// 包裹在事务中：Create + AssignRoles 原子执行
 	// TODO(service/user): AssignRoles 内部自己再开事务，当前外层 tx + 内层 r.db.Transaction 容易形成嵌套事务。
 	// 应提供 AssignRolesTx 或让 Repository 接收当前 tx，保证事务边界清晰。
-	return s.db.Transaction(func(tx *gorm.DB) error {
+	err = s.db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(user).Error; err != nil {
 			return err
 		}
@@ -119,13 +125,18 @@ func (s *UserService) Create(req request.CreateUserRequest) error {
 
 		return nil
 	})
+	if err != nil {
+		return err
+	}
+	s.writeAudit(operatorID, "user:create", user.ID, req.Username)
+	return nil
 }
 
 // Update 更新用户基本信息。
 //
 // 仅更新 RealName/Phone/Email 和角色分配，密码修改走独立接口。
 // 包裹在事务中保证 Update + AssignRoles 原子性。
-func (s *UserService) Update(id int64, req request.UpdateUserRequest) error {
+func (s *UserService) Update(id int64, req request.UpdateUserRequest, operatorID int64) error {
 	user, err := s.repo.GetByID(id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -139,7 +150,7 @@ func (s *UserService) Update(id int64, req request.UpdateUserRequest) error {
 	user.Email = req.Email
 
 	// 包裹在事务中：Update + AssignRoles 原子执行
-	return s.db.Transaction(func(tx *gorm.DB) error {
+	err = s.db.Transaction(func(tx *gorm.DB) error {
 		// TODO(service/user): GetByID → 修改字段 → Save 存在丢失更新竞态。
 		// 并发的 ChangePassword（仅更新 password_hash 列）可能被此处的 Save（全字段覆盖）冲掉。
 		// 应改用 UpdateColumns 只写 RealName/Phone/Email 三列，避免覆盖未修改字段。
@@ -154,12 +165,17 @@ func (s *UserService) Update(id int64, req request.UpdateUserRequest) error {
 
 		return nil
 	})
+	if err != nil {
+		return err
+	}
+	s.writeAudit(operatorID, "user:update", id, req.RealName)
+	return nil
 }
 
 // Freeze 冻结用户。
 //
 // 冻结前校验当前状态：已冻结的用户不能重复冻结（返回 10006）。
-func (s *UserService) Freeze(id int64) error {
+func (s *UserService) Freeze(id int64, operatorID int64) error {
 	// TODO(service/user): 禁止冻结最后一个系统管理员。
 	// 否则误操作可能导致后台无人能恢复用户和权限。
 	user, err := s.repo.GetByID(id)
@@ -174,13 +190,17 @@ func (s *UserService) Freeze(id int64) error {
 		return AppError{Code: errcode.ErrAlreadyFrozen, Message: "用户已被冻结"}
 	}
 
-	return s.repo.UpdateStatus(id, 2)
+	if err := s.repo.UpdateStatus(id, 2); err != nil {
+		return err
+	}
+	s.writeAudit(operatorID, "user:freeze", id, "")
+	return nil
 }
 
 // Restore 恢复已冻结用户。
 //
 // 恢复前校验当前状态：正常用户不能重复恢复（返回 10007）。
-func (s *UserService) Restore(id int64) error {
+func (s *UserService) Restore(id int64, operatorID int64) error {
 	user, err := s.repo.GetByID(id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -193,7 +213,11 @@ func (s *UserService) Restore(id int64) error {
 		return AppError{Code: errcode.ErrAlreadyActive, Message: "用户已处于正常状态"}
 	}
 
-	return s.repo.UpdateStatus(id, 1)
+	if err := s.repo.UpdateStatus(id, 1); err != nil {
+		return err
+	}
+	s.writeAudit(operatorID, "user:restore", id, "")
+	return nil
 }
 
 // toDetailResponse 将 User 模型转换为 UserDetailResponse。
@@ -221,3 +245,28 @@ func (s *UserService) toDetailResponse(user *model.User) (*response.UserDetailRe
 		UpdatedAt:  user.UpdatedAt.Format("2006-01-02 15:04:05"),
 	}, nil
 }
+
+// writeAudit 写入一条用户审计日志，失败仅 warn 不阻断主流程。
+func (s *UserService) writeAudit(operatorID int64, action string, targetID int64, detail string) {
+	if s.auditRepo == nil {
+		return
+	}
+	detailJSON := datatypes.JSON("{}")
+	if detail != "" {
+		if d, err := json.Marshal(map[string]string{"content": detail}); err == nil {
+			detailJSON = datatypes.JSON(d)
+		}
+	}
+	audit := &model.AuditLog{
+		OperatorID: operatorID,
+		Action:     action,
+		TargetType: "user",
+		TargetID:   targetID,
+		Detail:     detailJSON,
+		CreatedAt:  time.Now(),
+	}
+	if err := s.auditRepo.Create(audit); err != nil {
+		slog.Warn("审计日志写入失败", "action", action, "user_id", targetID, "error", err)
+	}
+}
+

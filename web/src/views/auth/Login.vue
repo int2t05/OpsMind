@@ -32,6 +32,13 @@
           <n-alert type="error" :title="error" closable @close="error = ''" />
         </n-form-item>
         <n-form-item>
+          <div class="forgot-password">
+            <n-button text type="primary" @click="router.push('/reset-password')">
+              忘记密码？
+            </n-button>
+          </div>
+        </n-form-item>
+        <n-form-item>
           <n-button
             type="primary"
             block
@@ -136,5 +143,9 @@ const handleLogin = async () => {
 
 .error-item :deep(.n-form-item-blank) {
   width: 100%;
+}
+
+.forgot-password {
+  text-align: right;
 }
 </style>

@@ -40,11 +40,16 @@ func setupKnowledgeTestDB(t *testing.T) *gorm.DB {
 		t.Fatalf("初始化数据库失败: %v", err)
 	}
 
-	db.Exec(`CREATE TABLE IF NOT EXISTS knowledge_bases (
+	// 重建表以确保使用最新 schema（CASCADE 级联删除依赖表）
+	db.Exec(`DROP TABLE IF EXISTS knowledge_chunks CASCADE`)
+	db.Exec(`DROP TABLE IF EXISTS knowledge_articles CASCADE`)
+	db.Exec(`DROP TABLE IF EXISTS knowledge_bases CASCADE`)
+
+	db.Exec(`CREATE TABLE knowledge_bases (
 		id BIGSERIAL PRIMARY KEY,
 		name VARCHAR(128) NOT NULL,
 		description TEXT,
-		rag_workspace_slug VARCHAR(128) UNIQUE,
+		rag_workspace_slug VARCHAR(128),
 		embedding_model VARCHAR(128) NOT NULL DEFAULT '',
 		vector_dimension INTEGER NOT NULL DEFAULT 0,
 		created_by BIGINT NOT NULL DEFAULT 0,
@@ -52,8 +57,6 @@ func setupKnowledgeTestDB(t *testing.T) *gorm.DB {
 		updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 	)`)
 
-	// 重建表以确保使用最新 schema
-	db.Exec(`DROP TABLE IF EXISTS knowledge_articles CASCADE`)
 	db.Exec(`CREATE TABLE knowledge_articles (
 		id BIGSERIAL PRIMARY KEY,
 		kb_id BIGINT NOT NULL,
@@ -77,15 +80,14 @@ func setupKnowledgeTestDB(t *testing.T) *gorm.DB {
 		updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 	)`)
 
-	db.Exec(`CREATE TABLE IF NOT EXISTS knowledge_chunks (
+	db.Exec(`CREATE TABLE knowledge_chunks (
 		id BIGSERIAL PRIMARY KEY,
 		article_id BIGINT NOT NULL,
+		kb_id BIGINT NOT NULL DEFAULT 0,
 		content TEXT NOT NULL,
+		chunk_index INTEGER NOT NULL DEFAULT 0,
 		embedding_model VARCHAR(128) NOT NULL DEFAULT '',
 		vector_dimension INTEGER NOT NULL DEFAULT 0,
-		sync_status VARCHAR(16) NOT NULL DEFAULT 'pending',
-		sync_error TEXT,
-		synced_at TIMESTAMPTZ,
 		created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 	)`)
 

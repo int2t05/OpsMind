@@ -29,11 +29,12 @@ import (
 type TicketService struct {
 	repo      *repository.TicketRepo
 	txManager TxManager
+	auditRepo *repository.AuditRepo
 }
 
 // NewTicketService 创建 TicketService 实例。
-func NewTicketService(repo *repository.TicketRepo, txManager TxManager) *TicketService {
-	return &TicketService{repo: repo, txManager: txManager}
+func NewTicketService(repo *repository.TicketRepo, txManager TxManager, auditRepo *repository.AuditRepo) *TicketService {
+	return &TicketService{repo: repo, txManager: txManager, auditRepo: auditRepo}
 }
 
 // =============================================================================
@@ -150,7 +151,11 @@ func (s *TicketService) SupplementTicket(id int64, userID int64, req request.Sup
 	}
 
 	// 更新状态为处理中
-	return s.repo.UpdateStatus(id, 2)
+	if err := s.repo.UpdateStatus(id, 2); err != nil {
+		return err
+	}
+	s.writeAudit(userID, "ticket:supplement", id, req.Content)
+	return nil
 }
 
 // =============================================================================
@@ -212,9 +217,9 @@ func (s *TicketService) UpdateStatus(id int64, operatorID int64, req request.Upd
 		// 当前注释/文档说会通知，但 TicketService 构造函数未注入 MessageService，实际用户可能收不到补充提醒。
 
 	case "resolve":
-		// 仅处理中(2)可解决
-		if ticket.Status != 2 {
-			return AppError{Code: errcode.ErrParam, Message: "仅处理中状态可解决"}
+		// 处理中(2) 或 需补充信息(3) 可解决
+		if ticket.Status != 2 && ticket.Status != 3 {
+			return AppError{Code: errcode.ErrParam, Message: "仅处理中或需补充信息状态可解决"}
 		}
 		newStatus = 4
 		recordAction = "resolve"
@@ -225,6 +230,15 @@ func (s *TicketService) UpdateStatus(id int64, operatorID int64, req request.Upd
 		// 当前重复关闭会再次创建 close 记录，可能污染处理时间线。
 		newStatus = 5
 		recordAction = "close"
+
+
+		case "reopen":
+			// 已解决(4) 或 已关闭(5) 可重新打开，状态回到处理中(2)
+			if ticket.Status != 4 && ticket.Status != 5 {
+				return AppError{Code: errcode.ErrParam, Message: "仅已解决或已关闭状态可重新处理"}
+			}
+			newStatus = 2
+			recordAction = "reopen"
 
 	default:
 		return AppError{Code: errcode.ErrParam, Message: "不支持的操作类型: " + req.Action}
@@ -253,6 +267,7 @@ func (s *TicketService) UpdateStatus(id int64, operatorID int64, req request.Upd
 	}
 	slog.Info("申告状态变更", "ticket_id", id, "action", recordAction,
 		"from", ticket.Status, "to", newStatus, "operator", operatorID)
+	s.writeAudit(operatorID, "ticket:"+recordAction, id, req.Result)
 	return nil
 }
 
@@ -287,7 +302,11 @@ func (s *TicketService) AddRecord(id int64, operatorID int64, req request.Create
 		Content:    req.Content,
 		Detail:     detailJSON,
 	}
-	return s.repo.CreateRecord(record)
+	if err := s.repo.CreateRecord(record); err != nil {
+		return err
+	}
+	s.writeAudit(operatorID, "ticket:"+req.Action, id, req.Content)
+	return nil
 }
 
 // =============================================================================
@@ -469,5 +488,32 @@ func (s *TicketService) AutoClose(olderThan time.Time) (int64, error) {
 		return 0, err
 	}
 
+	slog.Info("自动关闭申告审计完成", "count", len(ids))
 	return int64(len(ids)), nil
 }
+
+// writeAudit 写入一条申告审计日志，失败仅 warn 不阻断主流程。
+func (s *TicketService) writeAudit(operatorID int64, action string, targetID int64, detail string) {
+	if s.auditRepo == nil {
+		return
+	}
+	// detail 须为合法 JSON，否则 PostgreSQL JSONB 列写入失败
+	detailJSON := datatypes.JSON("{}")
+	if detail != "" {
+		if d, err := json.Marshal(map[string]string{"content": detail}); err == nil {
+			detailJSON = datatypes.JSON(d)
+		}
+	}
+	audit := &model.AuditLog{
+		OperatorID: operatorID,
+		Action:     action,
+		TargetType: "ticket",
+		TargetID:   targetID,
+		Detail:     detailJSON,
+		CreatedAt:  time.Now(),
+	}
+	if err := s.auditRepo.Create(audit); err != nil {
+		slog.Warn("审计日志写入失败", "action", action, "ticket_id", targetID, "error", err)
+	}
+}
+
