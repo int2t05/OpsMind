@@ -22,6 +22,14 @@ type ChatSession struct {
 
 func (ChatSession) TableName() string { return "chat_sessions" }
 
+// 消息生成状态：generating 表示后台仍在生成（刷新后据此续传），
+// completed/failed 为终态。默认 completed 兼容历史数据。
+const (
+	MessageStatusGenerating = "generating"
+	MessageStatusCompleted  = "completed"
+	MessageStatusFailed     = "failed"
+)
+
 // ChatMessage 对话消息表
 type ChatMessage struct {
 	ID              int64          `gorm:"primaryKey;autoIncrement" json:"id"`
@@ -31,6 +39,7 @@ type ChatMessage struct {
 	Sources         datatypes.JSON `gorm:"type:jsonb" json:"sources"`
 	PipelineMetrics datatypes.JSON `gorm:"type:jsonb" json:"pipeline_metrics"` // RAG 管道各步骤耗时（JSONB）
 	Confidence      float64        `json:"confidence"`
+	Status          string         `gorm:"type:varchar(16);not null;default:completed" json:"status"` // generating|completed|failed
 	CreatedAt       time.Time      `gorm:"not null" json:"created_at"`
 }
 
